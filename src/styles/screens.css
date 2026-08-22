@@ -1,0 +1,426 @@
+/* ============================================================
+   Home Screen
+   ============================================================ */
+.screen-home {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 80px);
+  padding: 32px 16px;
+}
+
+.home-card {
+  text-align: center;
+  max-width: 520px;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 56px 40px;
+  box-shadow: var(--shadow-lg);
+}
+
+.home-logo {
+  font-size: 4rem;
+  margin-bottom: 16px;
+}
+
+.home-title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  margin-bottom: 8px;
+  text-shadow: var(--glow-accent);
+}
+
+.home-subtitle {
+  font-size: 1.0625rem;
+  color: var(--text-muted);
+  margin-bottom: 40px;
+}
+
+.home-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ============================================================
+   Setup Screen
+   ============================================================ */
+.screen-setup {
+  max-width: 580px;
+  margin: 0 auto;
+}
+
+.screen-setup .phase-header {
+  margin-bottom: 32px;
+}
+
+/* ============================================================
+   Check-in Screen
+   ============================================================ */
+.screen-checkin {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.checkin-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+}
+
+.checkin-score-section {
+  margin-bottom: 24px;
+}
+
+.checkin-results {
+  margin-top: 32px;
+}
+
+.checkin-comments {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.checkin-comment-item {
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+/* ============================================================
+   Treasures Screen
+   ============================================================ */
+.screen-treasures {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.treasure-columns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 700px) {
+  .treasure-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.treasure-column-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.treasure-add-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.treasure-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ============================================================
+   Monsters Screen
+   ============================================================ */
+.screen-monsters {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.monsters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.monster-card {
+  cursor: pointer;
+  position: relative;
+}
+
+.monster-card.selected-monster {
+  border-color: var(--accent);
+  box-shadow: var(--glow-accent);
+}
+
+.monster-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* ============================================================
+   Combat Screen
+   ============================================================ */
+.screen-combat {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.combat-monster-banner {
+  background: linear-gradient(135deg, var(--surface-2), var(--surface));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.combat-monster-icon {
+  font-size: 2.5rem;
+  flex-shrink: 0;
+}
+
+.solutions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.solution-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+}
+
+.solution-text {
+  flex: 1;
+  font-size: 0.9375rem;
+}
+
+.vote-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 100px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+
+.vote-btn:hover {
+  border-color: var(--success);
+  color: var(--success);
+  background: var(--success-dim);
+}
+
+/* ============================================================
+   Missions Screen
+   ============================================================ */
+.screen-missions {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.missions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mission-card {
+  position: relative;
+}
+
+.mission-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mission-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mission-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ============================================================
+   Complete Screen
+   ============================================================ */
+.screen-complete {
+  max-width: 680px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.complete-hero {
+  padding: 40px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  margin-bottom: 24px;
+}
+
+.complete-xp-total {
+  font-size: 3.5rem;
+  font-weight: 800;
+  color: var(--accent);
+  text-shadow: var(--glow-accent);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  text-align: center;
+}
+
+.stat-card-value {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.stat-card-label {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+/* ============================================================
+   Report Screen
+   ============================================================ */
+.screen-report {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.report-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+
+#report-content {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 40px;
+}
+
+.report-header {
+  text-align: center;
+  margin-bottom: 40px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.report-title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.report-section {
+  margin-bottom: 32px;
+}
+
+.report-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.report-item {
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+  font-size: 0.9375rem;
+  color: var(--text);
+}
+
+/* ============================================================
+   Phase Header (common)
+   ============================================================ */
+.phase-header {
+  margin-bottom: 28px;
+}
+
+.phase-header-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.phase-icon {
+  font-size: 2rem;
+}
+
+.phase-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.phase-description {
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+}
+
+.phase-nav {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 32px;
+}
