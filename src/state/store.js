@@ -40,6 +40,7 @@ import {
   increment,
 } from '../services/firebase.js';
 import { getDeviceId } from '../services/presence.js';
+import { showErrorToast } from '../components/xpToast.js';
 
 const STORAGE_KEY = 'jornada_sprint_session';
 const ROLE_KEY    = '_jornada_role';
@@ -155,9 +156,10 @@ function setScalarState(scalars) {
       role: _r,
       ..._firestoreScalars
     } = _state;
-    saveSession(_sessionId, _firestoreScalars).catch((e) =>
-      console.warn('Firestore scalar write failed:', e)
-    );
+    saveSession(_sessionId, _firestoreScalars).catch((e) => {
+      console.warn('Firestore scalar write failed:', e);
+      showErrorToast('Falha ao salvar — verifique sua conexão.');
+    });
   }
 
   notify();
@@ -262,18 +264,20 @@ export function addXP(amount) {
 
 export function addCheckin(checkin) {
   if (!_sessionId) return;
-  saveItem(_sessionId, 'checkins', checkin).catch((e) =>
-    console.warn('Firestore addCheckin failed:', e)
-  );
+  saveItem(_sessionId, 'checkins', checkin).catch((e) => {
+    console.warn('Firestore addCheckin failed:', e);
+    showErrorToast('Check-in não foi salvo — verifique sua conexão.');
+  });
 }
 
 // ── Treasures ─────────────────────────────────────────────────────────────────
 
 export function addTreasure(treasure) {
   if (!_sessionId) return;
-  saveItem(_sessionId, 'treasures', treasure).catch((e) =>
-    console.warn('Firestore addTreasure failed:', e)
-  );
+  saveItem(_sessionId, 'treasures', treasure).catch((e) => {
+    console.warn('Firestore addTreasure failed:', e);
+    showErrorToast('Tesouro não foi salvo — verifique sua conexão.');
+  });
 }
 
 export function reactToTreasure(id, reaction) {
@@ -287,9 +291,10 @@ export function reactToTreasure(id, reaction) {
 
 export function addMonster(monster) {
   if (!_sessionId) return;
-  saveItem(_sessionId, 'monsters', monster).catch((e) =>
-    console.warn('Firestore addMonster failed:', e)
-  );
+  saveItem(_sessionId, 'monsters', monster).catch((e) => {
+    console.warn('Firestore addMonster failed:', e);
+    showErrorToast('Monstro não foi salvo — verifique sua conexão.');
+  });
 }
 
 export function reactToMonster(id, reaction) {
@@ -323,9 +328,10 @@ export function prioritizeMonsters() {
 
 export function addSolution(solution) {
   if (!_sessionId) return;
-  saveItem(_sessionId, 'solutions', solution).catch((e) =>
-    console.warn('Firestore addSolution failed:', e)
-  );
+  saveItem(_sessionId, 'solutions', solution).catch((e) => {
+    console.warn('Firestore addSolution failed:', e);
+    showErrorToast('Solução não foi salva — verifique sua conexão.');
+  });
 }
 
 export function voteSolution(id) {
@@ -339,16 +345,18 @@ export function voteSolution(id) {
 
 export function addMission(mission) {
   if (!_sessionId) return;
-  saveItem(_sessionId, 'missions', mission).catch((e) =>
-    console.warn('Firestore addMission failed:', e)
-  );
+  saveItem(_sessionId, 'missions', mission).catch((e) => {
+    console.warn('Firestore addMission failed:', e);
+    showErrorToast('Missão não foi salva — verifique sua conexão.');
+  });
 }
 
 export function removeMission(id) {
   if (!_sessionId) return;
-  removeItem(_sessionId, 'missions', id).catch((e) =>
-    console.warn('Firestore removeMission failed:', e)
-  );
+  removeItem(_sessionId, 'missions', id).catch((e) => {
+    console.warn('Firestore removeMission failed:', e);
+    showErrorToast('Falha ao remover missão — verifique sua conexão.');
+  });
 }
 
 // ── Reset ─────────────────────────────────────────────────────────────────────

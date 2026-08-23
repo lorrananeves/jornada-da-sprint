@@ -306,6 +306,44 @@
 }
 
 /* ============================================================
+   Error Toast
+   ============================================================ */
+.error-toast {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  background: var(--surface);
+  border: 1px solid rgba(248, 81, 73, 0.6);
+  border-radius: var(--radius-lg);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(248, 81, 73, 0.12), var(--shadow-lg);
+  z-index: 900;
+  pointer-events: none;
+  max-width: 360px;
+}
+
+/* Empurra para baixo se um XP toast estiver visível ao mesmo tempo */
+.xp-toast ~ .error-toast,
+.error-toast:not(:first-child) {
+  top: 140px;
+}
+
+.error-toast-icon {
+  font-size: 1.125rem;
+  flex-shrink: 0;
+}
+
+.error-toast-enter {
+  animation: slideInRight 0.35s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+/* ============================================================
    Navbar
    ============================================================ */
 .navbar {
