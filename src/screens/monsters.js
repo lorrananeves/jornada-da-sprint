@@ -37,7 +37,7 @@ function buildMonsterCard(m) {
     </div>
     <div class="monster-card-actions">
       ${REACTIONS.map((r) => `
-        <button class="reaction-btn" data-id="${escapeHTML(m.id)}" data-reaction="${r.key}" title="${r.title}">
+        <button class="reaction-btn" aria-label="${r.title} (${r.label})" data-id="${escapeHTML(m.id)}" data-reaction="${r.key}" title="${r.title}">
           ${r.label} <span class="reaction-count">${m.reactions[r.key] || 0}</span>
         </button>
       `).join('')}

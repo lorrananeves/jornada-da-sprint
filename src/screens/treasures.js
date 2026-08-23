@@ -16,9 +16,9 @@ const CATEGORIES = [
 ];
 
 const REACTIONS = [
-  { key: 'heart',  label: '❤️' },
-  { key: 'thumbs', label: '👍' },
-  { key: 'bulb',   label: '💡' },
+  { key: 'heart',  label: '❤️', title: 'Amei' },
+  { key: 'thumbs', label: '👍', title: 'Concordo' },
+  { key: 'bulb',   label: '💡', title: 'Inspirador' },
 ];
 
 function buildColumn(cat, treasures) {
@@ -59,7 +59,7 @@ function buildColumn(cat, treasures) {
       </div>
       <div class="card-reactions">
         ${REACTIONS.map((r) => `
-          <button class="reaction-btn" data-id="${escapeHTML(item.id)}" data-reaction="${r.key}">
+          <button class="reaction-btn" aria-label="${r.title} (${r.label})" data-id="${escapeHTML(item.id)}" data-reaction="${r.key}">
             ${r.label} <span class="reaction-count">${item.reactions[r.key] || 0}</span>
           </button>
         `).join('')}

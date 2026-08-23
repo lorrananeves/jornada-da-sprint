@@ -46,7 +46,7 @@ export function createCard({
         ${reactions
           .map(
             (r) => `
-          <button class="reaction-btn" data-reaction="${r.key}" title="${r.label}">
+          <button class="reaction-btn" aria-label="${r.label}" data-reaction="${r.key}" title="${r.label}">
             ${r.label} <span class="reaction-count">${r.count}</span>
           </button>
         `
