@@ -171,9 +171,11 @@ async function initFirebase() {
   _sessionId = getOrCreateSessionId();
 
   // 1. Carrega doc raiz
+  let sessionExists = false;
   try {
     const remote = await loadSession(_sessionId);
     if (remote) {
+      sessionExists = true;
       _state = { ..._state, ...remote };
       if (!getRole()) _state.currentPhase = 'roleSelect';
     } else if (_state.sprint?.name) {
@@ -183,45 +185,72 @@ async function initFirebase() {
         ..._scalars
       } = _state;
       await saveSession(_sessionId, _scalars);
+      sessionExists = true;
     }
+    // Se não há sessão remota nem dados locais, o usuário está na tela home —
+    // não há documento no Firestore ainda, portanto não abrimos subscriptions.
   } catch (e) {
     console.warn('Could not load session root from Firestore:', e);
   }
 
-  // 2. Carrega subcoleções inicialmente
-  try {
-    const [checkins, treasures, monsters, solutions, missions] = await Promise.all(
-      COLLECTIONS.map((col) => loadCollection(_sessionId, col))
-    );
-    _state = { ..._state, checkins, treasures, monsters, solutions, missions };
-  } catch (e) {
-    console.warn('Could not load subcollections from Firestore:', e);
+  // 2. Carrega e assina subcoleções apenas quando o documento raiz existe.
+  //    Sem isso, os onSnapshot disparariam imediatamente com permission-denied
+  //    porque as regras bloqueiam leituras em sessions/{id}/* sem doc raiz.
+  if (sessionExists) {
+    try {
+      const [checkins, treasures, monsters, solutions, missions] = await Promise.all(
+        COLLECTIONS.map((col) => loadCollection(_sessionId, col))
+      );
+      _state = { ..._state, checkins, treasures, monsters, solutions, missions };
+    } catch (e) {
+      console.warn('Could not load subcollections from Firestore:', e);
+    }
   }
 
   saveToStorage(_state);
   notify();
 
   // 3. Subscription ao doc raiz (fases, sprint, time…)
+  //    Sempre abrimos — permite detectar quando o SM cria a sessão remotamente.
   _unsubs.push(
     subscribeSession(_sessionId, (remoteScalars) => {
       // Ignora se não há timestamp ou se não é mais recente
       if (remoteScalars.updatedAt && remoteScalars.updatedAt <= _state.updatedAt) return;
+
+      const wasExisting = sessionExists;
+      sessionExists = true;
       _state = { ..._state, ...remoteScalars };
       delete _state.role;
       saveToStorage(_state);
       notify();
+
+      // 4. Se as subscriptions de subcoleção ainda não foram abertas
+      //    (sessão criada remotamente após o carregamento inicial), abre agora.
+      if (!wasExisting) {
+        for (const col of COLLECTIONS) {
+          _unsubs.push(
+            subscribeCollection(_sessionId, col, (items) => {
+              _state = { ..._state, [col]: items };
+              saveToStorage(_state);
+              notify();
+            })
+          );
+        }
+      }
     })
   );
 
-  // 4. Subscriptions às subcoleções
-  for (const col of COLLECTIONS) {
-    _unsubs.push(
-      subscribeCollection(_sessionId, col, (items) => {
-        _state = { ..._state, [col]: items };
-        saveToStorage(_state);
-        notify();
-      })
-    );
+  // 4. Subscriptions às subcoleções — só se a sessão já existia ao carregar
+  if (sessionExists) {
+    for (const col of COLLECTIONS) {
+      _unsubs.push(
+        subscribeCollection(_sessionId, col, (items) => {
+          _state = { ..._state, [col]: items };
+          saveToStorage(_state);
+          notify();
+        })
+      );
+    }
   }
 }
 
