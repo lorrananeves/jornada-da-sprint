@@ -5,6 +5,7 @@
 import { getState, setPhase, completePhase } from '../state/store.js';
 import { calcSummaryStats, getMoodLabel } from '../services/stats.js';
 import { formatXP } from '../utils/format.js';
+import { escapeHTML } from '../utils/dom.js';
 
 export function renderComplete(root) {
   const state = getState();
@@ -17,8 +18,8 @@ export function renderComplete(root) {
         <div style="font-size:4rem;margin-bottom:12px">🏆</div>
         <h2 style="color:var(--accent);margin-bottom:6px">Jornada Concluída!</h2>
         <p class="text-muted" style="margin-bottom:20px">
-          ${state.sprint.name ? `Sprint: <strong style="color:var(--text)">${state.sprint.name}</strong>` : 'Retrospectiva finalizada'}
-          ${state.team.name ? ` · Time: <strong style="color:var(--text)">${state.team.name}</strong>` : ''}
+          ${state.sprint.name ? `Sprint: <strong style="color:var(--text)">${escapeHTML(state.sprint.name)}</strong>` : 'Retrospectiva finalizada'}
+          ${state.team.name ? ` · Time: <strong style="color:var(--text)">${escapeHTML(state.team.name)}</strong>` : ''}
         </p>
         <div class="complete-xp-total">${formatXP(stats.totalXP)}</div>
         <p class="text-muted" style="margin-top:4px">XP total conquistado pela equipe</p>
@@ -66,8 +67,8 @@ export function renderComplete(root) {
             <div style="padding:10px 14px;background:var(--surface-2);border-radius:var(--radius);margin-bottom:8px;display:flex;align-items:center;gap:10px">
               <span style="font-size:1.25rem">🚀</span>
               <div>
-                <div style="font-weight:600">${m.title}</div>
-                ${m.owner ? `<div style="font-size:0.8125rem;color:var(--text-muted)">👤 ${m.owner}</div>` : ''}
+                <div style="font-weight:600">${escapeHTML(m.title)}</div>
+                ${m.owner ? `<div style="font-size:0.8125rem;color:var(--text-muted)">👤 ${escapeHTML(m.owner)}</div>` : ''}
               </div>
             </div>
           `).join('')}

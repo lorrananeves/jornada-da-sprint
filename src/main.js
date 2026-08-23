@@ -2,7 +2,7 @@
  * Main Entry Point — Router
  */
 
-import { getState, subscribe } from './state/store.js';
+import { getState, subscribe, setPhase, isSM } from './state/store.js';
 import { initNavbar } from './components/navbar.js';
 import { renderHome } from './screens/home.js';
 import { renderRoleSelect } from './screens/roleSelect.js';
@@ -30,11 +30,23 @@ const SCREENS = {
   report:     renderReport,
 };
 
+// Fases que fazem parte da retrospectiva ativa — entram no histórico do browser.
+// Fases pré-retro (home, roleSelect, setup, lobby) são locais/transitórias e
+// não devem criar entradas de histórico: navegar "para trás" nelas via browser
+// tiraria o usuário do fluxo sem nenhum benefício.
+const HISTORY_PHASES = new Set([
+  'checkin', 'treasures', 'monsters', 'combat', 'missions', 'complete', 'report',
+]);
+
 function getScreenRoot() {
   return document.getElementById('screen-root');
 }
 
 let _currentPhase = null;
+// Flag que distingue navegação iniciada pelo popstate de navegação normal.
+// Sem ela, popstate → setPhase → subscribe → navigate → pushState criaria
+// uma entrada duplicada no histórico a cada botão "voltar".
+let _fromPopstate = false;
 
 function navigate(phase) {
   if (phase === _currentPhase) return;
@@ -49,9 +61,14 @@ function navigate(phase) {
     return;
   }
 
-  // Scroll to top on phase change
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  // Gerencia o histórico do browser apenas para o SM e apenas para fases da retro.
+  // Membros do time não empurram entradas: a fase deles muda via Firestore/subscribe,
+  // não por interação direta, então pushState deles criaria entradas duplicadas.
+  if (!_fromPopstate && isSM() && HISTORY_PHASES.has(phase)) {
+    history.pushState({ phase }, '', window.location.href.split('?')[0] + window.location.search);
+  }
 
+  window.scrollTo({ top: 0, behavior: 'smooth' });
   renderer(root);
 }
 
@@ -60,11 +77,25 @@ function navigate(phase) {
 try {
   initNavbar();
 
+  // Garante que o estado inicial do histórico tem a fase gravada,
+  // para que o popstate do primeiro "voltar" saiba para onde ir.
   const initialState = getState();
-  navigate(initialState.currentPhase || 'home');
+  const initialPhase = initialState.currentPhase || 'home';
+  history.replaceState({ phase: initialPhase }, '', window.location.href);
+
+  navigate(initialPhase);
 
   subscribe((state) => {
     navigate(state.currentPhase);
+  });
+
+  // Botão "voltar/avançar" do browser
+  window.addEventListener('popstate', (e) => {
+    const phase = e.state?.phase;
+    if (!phase || !SCREENS[phase]) return;
+    _fromPopstate = true;
+    setPhase(phase); // setPhase já verifica isSM() internamente
+    _fromPopstate = false;
   });
 } catch (err) {
   renderConfigError(err);
