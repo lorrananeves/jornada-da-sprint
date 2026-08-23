@@ -4,7 +4,7 @@
 
 import {
   getState, addMonster, reactToMonster, selectMonster, prioritizeMonsters,
-  addXP, setPhase, completePhase,
+  addXP, setPhase, completePhase, isSM,
 } from '../state/store.js';
 import { xpForMonster } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
@@ -95,9 +95,9 @@ export function renderMonsters(root) {
 
         <div class="phase-nav">
           <button class="btn btn-ghost" id="btn-back">← Voltar</button>
-          <button class="btn btn-primary" id="btn-next" ${selectedCount > 0 ? '' : 'disabled'}>
-            🛡️ IR PARA COMBATE →
-          </button>
+          ${isSM()
+            ? `<button class="btn btn-primary" id="btn-next" ${selectedCount > 0 ? '' : 'disabled'}>🛡️ IR PARA COMBATE →</button>`
+            : `<span class="text-muted" style="font-size:0.875rem">Aguardando o Scrum Master avançar…</span>`}
         </div>
       </div>
     `;
@@ -163,7 +163,7 @@ export function renderMonsters(root) {
     });
 
     root.querySelector('#btn-back').addEventListener('click', () => setPhase('treasures'));
-    root.querySelector('#btn-next').addEventListener('click', () => {
+    root.querySelector('#btn-next')?.addEventListener('click', () => {
       completePhase('monsters');
       setPhase('combat');
     });

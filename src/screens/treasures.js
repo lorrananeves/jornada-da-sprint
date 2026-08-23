@@ -3,7 +3,7 @@
  */
 
 import {
-  getState, addTreasure, reactToTreasure, addXP, setPhase, completePhase,
+  getState, addTreasure, reactToTreasure, addXP, setPhase, completePhase, isSM,
 } from '../state/store.js';
 import { xpForTreasure } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
@@ -88,7 +88,7 @@ export function renderTreasures(root) {
         <div class="treasure-columns" id="treasure-cols"></div>
         <div class="phase-nav">
           <button class="btn btn-ghost" id="btn-back">← Voltar</button>
-          <button class="btn btn-primary" id="btn-next">👹 PRÓXIMA FASE →</button>
+          ${isSM() ? `<button class="btn btn-primary" id="btn-next">👹 PRÓXIMA FASE →</button>` : `<span class="text-muted" style="font-size:0.875rem">Aguardando o Scrum Master avançar…</span>`}
         </div>
       </div>
     `;
@@ -131,7 +131,7 @@ export function renderTreasures(root) {
     });
 
     root.querySelector('#btn-back').addEventListener('click', () => setPhase('checkin'));
-    root.querySelector('#btn-next').addEventListener('click', () => {
+    root.querySelector('#btn-next')?.addEventListener('click', () => {
       completePhase('treasures');
       setPhase('monsters');
     });

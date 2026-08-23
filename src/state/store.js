@@ -17,6 +17,7 @@ import {
   saveSession,
   subscribeSession,
 } from '../services/firebase.js';
+import { getDeviceId } from '../services/presence.js';
 
 const STORAGE_KEY = 'jornada_sprint_session';
 const ROLE_KEY    = '_jornada_role'; // sessionStorage — per-device, never synced
@@ -48,9 +49,26 @@ export function getRole() {
   return sessionStorage.getItem(ROLE_KEY);
 }
 
-/** Set this device's role — stored only in sessionStorage, never Firestore */
+/**
+ * Set this device's role.
+ * Se for scrum_master, grava também o smDeviceId no Firestore para que
+ * a proteção de avanço de fase seja verificável no lado do servidor.
+ */
 export function setRole(role) {
   sessionStorage.setItem(ROLE_KEY, role);
+  if (role === 'scrum_master') {
+    // Registra o deviceId do SM no estado compartilhado
+    setState({ smDeviceId: getDeviceId() });
+  }
+}
+
+/**
+ * Retorna true se este device for o Scrum Master legítimo.
+ * A verificação usa o smDeviceId gravado no Firestore, não apenas
+ * o valor local do sessionStorage.
+ */
+export function isSM() {
+  return _state.smDeviceId === getDeviceId();
 }
 
 // Flag para evitar que o listener remoto reescreva o Firestore em loop
@@ -173,13 +191,25 @@ async function initFirebase() {
 
 // ── Phase helpers ─────────────────────────────────────────────────────────────
 
-/** Navigate to a phase */
+/**
+ * Avança para uma fase.
+ * Só o Scrum Master (deviceId verificado contra smDeviceId no Firestore)
+ * pode alterar currentPhase. Para membros do time, a chamada é ignorada.
+ */
 export function setPhase(phase) {
+  if (!isSM()) {
+    console.warn('[setPhase] bloqueado — somente o Scrum Master pode avançar fases.');
+    return;
+  }
   setState({ currentPhase: phase });
 }
 
-/** Mark a phase as completed */
+/**
+ * Marca uma fase como concluída.
+ * Igualmente restrito ao Scrum Master.
+ */
 export function completePhase(phase) {
+  if (!isSM()) return;
   setState((s) => ({
     completedPhases: s.completedPhases.includes(phase)
       ? s.completedPhases

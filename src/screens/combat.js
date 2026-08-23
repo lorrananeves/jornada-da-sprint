@@ -3,7 +3,7 @@
  */
 
 import {
-  getState, setState, addSolution, voteSolution, addXP, setPhase, completePhase,
+  getState, setState, addSolution, voteSolution, addXP, setPhase, completePhase, isSM,
 } from '../state/store.js';
 import { xpForSolution } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
@@ -122,7 +122,7 @@ export function renderCombat(root) {
 
         <div class="phase-nav">
           <button class="btn btn-ghost" id="btn-back">← Voltar</button>
-          <button class="btn btn-primary" id="btn-next">🚀 PRÓXIMA FASE →</button>
+          ${isSM() ? `<button class="btn btn-primary" id="btn-next">🚀 PRÓXIMA FASE →</button>` : `<span class="text-muted" style="font-size:0.875rem">Aguardando o Scrum Master avançar…</span>`}
         </div>
       </div>
     `;
@@ -190,7 +190,7 @@ export function renderCombat(root) {
     if (nextMonBtn) nextMonBtn.addEventListener('click', () => { currentMonsterIdx++; render(); });
 
     root.querySelector('#btn-back').addEventListener('click', () => setPhase('monsters'));
-    root.querySelector('#btn-next').addEventListener('click', () => {
+    root.querySelector('#btn-next')?.addEventListener('click', () => {
       completePhase('combat');
       setPhase('missions');
     });

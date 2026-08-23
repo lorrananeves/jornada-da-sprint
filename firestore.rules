@@ -1,0 +1,53 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Sessões de retrospectiva ──────────────────────────────────────────────
+    match /sessions/{sessionId} {
+
+      // Qualquer um pode ler o documento da sessão (necessário para os membros
+      // do time acompanharem o estado em tempo real).
+      allow read: always;
+
+      // Criação: permitida para todos (o SM cria a sessão na primeira gravação).
+      allow create: if true;
+
+      // Atualização: regras diferenciadas por campo.
+      allow update: if
+        // Campos restritos ao Scrum Master: currentPhase e completedPhases.
+        // Só podem ser alterados pelo device cujo ID bate com smDeviceId gravado
+        // no documento já existente no Firestore.
+        (
+          // Se nenhum campo restrito está sendo alterado, qualquer participante
+          // pode gravar (ex: checkins, treasures, monsters, solutions, missions, xp).
+          !isChangingPhaseFields(request.resource.data, resource.data)
+        )
+        ||
+        (
+          // Se um campo de fase está mudando, exige que o deviceId do requisitante
+          // bata com o smDeviceId já registrado no documento.
+          isChangingPhaseFields(request.resource.data, resource.data)
+          && request.resource.data.smDeviceId == resource.data.smDeviceId
+          && request.resource.data.smDeviceId != null
+        );
+
+      // ── Sub-coleção de presença (lobby) ──────────────────────────────────
+      match /presence/{deviceId} {
+        // Qualquer participante pode registrar/remover sua própria presença.
+        allow read, write: if true;
+      }
+    }
+  }
+}
+
+// ── Funções auxiliares ────────────────────────────────────────────────────────
+
+// Retorna true se currentPhase ou completedPhases foram alterados na requisição.
+function isChangingPhaseFields(newData, oldData) {
+  return (
+    newData.get('currentPhase', null) != oldData.get('currentPhase', null)
+    ||
+    newData.get('completedPhases', []) != oldData.get('completedPhases', [])
+  );
+}

@@ -25,7 +25,7 @@ function getDb() {
 }
 
 /** A stable per-device random ID stored in sessionStorage */
-function getDeviceId() {
+export function getDeviceId() {
   let id = sessionStorage.getItem('_jornada_device');
   if (!id) {
     id = Math.random().toString(16).slice(2, 14);

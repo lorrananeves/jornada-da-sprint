@@ -3,7 +3,7 @@
  */
 
 import {
-  getState, addMission, removeMission, addXP, setPhase, completePhase, setState,
+  getState, addMission, removeMission, addXP, setPhase, completePhase, setState, isSM,
 } from '../state/store.js';
 import { xpForMission } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
@@ -133,7 +133,7 @@ export function renderMissions(root) {
 
         <div class="phase-nav">
           <button class="btn btn-ghost" id="btn-back">← Voltar</button>
-          <button class="btn btn-primary" id="btn-next">🏆 CONCLUIR JORNADA →</button>
+          ${isSM() ? `<button class="btn btn-primary" id="btn-next">🏆 CONCLUIR JORNADA →</button>` : `<span class="text-muted" style="font-size:0.875rem">Aguardando o Scrum Master avançar…</span>`}
         </div>
       </div>
     `;
@@ -187,7 +187,7 @@ export function renderMissions(root) {
     });
 
     root.querySelector('#btn-back').addEventListener('click', () => setPhase('combat'));
-    root.querySelector('#btn-next').addEventListener('click', () => {
+    root.querySelector('#btn-next')?.addEventListener('click', () => {
       completePhase('missions');
       setPhase('complete');
     });
