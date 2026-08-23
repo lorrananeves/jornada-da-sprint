@@ -1,78 +1,94 @@
 /**
  * Central State Store
  *
- * – localStorage  : fallback / cache local por device
- * – Firestore     : fonte de verdade compartilhada entre todos os devices
+ * Arquitetura de persistência:
+ *
+ *   Documento raiz  sessions/{id}
+ *     sprint, team, currentPhase, retroStarted, xp,
+ *     smDeviceId, completedPhases, createdAt, updatedAt
+ *
+ *   Subcoleções (um documento por item — sem race condition)
+ *     sessions/{id}/checkins/{itemId}
+ *     sessions/{id}/treasures/{itemId}
+ *     sessions/{id}/monsters/{itemId}
+ *     sessions/{id}/solutions/{itemId}
+ *     sessions/{id}/missions/{itemId}
  *
  * Fluxo:
- *   1. Ao iniciar, carrega do localStorage para evitar flash em branco.
- *   2. Conecta ao Firestore e substitui o estado pelo documento remoto.
- *   3. Qualquer setState() persiste no Firestore (e no localStorage).
- *   4. O listener em tempo real propaga mudanças feitas por outros devices.
+ *   1. Carrega localStorage para evitar flash em branco.
+ *   2. Conecta ao Firestore: carrega doc raiz + todas as subcoleções.
+ *   3. Subscriptions em tempo real: doc raiz (fases) + cada subcoleção.
+ *   4. Writes:
+ *      - Campos escalares  → saveSession() (setDoc merge, só campos raiz)
+ *      - XP               → incrementXP() (FieldValue.increment, atômico)
+ *      - Adicionar item    → saveItem()    (setDoc no documento do item)
+ *      - Atualizar item    → patchItem()   (updateDoc parcial)
+ *      - Remover item      → removeItem()  (deleteDoc)
  */
 
 import {
   getOrCreateSessionId,
   loadSession,
+  loadCollection,
   saveSession,
+  incrementXP,
+  saveItem,
+  patchItem,
+  removeItem,
   subscribeSession,
+  subscribeCollection,
+  increment,
 } from '../services/firebase.js';
 import { getDeviceId } from '../services/presence.js';
 
 const STORAGE_KEY = 'jornada_sprint_session';
-const ROLE_KEY    = '_jornada_role'; // sessionStorage — per-device, never synced
+const ROLE_KEY    = '_jornada_role';
+
+// Nomes das subcoleções
+const COLLECTIONS = ['checkins', 'treasures', 'monsters', 'solutions', 'missions'];
 
 const DEFAULT_STATE = () => ({
-  sprint: { name: '', startDate: '', endDate: '' },
-  team: { name: '', participantCount: '' },
-  currentPhase: 'home',
-  retroStarted: false,  // true once SM presses "Iniciar Retrospectiva"
-  xp: 0,
-  checkins: [],
-  treasures: [],
-  monsters: [],
-  solutions: [],
-  missions: [],
-  completedPhases: [],
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
+  // ── doc raiz ──
+  sprint:           { name: '', startDate: '', endDate: '' },
+  team:             { name: '', participantCount: '' },
+  currentPhase:     'home',
+  retroStarted:     false,
+  xp:               0,
+  smDeviceId:       null,
+  completedPhases:  [],
+  createdAt:        new Date().toISOString(),
+  updatedAt:        new Date().toISOString(),
+  // ── subcoleções (mantidas em memória como arrays) ──
+  checkins:   [],
+  treasures:  [],
+  monsters:   [],
+  solutions:  [],
+  missions:   [],
 });
 
 let _state     = DEFAULT_STATE();
 let _sessionId = null;
 let _listeners = new Set();
 
+// Unsubs das subscriptions em tempo real (doc raiz + cada subcoleção)
+const _unsubs = [];
+
 // ── Role (per-device, sessionStorage only) ────────────────────────────────────
 
-/** Get this device's role ('scrum_master' | 'team_member' | null) */
 export function getRole() {
   return sessionStorage.getItem(ROLE_KEY);
 }
 
-/**
- * Set this device's role.
- * Se for scrum_master, grava também o smDeviceId no Firestore para que
- * a proteção de avanço de fase seja verificável no lado do servidor.
- */
 export function setRole(role) {
   sessionStorage.setItem(ROLE_KEY, role);
   if (role === 'scrum_master') {
-    // Registra o deviceId do SM no estado compartilhado
-    setState({ smDeviceId: getDeviceId() });
+    setScalarState({ smDeviceId: getDeviceId() });
   }
 }
 
-/**
- * Retorna true se este device for o Scrum Master legítimo.
- * A verificação usa o smDeviceId gravado no Firestore, não apenas
- * o valor local do sessionStorage.
- */
 export function isSM() {
   return _state.smDeviceId === getDeviceId();
 }
-
-// Flag para evitar que o listener remoto reescreva o Firestore em loop
-let _remoteUpdate = false;
 
 // ── localStorage (cache local) ────────────────────────────────────────────────
 
@@ -101,43 +117,46 @@ function notify() {
   }
 }
 
-/** Subscribe to state changes. Returns unsubscribe function. */
 export function subscribe(listener) {
   _listeners.add(listener);
   return () => _listeners.delete(listener);
 }
 
-/** Get current state snapshot (shallow copy) */
 export function getState() {
   return { ..._state };
 }
 
-/** Check if a saved session exists (local or remote via URL param) */
 export function hasSavedSession() {
   const params = new URLSearchParams(window.location.search);
   return params.has('s') || !!localStorage.getItem(STORAGE_KEY);
 }
 
-// ── Core setState ─────────────────────────────────────────────────────────────
+// ── Campos escalares do doc raiz ─────────────────────────────────────────────
 
 /**
- * Set state with partial update. Persists to Firestore + localStorage + notifies.
+ * Atualiza apenas campos escalares (doc raiz).
+ * Nunca manda arrays — esses são gerenciados pelas funções de coleção abaixo.
  */
 export function setState(partial) {
-  if (typeof partial === 'function') {
-    _state = { ..._state, ...partial(_state) };
-  } else {
-    _state = { ..._state, ...partial };
-  }
-  _state.updatedAt = new Date().toISOString();
+  const resolved = typeof partial === 'function' ? partial(_state) : partial;
+  // Filtra para não reescrever subcoleções acidentalmente
+  const { checkins: _c, treasures: _t, monsters: _m, solutions: _s, missions: _mi, ...scalars } = resolved;
+  setScalarState(scalars);
+}
 
+function setScalarState(scalars) {
+  _state = { ..._state, ...scalars, updatedAt: new Date().toISOString() };
   saveToStorage(_state);
 
   if (_sessionId) {
-    // Never persist the local role to Firestore — it's per-device
-    const { role: _ignored, ...firestoreState } = _state;
-    saveSession(_sessionId, firestoreState).catch((e) =>
-      console.warn('Firestore write failed:', e)
+    // Extrai apenas os campos do doc raiz (sem arrays nem role local)
+    const {
+      checkins: _c, treasures: _t, monsters: _m, solutions: _s, missions: _mi,
+      role: _r,
+      ..._firestoreScalars
+    } = _state;
+    saveSession(_sessionId, _firestoreScalars).catch((e) =>
+      console.warn('Firestore scalar write failed:', e)
     );
   }
 
@@ -149,154 +168,191 @@ export function setState(partial) {
 async function initFirebase() {
   _sessionId = getOrCreateSessionId();
 
-  // 1. Tenta carregar o estado já existente no Firestore
+  // 1. Carrega doc raiz
   try {
     const remote = await loadSession(_sessionId);
     if (remote) {
-      _state = { ...DEFAULT_STATE(), ...remote };
-
-      // If this device hasn't chosen a role yet, send to role selection
-      // (handles team members entering via shared link)
-      if (!getRole()) {
-        _state.currentPhase = 'roleSelect';
-      }
-
-      saveToStorage(_state);
-      notify();
+      _state = { ..._state, ...remote };
+      if (!getRole()) _state.currentPhase = 'roleSelect';
     } else if (_state.sprint?.name) {
-      // Sessão nova mas localStorage tem dados — faz upload inicial
-      await saveSession(_sessionId, _state);
+      // Sessão nova com dados no localStorage — faz upload inicial dos escalares
+      const {
+        checkins: _c, treasures: _t, monsters: _m, solutions: _s, missions: _mi,
+        ..._scalars
+      } = _state;
+      await saveSession(_sessionId, _scalars);
     }
   } catch (e) {
-    console.warn('Could not load session from Firestore:', e);
+    console.warn('Could not load session root from Firestore:', e);
   }
 
-  // 2. Escuta mudanças em tempo real (outros devices)
-  subscribeSession(_sessionId, (remoteState) => {
-    // Ignora se o update veio de nós mesmos (evita loop)
-    if (_remoteUpdate) return;
+  // 2. Carrega subcoleções inicialmente
+  try {
+    const [checkins, treasures, monsters, solutions, missions] = await Promise.all(
+      COLLECTIONS.map((col) => loadCollection(_sessionId, col))
+    );
+    _state = { ..._state, checkins, treasures, monsters, solutions, missions };
+  } catch (e) {
+    console.warn('Could not load subcollections from Firestore:', e);
+  }
 
-    // Só aplica se o estado remoto for mais recente
-    if (remoteState.updatedAt && remoteState.updatedAt <= _state.updatedAt) return;
+  saveToStorage(_state);
+  notify();
 
-    _remoteUpdate = true;
-    _state = { ...DEFAULT_STATE(), ...remoteState };
-    // role is per-device only — never apply it from remote
-    delete _state.role;
-    saveToStorage(_state);
-    notify();
-    _remoteUpdate = false;
-  });
+  // 3. Subscription ao doc raiz (fases, sprint, time…)
+  _unsubs.push(
+    subscribeSession(_sessionId, (remoteScalars) => {
+      // Ignora se não há timestamp ou se não é mais recente
+      if (remoteScalars.updatedAt && remoteScalars.updatedAt <= _state.updatedAt) return;
+      _state = { ..._state, ...remoteScalars };
+      delete _state.role;
+      saveToStorage(_state);
+      notify();
+    })
+  );
+
+  // 4. Subscriptions às subcoleções
+  for (const col of COLLECTIONS) {
+    _unsubs.push(
+      subscribeCollection(_sessionId, col, (items) => {
+        _state = { ..._state, [col]: items };
+        saveToStorage(_state);
+        notify();
+      })
+    );
+  }
 }
 
 // ── Phase helpers ─────────────────────────────────────────────────────────────
 
-/**
- * Avança para uma fase.
- * Só o Scrum Master (deviceId verificado contra smDeviceId no Firestore)
- * pode alterar currentPhase. Para membros do time, a chamada é ignorada.
- */
 export function setPhase(phase) {
   if (!isSM()) {
     console.warn('[setPhase] bloqueado — somente o Scrum Master pode avançar fases.');
     return;
   }
-  setState({ currentPhase: phase });
+  setScalarState({ currentPhase: phase });
 }
 
-/**
- * Marca uma fase como concluída.
- * Igualmente restrito ao Scrum Master.
- */
 export function completePhase(phase) {
   if (!isSM()) return;
-  setState((s) => ({
-    completedPhases: s.completedPhases.includes(phase)
-      ? s.completedPhases
-      : [...s.completedPhases, phase],
-  }));
+  const completedPhases = _state.completedPhases.includes(phase)
+    ? _state.completedPhases
+    : [..._state.completedPhases, phase];
+  setScalarState({ completedPhases });
 }
 
-/** Add XP */
+// ── XP (incremento atômico) ───────────────────────────────────────────────────
+
 export function addXP(amount) {
-  setState((s) => ({ xp: s.xp + amount }));
+  // Otimismo local imediato
+  _state = { ..._state, xp: _state.xp + amount };
+  saveToStorage(_state);
+  notify();
+
+  // Atomic increment no Firestore — sem race condition
+  if (_sessionId) {
+    incrementXP(_sessionId, amount).catch((e) =>
+      console.warn('Firestore XP increment failed:', e)
+    );
+  }
   return amount;
 }
 
-/* ---- Checkins ---- */
+// ── Checkins ──────────────────────────────────────────────────────────────────
+
 export function addCheckin(checkin) {
-  setState((s) => ({ checkins: [...s.checkins, checkin] }));
+  if (!_sessionId) return;
+  saveItem(_sessionId, 'checkins', checkin).catch((e) =>
+    console.warn('Firestore addCheckin failed:', e)
+  );
 }
 
-/* ---- Treasures ---- */
+// ── Treasures ─────────────────────────────────────────────────────────────────
+
 export function addTreasure(treasure) {
-  setState((s) => ({ treasures: [...s.treasures, treasure] }));
+  if (!_sessionId) return;
+  saveItem(_sessionId, 'treasures', treasure).catch((e) =>
+    console.warn('Firestore addTreasure failed:', e)
+  );
 }
 
 export function reactToTreasure(id, reaction) {
-  setState((s) => ({
-    treasures: s.treasures.map((t) =>
-      t.id === id
-        ? { ...t, reactions: { ...t.reactions, [reaction]: (t.reactions[reaction] || 0) + 1 } }
-        : t
-    ),
-  }));
+  if (!_sessionId) return;
+  patchItem(_sessionId, 'treasures', id, {
+    [`reactions.${reaction}`]: increment(1),
+  }).catch((e) => console.warn('Firestore reactToTreasure failed:', e));
 }
 
-/* ---- Monsters ---- */
+// ── Monsters ──────────────────────────────────────────────────────────────────
+
 export function addMonster(monster) {
-  setState((s) => ({ monsters: [...s.monsters, monster] }));
+  if (!_sessionId) return;
+  saveItem(_sessionId, 'monsters', monster).catch((e) =>
+    console.warn('Firestore addMonster failed:', e)
+  );
 }
 
 export function reactToMonster(id, reaction) {
-  setState((s) => ({
-    monsters: s.monsters.map((m) =>
-      m.id === id
-        ? { ...m, reactions: { ...m.reactions, [reaction]: (m.reactions[reaction] || 0) + 1 } }
-        : m
-    ),
-  }));
+  if (!_sessionId) return;
+  patchItem(_sessionId, 'monsters', id, {
+    [`reactions.${reaction}`]: increment(1),
+  }).catch((e) => console.warn('Firestore reactToMonster failed:', e));
 }
 
 export function selectMonster(id) {
-  setState((s) => ({
-    monsters: s.monsters.map((m) =>
-      m.id === id ? { ...m, selected: !m.selected } : m
-    ),
-  }));
+  if (!_sessionId) return;
+  const monster = _state.monsters.find((m) => m.id === id);
+  if (!monster) return;
+  patchItem(_sessionId, 'monsters', id, { selected: !monster.selected }).catch((e) =>
+    console.warn('Firestore selectMonster failed:', e)
+  );
 }
 
 export function prioritizeMonsters() {
-  setState((s) => ({
-    monsters: [...s.monsters].sort(
-      (a, b) => (b.reactions.fire || 0) - (a.reactions.fire || 0)
+  // Reordenação é apenas local/visual — não há campo de ordem no Firestore
+  _state = {
+    ..._state,
+    monsters: [..._state.monsters].sort(
+      (a, b) => (b.reactions?.fire || 0) - (a.reactions?.fire || 0)
     ),
-  }));
+  };
+  notify();
 }
 
-/* ---- Solutions ---- */
+// ── Solutions ─────────────────────────────────────────────────────────────────
+
 export function addSolution(solution) {
-  setState((s) => ({ solutions: [...s.solutions, solution] }));
+  if (!_sessionId) return;
+  saveItem(_sessionId, 'solutions', solution).catch((e) =>
+    console.warn('Firestore addSolution failed:', e)
+  );
 }
 
 export function voteSolution(id) {
-  setState((s) => ({
-    solutions: s.solutions.map((sol) =>
-      sol.id === id ? { ...sol, votes: (sol.votes || 0) + 1 } : sol
-    ),
-  }));
+  if (!_sessionId) return;
+  patchItem(_sessionId, 'solutions', id, {
+    votes: increment(1),
+  }).catch((e) => console.warn('Firestore voteSolution failed:', e));
 }
 
-/* ---- Missions ---- */
+// ── Missions ──────────────────────────────────────────────────────────────────
+
 export function addMission(mission) {
-  setState((s) => ({ missions: [...s.missions, mission] }));
+  if (!_sessionId) return;
+  saveItem(_sessionId, 'missions', mission).catch((e) =>
+    console.warn('Firestore addMission failed:', e)
+  );
 }
 
 export function removeMission(id) {
-  setState((s) => ({ missions: s.missions.filter((m) => m.id !== id) }));
+  if (!_sessionId) return;
+  removeItem(_sessionId, 'missions', id).catch((e) =>
+    console.warn('Firestore removeMission failed:', e)
+  );
 }
 
-/* ---- Reset ---- */
+// ── Reset ─────────────────────────────────────────────────────────────────────
+
 export function resetState() {
   _state = DEFAULT_STATE();
   localStorage.removeItem(STORAGE_KEY);
@@ -305,8 +361,5 @@ export function resetState() {
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
-// 1. Carrega cache local imediatamente (evita tela em branco)
 loadFromStorage();
-
-// 2. Conecta ao Firebase em background
 initFirebase();

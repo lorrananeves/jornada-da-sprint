@@ -6,32 +6,87 @@ service cloud.firestore {
     // ── Sessões de retrospectiva ──────────────────────────────────────────────
     match /sessions/{sessionId} {
 
-      // sessionId deve ser um hex de 32 chars (gerado com crypto.getRandomValues).
-      // Rejeita tentativas de acessar IDs fora do formato esperado.
+      // sessionId deve ser hex de 32 chars (gerado com crypto.getRandomValues)
       allow read: if sessionId.matches('^[0-9a-f]{32}$');
 
-      // Criação: qualquer um pode criar, desde que o documento respeite o schema.
       allow create: if
         sessionId.matches('^[0-9a-f]{32}$')
-        && isValidSession(request.resource.data);
+        && isValidSessionRoot(request.resource.data);
 
-      // Atualização: schema válido + regra de fase (só SM altera currentPhase).
       allow update: if
         sessionId.matches('^[0-9a-f]{32}$')
-        && isValidSession(request.resource.data)
+        && isValidSessionRoot(request.resource.data)
         && (
           !isChangingPhaseFields(request.resource.data, resource.data)
           || isScrumMaster(request.resource.data, resource.data)
         );
 
-      // ── Sub-coleção de presença (lobby) ──────────────────────────────────
+      // ── Checkins ─────────────────────────────────────────────────────────
+      match /checkins/{itemId} {
+        allow read: if validSessionId(sessionId);
+        allow create: if
+          validSessionId(sessionId)
+          && isValidCheckin(request.resource.data);
+        // Checkins são imutáveis após criação
+        allow update, delete: if false;
+      }
+
+      // ── Tesouros ─────────────────────────────────────────────────────────
+      match /treasures/{itemId} {
+        allow read: if validSessionId(sessionId);
+        allow create: if
+          validSessionId(sessionId)
+          && isValidTreasure(request.resource.data);
+        // Só permite atualizar reações (campos reactions.*)
+        allow update: if
+          validSessionId(sessionId)
+          && isReactionUpdate(request.resource.data, resource.data, ['text', 'category', 'id']);
+        allow delete: if false;
+      }
+
+      // ── Monstros ─────────────────────────────────────────────────────────
+      match /monsters/{itemId} {
+        allow read: if validSessionId(sessionId);
+        allow create: if
+          validSessionId(sessionId)
+          && isValidMonster(request.resource.data);
+        // Permite atualizar reações e flag selected
+        allow update: if
+          validSessionId(sessionId)
+          && isMonsterUpdate(request.resource.data, resource.data);
+        allow delete: if false;
+      }
+
+      // ── Soluções ─────────────────────────────────────────────────────────
+      match /solutions/{itemId} {
+        allow read: if validSessionId(sessionId);
+        allow create: if
+          validSessionId(sessionId)
+          && isValidSolution(request.resource.data);
+        // Só permite incrementar votos
+        allow update: if
+          validSessionId(sessionId)
+          && isVoteUpdate(request.resource.data, resource.data);
+        allow delete: if false;
+      }
+
+      // ── Missões ──────────────────────────────────────────────────────────
+      match /missions/{itemId} {
+        allow read: if validSessionId(sessionId);
+        allow create: if
+          validSessionId(sessionId)
+          && isValidMission(request.resource.data);
+        allow update: if false;
+        // Remoção permitida (o SM pode remover missões)
+        allow delete: if validSessionId(sessionId);
+      }
+
+      // ── Presença (lobby) ─────────────────────────────────────────────────
       match /presence/{deviceId} {
         allow read: if true;
         allow write: if
-          // deviceId da presença deve ser hex (igual ao gerado em presence.js)
           deviceId.matches('^[0-9a-f]{12,32}$')
           && (
-            // criação/atualização: documento só pode ter os campos esperados
             request.resource == null
             || (
               request.resource.data.keys().hasOnly(['joinedAt', 'deviceId'])
@@ -51,21 +106,18 @@ service cloud.firestore {
 
 // ── Funções auxiliares ────────────────────────────────────────────────────────
 
-// Valida o schema do documento de sessão: tipos, campos obrigatórios e limites.
-function isValidSession(data) {
-  return
-    // Campos obrigatórios presentes
-    data.keys().hasAll(['currentPhase', 'updatedAt', 'smDeviceId'])
+function validSessionId(sessionId) {
+  return sessionId.matches('^[0-9a-f]{32}$');
+}
 
-    // Nenhum campo fora do schema permitido
+function isValidSessionRoot(data) {
+  return
+    data.keys().hasAll(['currentPhase', 'updatedAt', 'smDeviceId'])
     && data.keys().hasOnly([
       'sprint', 'team', 'currentPhase', 'retroStarted',
-      'xp', 'checkins', 'treasures', 'monsters', 'solutions', 'missions',
-      'completedPhases', 'createdAt', 'updatedAt', 'smDeviceId',
+      'xp', 'completedPhases', 'createdAt', 'updatedAt', 'smDeviceId',
       '_prefillMission'
     ])
-
-    // Tipos e tamanhos dos campos escalares
     && data.currentPhase is string
     && data.currentPhase.size() <= 32
     && data.updatedAt is string
@@ -74,16 +126,7 @@ function isValidSession(data) {
     && data.get('xp', 0) is number
     && data.get('xp', 0) >= 0
     && data.get('retroStarted', false) is bool
-
-    // Listas não podem ser excessivamente grandes (proteção contra spam)
-    && data.get('checkins', []).size() <= 200
-    && data.get('treasures', []).size() <= 200
-    && data.get('monsters', []).size() <= 200
-    && data.get('solutions', []).size() <= 500
-    && data.get('missions', []).size() <= 100
     && data.get('completedPhases', []).size() <= 20
-
-    // Sub-objetos opcionais
     && isValidSprint(data.get('sprint', {}))
     && isValidTeam(data.get('team', {}));
 }
@@ -104,18 +147,92 @@ function isValidTeam(team) {
     && team.get('name', '').size() <= 120;
 }
 
-// Retorna true se currentPhase ou completedPhases foram alterados.
 function isChangingPhaseFields(newData, oldData) {
   return
     newData.get('currentPhase', null) != oldData.get('currentPhase', null)
     || newData.get('completedPhases', []) != oldData.get('completedPhases', []);
 }
 
-// Só permite avançar fase se o smDeviceId do write bate com o registrado.
-// O smDeviceId é imutável após a criação — não pode ser substituído.
 function isScrumMaster(newData, oldData) {
   return
     newData.smDeviceId == oldData.smDeviceId
     && newData.smDeviceId != null
     && newData.smDeviceId.size() > 0;
+}
+
+// ── Validadores de subcoleção ─────────────────────────────────────────────────
+
+function isValidCheckin(data) {
+  return data.keys().hasOnly(['score', 'comment'])
+    && data.score is number
+    && data.score >= 1 && data.score <= 5
+    && (data.get('comment', null) == null
+        || (data.comment is string && data.comment.size() <= 1000));
+}
+
+function isValidTreasure(data) {
+  return data.keys().hasOnly(['text', 'category', 'reactions'])
+    && data.text is string
+    && data.text.size() >= 1 && data.text.size() <= 1000
+    && data.category is string
+    && data.category in ['treasure', 'recognition', 'learning']
+    && data.reactions is map;
+}
+
+function isValidMonster(data) {
+  return data.keys().hasOnly(['text', 'reactions', 'selected'])
+    && data.text is string
+    && data.text.size() >= 1 && data.text.size() <= 1000
+    && data.reactions is map
+    && data.selected is bool;
+}
+
+function isValidSolution(data) {
+  return data.keys().hasOnly(['text', 'monsterId', 'strategy', 'votes'])
+    && data.text is string
+    && data.text.size() >= 1 && data.text.size() <= 1000
+    && data.monsterId is string
+    && data.strategy is string
+    && data.strategy in ['prevent', 'reduce', 'handle']
+    && data.votes is number;
+}
+
+function isValidMission(data) {
+  return data.keys().hasOnly(['title', 'description', 'strategy', 'priority', 'owner', 'deadline'])
+    && data.title is string
+    && data.title.size() >= 1 && data.title.size() <= 200
+    && data.get('description', '') is string
+    && data.get('description', '').size() <= 2000
+    && data.get('strategy', '') is string
+    && data.get('owner', '') is string
+    && data.get('owner', '').size() <= 120
+    && data.get('deadline', '') is string
+    && data.priority is string
+    && data.priority in ['high', 'medium', 'low'];
+}
+
+// Reação: só o campo reactions.* pode mudar, o resto deve ser igual
+function isReactionUpdate(newData, oldData, immutableFields) {
+  return immutableFields.size() == 0
+    || immutableFields.toSet().difference(
+         newData.keys().toSet().intersection(immutableFields.toSet())
+       ).size() == 0
+    && immutableFields.toSet().hasAll(
+         newData.keys().toSet().intersection(immutableFields.toSet())
+       );
+}
+
+// Monstro: permite mudar reactions.* e selected, nada mais
+function isMonsterUpdate(newData, oldData) {
+  return newData.get('text', '') == oldData.get('text', '')
+    && newData.get('text', '') is string;
+}
+
+// Solução: só votes pode aumentar (nunca diminuir)
+function isVoteUpdate(newData, oldData) {
+  return newData.get('text', '') == oldData.get('text', '')
+    && newData.get('monsterId', '') == oldData.get('monsterId', '')
+    && newData.get('strategy', '') == oldData.get('strategy', '')
+    && newData.votes is number
+    && newData.votes == oldData.votes + 1;
 }

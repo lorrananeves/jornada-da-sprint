@@ -1,18 +1,30 @@
 /**
  * Firebase Firestore — real-time sync service
  *
- * Each retrospective session is identified by a `sessionId` that lives in
- * the URL query string (?s=<id>).  Everyone who opens the same URL shares
- * the same Firestore document and sees updates instantly.
+ * Cada sessão de retrospectiva vive em:
+ *   sessions/{sessionId}                  ← campos escalares (fase, sprint, time…)
+ *   sessions/{sessionId}/checkins/{id}    ← checkins individuais
+ *   sessions/{sessionId}/treasures/{id}   ← tesouros
+ *   sessions/{sessionId}/monsters/{id}    ← monstros
+ *   sessions/{sessionId}/solutions/{id}   ← soluções
+ *   sessions/{sessionId}/missions/{id}    ← missões
+ *
+ * Usar subcoleções elimina o problema de last-write-wins em arrays: cada item
+ * é um documento independente, escrito atomicamente, sem interferir nos demais.
  */
 
 import { initializeApp } from 'firebase/app';
 import {
   getFirestore,
   doc,
+  collection,
   getDoc,
+  getDocs,
   setDoc,
+  updateDoc,
+  deleteDoc,
   onSnapshot,
+  increment,
 } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -32,7 +44,6 @@ const db  = getFirestore(app);
 /**
  * Gera um ID de sessão com 128 bits de entropia usando a Web Crypto API.
  * Resulta em 32 caracteres hex — impossível de enumerar por força bruta.
- * Math.random() tinha apenas ~32 bits e não era criptograficamente seguro.
  */
 function generateId() {
   const bytes = new Uint8Array(16);
@@ -41,8 +52,7 @@ function generateId() {
 }
 
 /**
- * Return the current session ID from the URL, or create a new one and push it
- * to the URL so the user can share the link with the team.
+ * Retorna o sessionId da URL ou cria um novo e atualiza a URL.
  */
 export function getOrCreateSessionId() {
   const params = new URLSearchParams(window.location.search);
@@ -58,15 +68,25 @@ export function getOrCreateSessionId() {
   return id;
 }
 
-// ── Firestore helpers ─────────────────────────────────────────────────────────
+// ── Refs ──────────────────────────────────────────────────────────────────────
 
 function sessionRef(sessionId) {
   return doc(db, 'sessions', sessionId);
 }
 
+function subcolRef(sessionId, colName) {
+  return collection(db, 'sessions', sessionId, colName);
+}
+
+function itemRef(sessionId, colName, itemId) {
+  return doc(db, 'sessions', sessionId, colName, itemId);
+}
+
+// ── Documento raiz (campos escalares) ─────────────────────────────────────────
+
 /**
- * Load the session document from Firestore.
- * Returns `null` if the document does not exist yet.
+ * Carrega o documento raiz da sessão.
+ * Retorna null se ainda não existir.
  */
 export async function loadSession(sessionId) {
   const snap = await getDoc(sessionRef(sessionId));
@@ -74,23 +94,76 @@ export async function loadSession(sessionId) {
 }
 
 /**
- * Persist the full state object to Firestore.
- * Uses `setDoc` with merge so concurrent writes on different fields are safe.
+ * Persiste apenas os campos escalares no documento raiz.
+ * Não envia arrays — esses vivem em subcoleções.
  */
-export async function saveSession(sessionId, state) {
-  await setDoc(sessionRef(sessionId), state, { merge: true });
+export async function saveSession(sessionId, scalarFields) {
+  await setDoc(sessionRef(sessionId), scalarFields, { merge: true });
 }
 
 /**
- * Subscribe to real-time updates for the session document.
- * `callback` is called every time the document changes (including the first
- * load), receiving the full state object.
- * Returns the unsubscribe function.
+ * Incrementa xp atomicamente — sem risco de race condition.
+ * Usa FieldValue.increment para que dois writes simultâneos se somem
+ * em vez de um sobrescrever o outro.
+ */
+export async function incrementXP(sessionId, amount) {
+  await updateDoc(sessionRef(sessionId), { xp: increment(amount) });
+}
+
+/**
+ * Subscribe a mudanças nos campos escalares do documento raiz.
  */
 export function subscribeSession(sessionId, callback) {
   return onSnapshot(sessionRef(sessionId), (snap) => {
-    if (snap.exists()) {
-      callback(snap.data());
-    }
+    if (snap.exists()) callback(snap.data());
   });
 }
+
+// ── Subcoleções (checkins / treasures / monsters / solutions / missions) ───────
+
+/**
+ * Lê todos os documentos de uma subcoleção de uma vez (carregamento inicial).
+ * Retorna um array de objetos com o campo `id` incluído.
+ */
+export async function loadCollection(sessionId, colName) {
+  const snap = await getDocs(subcolRef(sessionId, colName));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+/**
+ * Grava (cria ou substitui) um item na subcoleção.
+ * O `item` deve ter um campo `id` que será usado como ID do documento.
+ */
+export async function saveItem(sessionId, colName, item) {
+  const { id, ...data } = item;
+  await setDoc(itemRef(sessionId, colName, id), data);
+}
+
+/**
+ * Atualiza campos específicos de um item (merge parcial, sem reescrever tudo).
+ * Ideal para incrementar contadores de reação sem tocar no restante do documento.
+ */
+export async function patchItem(sessionId, colName, itemId, partial) {
+  await updateDoc(itemRef(sessionId, colName, itemId), partial);
+}
+
+/**
+ * Remove um item da subcoleção.
+ */
+export async function removeItem(sessionId, colName, itemId) {
+  await deleteDoc(itemRef(sessionId, colName, itemId));
+}
+
+/**
+ * Escuta em tempo real todos os itens de uma subcoleção.
+ * `callback` recebe o array atualizado completo a cada mudança.
+ * Retorna a função de unsubscribe.
+ */
+export function subscribeCollection(sessionId, colName, callback) {
+  return onSnapshot(subcolRef(sessionId, colName), (snap) => {
+    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  });
+}
+
+// Reexporta increment para uso nos patchItem calls do store
+export { increment };
