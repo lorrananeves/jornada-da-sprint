@@ -1,6 +1,22 @@
 /**
- * Central State Store with LocalStorage persistence
+ * Central State Store
+ *
+ * – localStorage  : fallback / cache local por device
+ * – Firestore     : fonte de verdade compartilhada entre todos os devices
+ *
+ * Fluxo:
+ *   1. Ao iniciar, carrega do localStorage para evitar flash em branco.
+ *   2. Conecta ao Firestore e substitui o estado pelo documento remoto.
+ *   3. Qualquer setState() persiste no Firestore (e no localStorage).
+ *   4. O listener em tempo real propaga mudanças feitas por outros devices.
  */
+
+import {
+  getOrCreateSessionId,
+  loadSession,
+  saveSession,
+  subscribeSession,
+} from '../services/firebase.js';
 
 const STORAGE_KEY = 'jornada_sprint_session';
 
@@ -19,33 +35,34 @@ const DEFAULT_STATE = () => ({
   updatedAt: new Date().toISOString(),
 });
 
-let _state = DEFAULT_STATE();
-const _listeners = new Set();
+let _state     = DEFAULT_STATE();
+let _sessionId = null;
+let _listeners = new Set();
 
-/** Load state from LocalStorage */
+// Flag para evitar que o listener remoto reescreva o Firestore em loop
+let _remoteUpdate = false;
+
+// ── localStorage (cache local) ────────────────────────────────────────────────
+
 function loadFromStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      _state = { ...DEFAULT_STATE(), ...parsed };
-    }
+    if (raw) _state = { ...DEFAULT_STATE(), ...JSON.parse(raw) };
   } catch (e) {
     console.warn('Could not load saved session:', e);
   }
 }
 
-/** Persist current state to LocalStorage */
-function saveToStorage() {
+function saveToStorage(state) {
   try {
-    _state.updatedAt = new Date().toISOString();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(_state));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (e) {
     console.warn('Could not save session:', e);
   }
 }
 
-/** Notify all subscribers */
+// ── Subscribers ───────────────────────────────────────────────────────────────
+
 function notify() {
   for (const listener of _listeners) {
     listener({ ..._state });
@@ -63,13 +80,16 @@ export function getState() {
   return { ..._state };
 }
 
-/** Check if a saved session exists */
+/** Check if a saved session exists (local or remote via URL param) */
 export function hasSavedSession() {
-  return !!localStorage.getItem(STORAGE_KEY);
+  const params = new URLSearchParams(window.location.search);
+  return params.has('s') || !!localStorage.getItem(STORAGE_KEY);
 }
 
+// ── Core setState ─────────────────────────────────────────────────────────────
+
 /**
- * Set state with partial update. Persists + notifies.
+ * Set state with partial update. Persists to Firestore + localStorage + notifies.
  */
 export function setState(partial) {
   if (typeof partial === 'function') {
@@ -77,9 +97,56 @@ export function setState(partial) {
   } else {
     _state = { ..._state, ...partial };
   }
-  saveToStorage();
+  _state.updatedAt = new Date().toISOString();
+
+  saveToStorage(_state);
+
+  if (_sessionId) {
+    saveSession(_sessionId, _state).catch((e) =>
+      console.warn('Firestore write failed:', e)
+    );
+  }
+
   notify();
 }
+
+// ── Firebase init ─────────────────────────────────────────────────────────────
+
+async function initFirebase() {
+  _sessionId = getOrCreateSessionId();
+
+  // 1. Tenta carregar o estado já existente no Firestore
+  try {
+    const remote = await loadSession(_sessionId);
+    if (remote) {
+      _state = { ...DEFAULT_STATE(), ...remote };
+      saveToStorage(_state);
+      notify();
+    } else if (_state.sprint?.name) {
+      // Sessão nova mas localStorage tem dados — faz upload inicial
+      await saveSession(_sessionId, _state);
+    }
+  } catch (e) {
+    console.warn('Could not load session from Firestore:', e);
+  }
+
+  // 2. Escuta mudanças em tempo real (outros devices)
+  subscribeSession(_sessionId, (remoteState) => {
+    // Ignora se o update veio de nós mesmos (evita loop)
+    if (_remoteUpdate) return;
+
+    // Só aplica se o estado remoto for mais recente
+    if (remoteState.updatedAt && remoteState.updatedAt <= _state.updatedAt) return;
+
+    _remoteUpdate = true;
+    _state = { ...DEFAULT_STATE(), ...remoteState };
+    saveToStorage(_state);
+    notify();
+    _remoteUpdate = false;
+  });
+}
+
+// ── Phase helpers ─────────────────────────────────────────────────────────────
 
 /** Navigate to a phase */
 export function setPhase(phase) {
@@ -181,5 +248,10 @@ export function resetState() {
   notify();
 }
 
-// Initialize
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+
+// 1. Carrega cache local imediatamente (evita tela em branco)
 loadFromStorage();
+
+// 2. Conecta ao Firebase em background
+initFirebase();
