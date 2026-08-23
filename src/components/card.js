@@ -2,6 +2,8 @@
  * Reusable Card Component
  */
 
+import { escapeHTML } from '../utils/dom.js';
+
 /**
  * Create a content card element
  * @param {object} opts
@@ -57,7 +59,7 @@ export function createCard({
   card.innerHTML = `
     <div class="card-header">
       ${emojiHTML}
-      <span class="card-text">${text}</span>
+      <span class="card-text">${escapeHTML(text)}</span>
     </div>
     ${reactionsHTML}
   `;
