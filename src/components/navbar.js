@@ -40,7 +40,7 @@ function renderNavbar() {
           <span class="xp-badge">⭐ ${xp.toLocaleString('pt-BR')} XP</span>
         </div>
         <div class="progress-bar-track" role="progressbar">
-          ${PHASES.map((phase, i) => {
+          ${PHASES.map((phase) => {
             const isActive = phase.id === currentPhase;
             const isCompleted = completedPhases.includes(phase.id);
             let cls = 'phase-step';

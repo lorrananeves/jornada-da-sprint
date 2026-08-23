@@ -71,19 +71,6 @@ function buildColumn(cat, treasures) {
   return col;
 }
 
-/**
- * Atualiza apenas os contadores de reação de um item específico, sem
- * recriar a coluna inteira — preserva o texto digitado nos <textarea>.
- */
-function patchReactionCounts(root, itemId, reactions) {
-  const card = root.querySelector(`[data-item-id="${CSS.escape(itemId)}"]`);
-  if (!card) return;
-  REACTIONS.forEach((r) => {
-    const span = card.querySelector(`[data-reaction="${r.key}"] .reaction-count`);
-    if (span) span.textContent = reactions[r.key] || 0;
-  });
-}
-
 export function renderTreasures(root) {
   function render() {
     const state = getState();

@@ -18,7 +18,7 @@ export function renderReport(root) {
   const treasureItems = treasures.filter((t) => t.category === 'treasure');
   const recognitionItems = treasures.filter((t) => t.category === 'recognition');
   const learningItems = treasures.filter((t) => t.category === 'learning');
-  const selectedMonsters = monsters.filter((m) => m.selected);
+  const _selectedMonsters = monsters.filter((m) => m.selected);
 
   function renderItemList(items, emoji) {
     if (!items.length) return '<p style="color:var(--text-muted);font-size:0.875rem">Nenhum item registrado.</p>';

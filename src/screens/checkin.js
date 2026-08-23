@@ -12,7 +12,7 @@ import { escapeHTML, preserveInputs } from '../utils/dom.js';
 const SCORES = [1, 2, 3, 4, 5];
 
 export function renderCheckin(root) {
-  const state = getState();
+  const _state = getState();
   let selectedScore = null;
 
   function buildCheckinForm() {

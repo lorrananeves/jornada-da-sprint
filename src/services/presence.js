@@ -22,7 +22,7 @@
  *     por pessoa — confortavelmente dentro do free tier do Firestore.
  */
 
-import { initializeApp, getApps } from 'firebase/app';
+import { getApps } from 'firebase/app';
 import {
   getFirestore,
   doc,

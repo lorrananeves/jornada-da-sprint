@@ -68,7 +68,7 @@ const DEFAULT_STATE = () => ({
 
 let _state     = DEFAULT_STATE();
 let _sessionId = null;
-let _listeners = new Set();
+const _listeners = new Set();
 
 // Unsubs das subscriptions em tempo real (doc raiz + cada subcoleção)
 const _unsubs = [];
