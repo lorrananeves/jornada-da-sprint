@@ -19,12 +19,12 @@ import {
 } from '../services/firebase.js';
 
 const STORAGE_KEY = 'jornada_sprint_session';
+const ROLE_KEY    = '_jornada_role'; // sessionStorage — per-device, never synced
 
 const DEFAULT_STATE = () => ({
   sprint: { name: '', startDate: '', endDate: '' },
   team: { name: '', participantCount: '' },
   currentPhase: 'home',
-  role: null,           // 'scrum_master' | 'team_member'
   retroStarted: false,  // true once SM presses "Iniciar Retrospectiva"
   xp: 0,
   checkins: [],
@@ -40,6 +40,18 @@ const DEFAULT_STATE = () => ({
 let _state     = DEFAULT_STATE();
 let _sessionId = null;
 let _listeners = new Set();
+
+// ── Role (per-device, sessionStorage only) ────────────────────────────────────
+
+/** Get this device's role ('scrum_master' | 'team_member' | null) */
+export function getRole() {
+  return sessionStorage.getItem(ROLE_KEY);
+}
+
+/** Set this device's role — stored only in sessionStorage, never Firestore */
+export function setRole(role) {
+  sessionStorage.setItem(ROLE_KEY, role);
+}
 
 // Flag para evitar que o listener remoto reescreva o Firestore em loop
 let _remoteUpdate = false;
@@ -104,7 +116,9 @@ export function setState(partial) {
   saveToStorage(_state);
 
   if (_sessionId) {
-    saveSession(_sessionId, _state).catch((e) =>
+    // Never persist the local role to Firestore — it's per-device
+    const { role: _ignored, ...firestoreState } = _state;
+    saveSession(_sessionId, firestoreState).catch((e) =>
       console.warn('Firestore write failed:', e)
     );
   }
@@ -125,7 +139,7 @@ async function initFirebase() {
 
       // If this device hasn't chosen a role yet, send to role selection
       // (handles team members entering via shared link)
-      if (!_state.role) {
+      if (!getRole()) {
         _state.currentPhase = 'roleSelect';
       }
 
@@ -148,10 +162,9 @@ async function initFirebase() {
     if (remoteState.updatedAt && remoteState.updatedAt <= _state.updatedAt) return;
 
     _remoteUpdate = true;
-    const localRole = _state.role; // preserve this device's role choice
     _state = { ...DEFAULT_STATE(), ...remoteState };
-    // Never overwrite the local role from a remote update
-    if (localRole) _state.role = localRole;
+    // role is per-device only — never apply it from remote
+    delete _state.role;
     saveToStorage(_state);
     notify();
     _remoteUpdate = false;

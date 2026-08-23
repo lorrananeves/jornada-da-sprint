@@ -3,12 +3,12 @@
  * Asks: "Are you the Scrum Master or a team member?"
  */
 
-import { setState, setPhase, getState } from '../state/store.js';
+import { setPhase } from '../state/store.js';
+import { setRole } from '../state/store.js';
 import { joinSession } from '../services/presence.js';
 
 export function renderRoleSelect(root) {
-  const state = getState();
-  // If entering via a shared link (?s=...), pre-select team member role
+  // If entering via a shared link (?s=...), highlight team member option
   const params = new URLSearchParams(window.location.search);
   const hasSession = params.has('s');
 
@@ -36,14 +36,14 @@ export function renderRoleSelect(root) {
   `;
 
   root.querySelector('#btn-sm').addEventListener('click', () => {
-    setState({ role: 'scrum_master' });
+    setRole('scrum_master');
     setPhase('setup');
   });
 
   root.querySelector('#btn-team').addEventListener('click', async () => {
-    setState({ role: 'team_member' });
-    // Register presence and go to checkin
+    setRole('team_member');
+    // Register presence then go to lobby (waiting room for the team)
     await joinSession();
-    setPhase('checkin');
+    setPhase('lobby');
   });
 }

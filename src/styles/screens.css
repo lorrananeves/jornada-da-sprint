@@ -184,6 +184,35 @@
   flex-wrap: wrap;
 }
 
+.lobby-title-wait {
+  color: var(--text);
+}
+
+.lobby-waiting-msg {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.lobby-waiting-msg p {
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+  margin-bottom: 4px;
+}
+
+.lobby-waiting-hint {
+  font-size: 0.8125rem !important;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.lobby-participants-team {
+  margin-bottom: 0;
+}
+
 /* ============================================================
    Home Screen
    ============================================================ */
