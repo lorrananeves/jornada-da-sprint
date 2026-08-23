@@ -27,6 +27,26 @@ import {
   increment,
 } from 'firebase/firestore';
 
+// ── Validação das variáveis de ambiente ───────────────────────────────────────
+
+const REQUIRED_ENV_VARS = [
+  'VITE_FIREBASE_API_KEY',
+  'VITE_FIREBASE_AUTH_DOMAIN',
+  'VITE_FIREBASE_PROJECT_ID',
+  'VITE_FIREBASE_STORAGE_BUCKET',
+  'VITE_FIREBASE_MESSAGING_SENDER_ID',
+  'VITE_FIREBASE_APP_ID',
+];
+
+const missing = REQUIRED_ENV_VARS.filter((key) => !import.meta.env[key]);
+
+if (missing.length > 0) {
+  throw new Error(
+    `[Firebase] Variáveis de ambiente ausentes: ${missing.join(', ')}.\n` +
+    'Copie .env.example para .env e preencha com os valores do seu projeto Firebase.'
+  );
+}
+
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
