@@ -134,9 +134,11 @@ export async function incrementXP(sessionId, amount) {
  * Subscribe a mudanças nos campos escalares do documento raiz.
  */
 export function subscribeSession(sessionId, callback) {
-  return onSnapshot(sessionRef(sessionId), (snap) => {
-    if (snap.exists()) callback(snap.data());
-  });
+  return onSnapshot(
+    sessionRef(sessionId),
+    (snap) => { if (snap.exists()) callback(snap.data()); },
+    (err) => console.warn('[subscribeSession] snapshot error:', err.code)
+  );
 }
 
 // ── Subcoleções (checkins / treasures / monsters / solutions / missions) ───────
@@ -180,9 +182,11 @@ export async function removeItem(sessionId, colName, itemId) {
  * Retorna a função de unsubscribe.
  */
 export function subscribeCollection(sessionId, colName, callback) {
-  return onSnapshot(subcolRef(sessionId, colName), (snap) => {
-    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-  });
+  return onSnapshot(
+    subcolRef(sessionId, colName),
+    (snap) => { callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))); },
+    (err) => console.warn(`[subscribeCollection:${colName}] snapshot error:`, err.code)
+  );
 }
 
 // Reexporta increment para uso nos patchItem calls do store

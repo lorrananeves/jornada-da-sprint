@@ -54,12 +54,42 @@ Os arquivos gerados ficarão na pasta `dist/`.
 npm run preview
 ```
 
+## 🔥 Firebase / Firestore
+
+O app sincroniza estado em tempo real via **Cloud Firestore**. Configure as variáveis de ambiente antes de rodar:
+
+```bash
+cp .env.example .env
+# edite .env com os valores do seu projeto Firebase
+```
+
+### Publicar as regras de segurança do Firestore
+
+As regras de segurança estão em [`firestore.rules`](firestore.rules). Elas **precisam ser deployadas** para o seu projeto Firebase — caso contrário o Firestore usará as regras padrão (que bloqueiam tudo após 30 dias em modo teste).
+
+```bash
+# instale a Firebase CLI se ainda não tiver
+npm install -g firebase-tools
+
+# faça login
+firebase login
+
+# associe ao seu projeto (só na primeira vez)
+firebase use --add
+
+# publique as regras
+firebase deploy --only firestore:rules
+```
+
+> **Atenção:** sem este passo, o app receberá erros `permission-denied` ao tentar ler ou escrever no Firestore.
+
 ## 🛠️ Tecnologias
 
 - **Vanilla JavaScript** (ES Modules) — sem frameworks
 - **Vite** — bundler e servidor de desenvolvimento
-- **jsPDF + html2canvas** — exportação do relatório em PDF
-- **LocalStorage** — persistência da sessão no navegador
+- **Firebase / Firestore** — persistência e sincronização em tempo real
+- **jsPDF** — exportação do relatório em PDF com texto nativo
+- **LocalStorage** — cache local da sessão
 
 ## 📁 Estrutura do Projeto
 
