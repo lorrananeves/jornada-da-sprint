@@ -6,48 +6,116 @@ service cloud.firestore {
     // ── Sessões de retrospectiva ──────────────────────────────────────────────
     match /sessions/{sessionId} {
 
-      // Qualquer um pode ler o documento da sessão (necessário para os membros
-      // do time acompanharem o estado em tempo real).
-      allow read: always;
+      // sessionId deve ser um hex de 32 chars (gerado com crypto.getRandomValues).
+      // Rejeita tentativas de acessar IDs fora do formato esperado.
+      allow read: if sessionId.matches('^[0-9a-f]{32}$');
 
-      // Criação: permitida para todos (o SM cria a sessão na primeira gravação).
-      allow create: if true;
+      // Criação: qualquer um pode criar, desde que o documento respeite o schema.
+      allow create: if
+        sessionId.matches('^[0-9a-f]{32}$')
+        && isValidSession(request.resource.data);
 
-      // Atualização: regras diferenciadas por campo.
+      // Atualização: schema válido + regra de fase (só SM altera currentPhase).
       allow update: if
-        // Campos restritos ao Scrum Master: currentPhase e completedPhases.
-        // Só podem ser alterados pelo device cujo ID bate com smDeviceId gravado
-        // no documento já existente no Firestore.
-        (
-          // Se nenhum campo restrito está sendo alterado, qualquer participante
-          // pode gravar (ex: checkins, treasures, monsters, solutions, missions, xp).
+        sessionId.matches('^[0-9a-f]{32}$')
+        && isValidSession(request.resource.data)
+        && (
           !isChangingPhaseFields(request.resource.data, resource.data)
-        )
-        ||
-        (
-          // Se um campo de fase está mudando, exige que o deviceId do requisitante
-          // bata com o smDeviceId já registrado no documento.
-          isChangingPhaseFields(request.resource.data, resource.data)
-          && request.resource.data.smDeviceId == resource.data.smDeviceId
-          && request.resource.data.smDeviceId != null
+          || isScrumMaster(request.resource.data, resource.data)
         );
 
       // ── Sub-coleção de presença (lobby) ──────────────────────────────────
       match /presence/{deviceId} {
-        // Qualquer participante pode registrar/remover sua própria presença.
-        allow read, write: if true;
+        allow read: if true;
+        allow write: if
+          // deviceId da presença deve ser hex (igual ao gerado em presence.js)
+          deviceId.matches('^[0-9a-f]{12,32}$')
+          && (
+            // criação/atualização: documento só pode ter os campos esperados
+            request.resource == null
+            || (
+              request.resource.data.keys().hasOnly(['joinedAt', 'deviceId'])
+              && request.resource.data.deviceId is string
+              && request.resource.data.deviceId.size() <= 32
+            )
+          );
       }
+    }
+
+    // Bloqueia qualquer outra coleção não prevista
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
 
 // ── Funções auxiliares ────────────────────────────────────────────────────────
 
-// Retorna true se currentPhase ou completedPhases foram alterados na requisição.
+// Valida o schema do documento de sessão: tipos, campos obrigatórios e limites.
+function isValidSession(data) {
+  return
+    // Campos obrigatórios presentes
+    data.keys().hasAll(['currentPhase', 'updatedAt', 'smDeviceId'])
+
+    // Nenhum campo fora do schema permitido
+    && data.keys().hasOnly([
+      'sprint', 'team', 'currentPhase', 'retroStarted',
+      'xp', 'checkins', 'treasures', 'monsters', 'solutions', 'missions',
+      'completedPhases', 'createdAt', 'updatedAt', 'smDeviceId',
+      '_prefillMission'
+    ])
+
+    // Tipos e tamanhos dos campos escalares
+    && data.currentPhase is string
+    && data.currentPhase.size() <= 32
+    && data.updatedAt is string
+    && data.smDeviceId is string
+    && data.smDeviceId.size() <= 32
+    && data.get('xp', 0) is number
+    && data.get('xp', 0) >= 0
+    && data.get('retroStarted', false) is bool
+
+    // Listas não podem ser excessivamente grandes (proteção contra spam)
+    && data.get('checkins', []).size() <= 200
+    && data.get('treasures', []).size() <= 200
+    && data.get('monsters', []).size() <= 200
+    && data.get('solutions', []).size() <= 500
+    && data.get('missions', []).size() <= 100
+    && data.get('completedPhases', []).size() <= 20
+
+    // Sub-objetos opcionais
+    && isValidSprint(data.get('sprint', {}))
+    && isValidTeam(data.get('team', {}));
+}
+
+function isValidSprint(sprint) {
+  return sprint is map
+    && sprint.keys().hasOnly(['name', 'startDate', 'endDate'])
+    && sprint.get('name', '') is string
+    && sprint.get('name', '').size() <= 120
+    && sprint.get('startDate', '') is string
+    && sprint.get('endDate', '') is string;
+}
+
+function isValidTeam(team) {
+  return team is map
+    && team.keys().hasOnly(['name', 'participantCount'])
+    && team.get('name', '') is string
+    && team.get('name', '').size() <= 120;
+}
+
+// Retorna true se currentPhase ou completedPhases foram alterados.
 function isChangingPhaseFields(newData, oldData) {
-  return (
+  return
     newData.get('currentPhase', null) != oldData.get('currentPhase', null)
-    ||
-    newData.get('completedPhases', []) != oldData.get('completedPhases', [])
-  );
+    || newData.get('completedPhases', []) != oldData.get('completedPhases', []);
+}
+
+// Só permite avançar fase se o smDeviceId do write bate com o registrado.
+// O smDeviceId é imutável após a criação — não pode ser substituído.
+function isScrumMaster(newData, oldData) {
+  return
+    newData.smDeviceId == oldData.smDeviceId
+    && newData.smDeviceId != null
+    && newData.smDeviceId.size() > 0;
 }

@@ -29,9 +29,15 @@ const db  = getFirestore(app);
 
 // ── Session ID ────────────────────────────────────────────────────────────────
 
-/** Generate a short random ID (8 hex chars) */
+/**
+ * Gera um ID de sessão com 128 bits de entropia usando a Web Crypto API.
+ * Resulta em 32 caracteres hex — impossível de enumerar por força bruta.
+ * Math.random() tinha apenas ~32 bits e não era criptograficamente seguro.
+ */
 function generateId() {
-  return Math.random().toString(16).slice(2, 10);
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**
