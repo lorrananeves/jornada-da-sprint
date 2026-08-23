@@ -191,7 +191,7 @@ export function renderReport(root) {
     btn.disabled = true;
     btn.textContent = '⏳ Gerando PDF...';
     try {
-      await exportAsPDF(reportEl, `jornada-sprint-${sprint.name || 'relatorio'}.pdf`);
+      await exportAsPDF(state, `jornada-sprint-${sprint.name || 'relatorio'}.pdf`);
     } finally {
       btn.disabled = false;
       btn.innerHTML = '📄 BAIXAR PDF';
