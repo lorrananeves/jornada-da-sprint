@@ -1,5 +1,5 @@
 /**
- * Setup Screen
+ * Setup Screen — only accessible by Scrum Master
  */
 
 import { getState, setState, setPhase, completePhase } from '../state/store.js';
@@ -65,7 +65,7 @@ export function renderSetup(root) {
     </div>
   `;
 
-  root.querySelector('#btn-back').addEventListener('click', () => setPhase('home'));
+  root.querySelector('#btn-back').addEventListener('click', () => setPhase('roleSelect'));
 
   root.querySelector('#btn-start-journey').addEventListener('click', () => {
     const name = root.querySelector('#sprint-name').value.trim();
@@ -88,6 +88,6 @@ export function renderSetup(root) {
     });
 
     completePhase('setup');
-    setPhase('checkin');
+    setPhase('lobby');
   });
 }

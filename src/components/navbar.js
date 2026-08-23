@@ -6,7 +6,6 @@ import { getState, subscribe, setPhase } from '../state/store.js';
 import { qs } from '../utils/dom.js';
 
 const PHASES = [
-  { id: 'home',      label: 'Início',     emoji: '🏠' },
   { id: 'setup',     label: 'Setup',      emoji: '⚙️' },
   { id: 'checkin',   label: 'Check-in',   emoji: '🌡️' },
   { id: 'treasures', label: 'Tesouros',   emoji: '💎' },
@@ -17,6 +16,9 @@ const PHASES = [
   { id: 'report',    label: 'Relatório',  emoji: '📋' },
 ];
 
+// Phases where navbar is hidden (no progress bar needed)
+const HIDDEN_PHASES = new Set(['home', 'roleSelect', 'lobby']);
+
 function renderNavbar() {
   const root = qs('#navbar-root');
   if (!root) return;
@@ -24,8 +26,8 @@ function renderNavbar() {
   const state = getState();
   const { currentPhase, xp, completedPhases } = state;
 
-  // hide navbar on home screen
-  if (currentPhase === 'home') {
+  // hide navbar on pre-retro screens
+  if (HIDDEN_PHASES.has(currentPhase)) {
     root.innerHTML = '';
     return;
   }

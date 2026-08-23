@@ -1,5 +1,5 @@
 /**
- * Home Screen — no async/await at module level
+ * Home Screen — redirects straight to role selection
  */
 
 import { setPhase, setState, hasSavedSession, resetState, getState } from '../state/store.js';
@@ -38,14 +38,16 @@ export function renderHome(root) {
       if (!confirmed) return;
       resetState();
     }
-    setState({ currentPhase: 'setup', createdAt: new Date().toISOString() });
+    // Go to role selection instead of setup directly
+    setState({ currentPhase: 'roleSelect', createdAt: new Date().toISOString() });
   });
 
   const continueBtn = root.querySelector('#btn-continue');
   if (continueBtn && !continueBtn.disabled) {
     continueBtn.addEventListener('click', () => {
       const s = getState();
-      setPhase(s.currentPhase && s.currentPhase !== 'home' ? s.currentPhase : 'setup');
+      const phase = s.currentPhase && s.currentPhase !== 'home' ? s.currentPhase : 'roleSelect';
+      setPhase(phase);
     });
   }
 

@@ -24,6 +24,8 @@ const DEFAULT_STATE = () => ({
   sprint: { name: '', startDate: '', endDate: '' },
   team: { name: '', participantCount: '' },
   currentPhase: 'home',
+  role: null,           // 'scrum_master' | 'team_member'
+  retroStarted: false,  // true once SM presses "Iniciar Retrospectiva"
   xp: 0,
   checkins: [],
   treasures: [],
@@ -120,6 +122,13 @@ async function initFirebase() {
     const remote = await loadSession(_sessionId);
     if (remote) {
       _state = { ...DEFAULT_STATE(), ...remote };
+
+      // If this device hasn't chosen a role yet, send to role selection
+      // (handles team members entering via shared link)
+      if (!_state.role) {
+        _state.currentPhase = 'roleSelect';
+      }
+
       saveToStorage(_state);
       notify();
     } else if (_state.sprint?.name) {
@@ -139,7 +148,10 @@ async function initFirebase() {
     if (remoteState.updatedAt && remoteState.updatedAt <= _state.updatedAt) return;
 
     _remoteUpdate = true;
+    const localRole = _state.role; // preserve this device's role choice
     _state = { ...DEFAULT_STATE(), ...remoteState };
+    // Never overwrite the local role from a remote update
+    if (localRole) _state.role = localRole;
     saveToStorage(_state);
     notify();
     _remoteUpdate = false;

@@ -5,7 +5,9 @@
 import { getState, subscribe } from './state/store.js';
 import { initNavbar } from './components/navbar.js';
 import { renderHome } from './screens/home.js';
+import { renderRoleSelect } from './screens/roleSelect.js';
 import { renderSetup } from './screens/setup.js';
+import { renderLobby } from './screens/lobby.js';
 import { renderCheckin } from './screens/checkin.js';
 import { renderTreasures } from './screens/treasures.js';
 import { renderMonsters } from './screens/monsters.js';
@@ -15,15 +17,17 @@ import { renderComplete } from './screens/complete.js';
 import { renderReport } from './screens/report.js';
 
 const SCREENS = {
-  home:      renderHome,
-  setup:     renderSetup,
-  checkin:   renderCheckin,
-  treasures: renderTreasures,
-  monsters:  renderMonsters,
-  combat:    renderCombat,
-  missions:  renderMissions,
-  complete:  renderComplete,
-  report:    renderReport,
+  home:       renderHome,
+  roleSelect: renderRoleSelect,
+  setup:      renderSetup,
+  lobby:      renderLobby,
+  checkin:    renderCheckin,
+  treasures:  renderTreasures,
+  monsters:   renderMonsters,
+  combat:     renderCombat,
+  missions:   renderMissions,
+  complete:   renderComplete,
+  report:     renderReport,
 };
 
 function getScreenRoot() {
