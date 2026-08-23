@@ -41,7 +41,7 @@ function buildMonsterCard(m) {
           ${r.label} <span class="reaction-count">${m.reactions[r.key] || 0}</span>
         </button>
       `).join('')}
-      <button class="btn btn-sm ${m.selected ? 'btn-danger' : 'btn-ghost'}" data-select="${escapeHTML(m.id)}" style="margin-left:auto">
+      <button class="btn btn-sm ${m.selected ? 'btn-danger' : 'btn-ghost'}" data-select="${escapeHTML(m.id)}" aria-pressed="${m.selected}" style="margin-left:auto">
         ${m.selected ? '✕ Remover' : '🎯 Selecionar'}
       </button>
     </div>
@@ -165,6 +165,7 @@ export function renderMonsters(root) {
           const isNowSelected = !card.classList.contains('selected-monster');
           card.classList.toggle('selected-monster', isNowSelected);
           btn.className = `btn btn-sm ${isNowSelected ? 'btn-danger' : 'btn-ghost'}`;
+          btn.setAttribute('aria-pressed', String(isNowSelected));
           btn.textContent = isNowSelected ? '✕ Remover' : '🎯 Selecionar';
           const badge = card.querySelector('.badge-accent');
           if (isNowSelected && !badge) {

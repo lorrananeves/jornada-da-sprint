@@ -23,7 +23,7 @@ export function renderCheckin(root) {
           <p class="text-muted mb-2" style="font-size:0.875rem">Selecione uma nota:</p>
           <div class="score-buttons">
             ${SCORES.map((s) => `
-              <button class="score-btn ${selectedScore === s ? 'selected' : ''}" data-score="${s}" title="${getScoreLabel(s)}">
+              <button class="score-btn ${selectedScore === s ? 'selected' : ''}" data-score="${s}" title="${getScoreLabel(s)}" aria-label="${getScoreLabel(s)} (${getScoreEmoji(s)})" aria-pressed="${selectedScore === s}">
                 <span style="font-size:1.5rem">${getScoreEmoji(s)}</span>
                 <span style="font-size:0.75rem;font-weight:600;color:var(--text-muted)">${s}</span>
               </button>
@@ -138,8 +138,12 @@ export function renderCheckin(root) {
     root.querySelectorAll('.score-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         selectedScore = parseInt(btn.dataset.score);
-        root.querySelectorAll('.score-btn').forEach((b) => b.classList.remove('selected'));
+        root.querySelectorAll('.score-btn').forEach((b) => {
+          b.classList.remove('selected');
+          b.setAttribute('aria-pressed', 'false');
+        });
         btn.classList.add('selected');
+        btn.setAttribute('aria-pressed', 'true');
         const reg = root.querySelector('#btn-register');
         if (reg) reg.disabled = false;
       });
