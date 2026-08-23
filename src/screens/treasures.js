@@ -7,7 +7,7 @@ import {
 } from '../state/store.js';
 import { xpForTreasure } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
-import { uid, escapeHTML } from '../utils/dom.js';
+import { uid, escapeHTML, preserveInputs } from '../utils/dom.js';
 
 const CATEGORIES = [
   { id: 'treasure',    emoji: '💎', label: 'Tesouro',        question: 'O que funcionou bem nessa Sprint?' },
@@ -35,7 +35,7 @@ function buildColumn(cat, treasures) {
     </div>
     <div class="treasure-add-form">
       <p class="text-muted" style="font-size:0.8125rem;margin-bottom:8px">${cat.question}</p>
-      <textarea class="form-textarea treasure-input" placeholder="Escreva aqui..." style="width:100%;min-height:64px" data-cat="${cat.id}"></textarea>
+      <textarea class="form-textarea treasure-input" placeholder="Escreva aqui..." style="width:100%;min-height:64px" data-cat="${cat.id}" id="treasure-input-${cat.id}"></textarea>
       <button class="btn btn-success btn-sm btn-full" style="margin-top:8px" data-add="${cat.id}">
         + Adicionar
       </button>
@@ -51,6 +51,7 @@ function buildColumn(cat, treasures) {
   items.forEach((item) => {
     const card = document.createElement('div');
     card.className = 'card card-sm card-appear';
+    card.dataset.itemId = item.id;
     card.innerHTML = `
       <div class="card-header">
         <span class="card-emoji">${cat.emoji}</span>
@@ -59,7 +60,7 @@ function buildColumn(cat, treasures) {
       <div class="card-reactions">
         ${REACTIONS.map((r) => `
           <button class="reaction-btn" data-id="${escapeHTML(item.id)}" data-reaction="${r.key}">
-            ${r.label} <span>${item.reactions[r.key] || 0}</span>
+            ${r.label} <span class="reaction-count">${item.reactions[r.key] || 0}</span>
           </button>
         `).join('')}
       </div>
@@ -70,33 +71,56 @@ function buildColumn(cat, treasures) {
   return col;
 }
 
+/**
+ * Atualiza apenas os contadores de reação de um item específico, sem
+ * recriar a coluna inteira — preserva o texto digitado nos <textarea>.
+ */
+function patchReactionCounts(root, itemId, reactions) {
+  const card = root.querySelector(`[data-item-id="${CSS.escape(itemId)}"]`);
+  if (!card) return;
+  REACTIONS.forEach((r) => {
+    const span = card.querySelector(`[data-reaction="${r.key}"] .reaction-count`);
+    if (span) span.textContent = reactions[r.key] || 0;
+  });
+}
+
 export function renderTreasures(root) {
   function render() {
     const state = getState();
 
-    root.innerHTML = `
-      <div class="screen-treasures screen-enter">
-        <div class="phase-header">
-          <div class="phase-header-top">
-            <span class="phase-icon">💎</span>
-            <h2 class="phase-title">Tesouros da Sprint</h2>
+    preserveInputs(root, () => {
+      root.innerHTML = `
+        <div class="screen-treasures screen-enter">
+          <div class="phase-header">
+            <div class="phase-header-top">
+              <span class="phase-icon">💎</span>
+              <h2 class="phase-title">Tesouros da Sprint</h2>
+            </div>
+            <p class="phase-description">
+              Capture o que funcionou bem, reconhecimentos e aprendizados desta Sprint.
+            </p>
           </div>
-          <p class="phase-description">
-            Capture o que funcionou bem, reconhecimentos e aprendizados desta Sprint.
-          </p>
+          <div class="treasure-columns" id="treasure-cols"></div>
+          <div class="phase-nav">
+            <button class="btn btn-ghost" id="btn-back">← Voltar</button>
+            ${isSM() ? `<button class="btn btn-primary" id="btn-next">👹 PRÓXIMA FASE →</button>` : `<span class="text-muted" style="font-size:0.875rem">Aguardando o Scrum Master avançar…</span>`}
+          </div>
         </div>
-        <div class="treasure-columns" id="treasure-cols"></div>
-        <div class="phase-nav">
-          <button class="btn btn-ghost" id="btn-back">← Voltar</button>
-          ${isSM() ? `<button class="btn btn-primary" id="btn-next">👹 PRÓXIMA FASE →</button>` : `<span class="text-muted" style="font-size:0.875rem">Aguardando o Scrum Master avançar…</span>`}
-        </div>
-      </div>
-    `;
+      `;
 
-    const cols = root.querySelector('#treasure-cols');
+      const cols = root.querySelector('#treasure-cols');
+      CATEGORIES.forEach((cat) => {
+        cols.appendChild(buildColumn(cat, state.treasures));
+      });
+    });
+
+    attachEvents();
+  }
+
+  function attachEvents() {
     CATEGORIES.forEach((cat) => {
-      const col = buildColumn(cat, state.treasures);
-      cols.appendChild(col);
+      const col = root.querySelector(`[data-category="${cat.id}"]`);
+      if (!col) return;
 
       // Add item event
       col.querySelector(`[data-add="${cat.id}"]`).addEventListener('click', () => {
@@ -121,11 +145,16 @@ export function renderTreasures(root) {
         render();
       });
 
-      // Reaction events
+      // Reaction events — patch cirúrgico: só atualiza o contador no DOM,
+      // sem recriar a tela e sem destruir os <textarea> com texto digitado
       col.querySelectorAll('.reaction-btn[data-reaction]').forEach((btn) => {
         btn.addEventListener('click', () => {
-          reactToTreasure(btn.dataset.id, btn.dataset.reaction);
-          render();
+          const { id: itemId, reaction } = btn.dataset;
+          reactToTreasure(itemId, reaction);
+          // Atualiza otimisticamente o contador no DOM enquanto o Firestore
+          // processa (o patchItem remoto chegará em breve via subscription)
+          const span = btn.querySelector('.reaction-count');
+          if (span) span.textContent = Number(span.textContent) + 1;
         });
       });
     });

@@ -60,6 +60,46 @@ export function setHTML(el, html) {
   el.innerHTML = html;
 }
 
+/**
+ * Executa fn() (que normalmente faz root.innerHTML = ...) preservando os
+ * valores de todos os inputs/textareas dentro de `root`.
+ *
+ * Como funciona:
+ *  1. Antes do re-render: captura { id → value } de cada campo com id.
+ *  2. Chama fn() que destrói e recria o DOM.
+ *  3. Restaura os valores nos campos recém-criados que tenham o mesmo id.
+ *  4. Se o campo focado antes do render ainda existe, devolve o foco a ele
+ *     e reposiciona o cursor no fim do texto.
+ *
+ * @param {HTMLElement} root  - container que será re-renderizado
+ * @param {Function}    fn    - função que faz o re-render (innerHTML = ...)
+ */
+export function preserveInputs(root, fn) {
+  // Captura estado dos campos
+  const saved = {};
+  const focusedId = document.activeElement?.id || null;
+  root.querySelectorAll('input[id], textarea[id]').forEach((el) => {
+    saved[el.id] = { value: el.value, selectionStart: el.selectionStart, selectionEnd: el.selectionEnd };
+  });
+
+  fn();
+
+  // Restaura valores e foco
+  for (const [id, state] of Object.entries(saved)) {
+    const el = root.querySelector(`#${CSS.escape(id)}`);
+    if (!el) continue;
+    el.value = state.value;
+    if (id === focusedId) {
+      el.focus();
+      try {
+        el.setSelectionRange(state.selectionStart, state.selectionEnd);
+      } catch {
+        // inputs tipo date/number não suportam setSelectionRange
+      }
+    }
+  }
+}
+
 /** Clear children of an element */
 export function clearEl(el) {
   while (el.firstChild) el.removeChild(el.firstChild);

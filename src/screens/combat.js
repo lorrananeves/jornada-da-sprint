@@ -7,7 +7,7 @@ import {
 } from '../state/store.js';
 import { xpForSolution } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
-import { uid, escapeHTML } from '../utils/dom.js';
+import { uid, escapeHTML, preserveInputs } from '../utils/dom.js';
 import { getStrategyLabel } from '../utils/format.js';
 
 const STRATEGIES = [
@@ -48,7 +48,7 @@ export function renderCombat(root) {
     );
     const strategy = STRATEGIES.find((s) => s.id === currentStrategy);
 
-    root.innerHTML = `
+    preserveInputs(root, () => { root.innerHTML = `
       <div class="screen-combat screen-enter">
         <div class="phase-header">
           <div class="phase-header-top">
@@ -125,7 +125,7 @@ export function renderCombat(root) {
           ${isSM() ? `<button class="btn btn-primary" id="btn-next">🚀 PRÓXIMA FASE →</button>` : `<span class="text-muted" style="font-size:0.875rem">Aguardando o Scrum Master avançar…</span>`}
         </div>
       </div>
-    `;
+    `; }); // end preserveInputs
 
     attachEvents(monster);
   }
@@ -162,11 +162,13 @@ export function renderCombat(root) {
       render();
     });
 
-    // Vote
+    // Vote — patch cirúrgico: incrementa o contador sem re-render completo
     root.querySelectorAll('[data-vote]').forEach((btn) => {
       btn.addEventListener('click', () => {
         voteSolution(btn.dataset.vote);
-        render();
+        // Otimismo local: incrementa o número exibido no botão
+        const match = btn.textContent.match(/\d+/);
+        if (match) btn.textContent = `👍 ${Number(match[0]) + 1}`;
       });
     });
 

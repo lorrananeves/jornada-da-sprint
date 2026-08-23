@@ -8,7 +8,7 @@ import {
 } from '../state/store.js';
 import { xpForMonster } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
-import { uid, escapeHTML } from '../utils/dom.js';
+import { uid, escapeHTML, preserveInputs } from '../utils/dom.js';
 
 const SUGGESTIONS = [
   'Dependências externas', 'Problemas técnicos', 'Comunicação',
@@ -38,7 +38,7 @@ function buildMonsterCard(m) {
     <div class="monster-card-actions">
       ${REACTIONS.map((r) => `
         <button class="reaction-btn" data-id="${escapeHTML(m.id)}" data-reaction="${r.key}" title="${r.title}">
-          ${r.label} <span>${m.reactions[r.key] || 0}</span>
+          ${r.label} <span class="reaction-count">${m.reactions[r.key] || 0}</span>
         </button>
       `).join('')}
       <button class="btn btn-sm ${m.selected ? 'btn-danger' : 'btn-ghost'}" data-select="${escapeHTML(m.id)}" style="margin-left:auto">
@@ -56,7 +56,7 @@ export function renderMonsters(root) {
     const monsters = state.monsters;
     const selectedCount = monsters.filter((m) => m.selected).length;
 
-    root.innerHTML = `
+    preserveInputs(root, () => { root.innerHTML = `
       <div class="screen-monsters screen-enter">
         <div class="phase-header">
           <div class="phase-header-top">
@@ -100,13 +100,12 @@ export function renderMonsters(root) {
             : `<span class="text-muted" style="font-size:0.875rem">Aguardando o Scrum Master avançar…</span>`}
         </div>
       </div>
-    `;
-
-    // Render monster cards
-    const grid = root.querySelector('#monsters-grid');
-    if (monsters.length > 0) {
-      monsters.forEach((m) => grid.appendChild(buildMonsterCard(m)));
-    }
+    `; // end preserveInputs
+      const grid = root.querySelector('#monsters-grid');
+      if (monsters.length > 0) {
+        monsters.forEach((m) => grid.appendChild(buildMonsterCard(m)));
+      }
+    });
 
     attachEvents();
   }
@@ -144,21 +143,47 @@ export function renderMonsters(root) {
       render();
     });
 
-    // Reactions
+    // Reactions — patch cirúrgico: incrementa o contador sem render completo
     root.querySelectorAll('.reaction-btn[data-reaction]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         reactToMonster(btn.dataset.id, btn.dataset.reaction);
-        render();
+        const span = btn.querySelector('.reaction-count');
+        if (span) span.textContent = Number(span.textContent) + 1;
       });
     });
 
-    // Select
+    // Select — só altera aparência do card, não destrói o input
     root.querySelectorAll('[data-select]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        selectMonster(btn.dataset.select);
-        render();
+        const id = btn.dataset.select;
+        selectMonster(id);
+        // Patch visual do card: inverte classes selected e texto do botão
+        const card = root.querySelector(`.monster-card[data-id="${CSS.escape(id)}"]`);
+        if (card) {
+          const isNowSelected = !card.classList.contains('selected-monster');
+          card.classList.toggle('selected-monster', isNowSelected);
+          btn.className = `btn btn-sm ${isNowSelected ? 'btn-danger' : 'btn-ghost'}`;
+          btn.textContent = isNowSelected ? '✕ Remover' : '🎯 Selecionar';
+          const badge = card.querySelector('.badge-accent');
+          if (isNowSelected && !badge) {
+            const textDiv = card.querySelector('.card-text').parentElement;
+            const newBadge = document.createElement('span');
+            newBadge.className = 'badge badge-accent';
+            newBadge.style.cssText = 'margin-top:4px;display:inline-flex';
+            newBadge.textContent = '🎯 Selecionado';
+            textDiv.appendChild(newBadge);
+          } else if (!isNowSelected && badge) {
+            badge.remove();
+          }
+          // Atualiza o contador e botão "ir para combate" sem re-render
+          const newCount = root.querySelectorAll('.monster-card.selected-monster').length;
+          const nextBtn = root.querySelector('#btn-next');
+          if (nextBtn) nextBtn.disabled = newCount === 0;
+          const countBadge = root.querySelector('.badge-accent[data-selected-count]');
+          if (countBadge) countBadge.textContent = `🎯 ${newCount} selecionado${newCount !== 1 ? 's' : ''}`;
+        }
       });
     });
 

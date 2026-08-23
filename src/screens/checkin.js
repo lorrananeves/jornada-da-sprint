@@ -7,7 +7,7 @@ import { xpForCheckin } from '../services/xp.js';
 import { calcCheckinStats, getMoodLabel } from '../services/stats.js';
 import { showXPToast } from '../components/xpToast.js';
 import { getScoreEmoji, getScoreLabel } from '../utils/format.js';
-import { escapeHTML } from '../utils/dom.js';
+import { escapeHTML, preserveInputs } from '../utils/dom.js';
 
 const SCORES = [1, 2, 3, 4, 5];
 
@@ -98,7 +98,7 @@ export function renderCheckin(root) {
 
   function render() {
     const checkins = getState().checkins;
-    root.innerHTML = `
+    preserveInputs(root, () => { root.innerHTML = `
       <div class="screen-checkin screen-enter">
         <div class="phase-header">
           <div class="phase-header-top">
@@ -128,7 +128,7 @@ export function renderCheckin(root) {
           ${isSM() ? `<button class="btn btn-primary" id="btn-next">💎 PRÓXIMA FASE →</button>` : `<span class="text-muted" style="font-size:0.875rem">Aguardando o Scrum Master avançar…</span>`}
         </div>
       </div>
-    `;
+    `; }); // end preserveInputs
 
     attachEvents();
   }

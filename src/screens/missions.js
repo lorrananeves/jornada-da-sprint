@@ -8,7 +8,7 @@ import {
 import { xpForMission } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
 import { showModal } from '../components/modal.js';
-import { uid, escapeHTML } from '../utils/dom.js';
+import { uid, escapeHTML, preserveInputs } from '../utils/dom.js';
 import { getPriorityLabel, getStrategyLabel, formatDate } from '../utils/format.js';
 
 const PRIORITIES = [
@@ -24,7 +24,7 @@ export function renderMissions(root) {
     const prefill = state._prefillMission || null;
     const showWarning = missions.length > 3;
 
-    root.innerHTML = `
+    preserveInputs(root, () => { root.innerHTML = `
       <div class="screen-missions screen-enter">
         <div class="phase-header">
           <div class="phase-header-top">
@@ -136,7 +136,7 @@ export function renderMissions(root) {
           ${isSM() ? `<button class="btn btn-primary" id="btn-next">🏆 CONCLUIR JORNADA →</button>` : `<span class="text-muted" style="font-size:0.875rem">Aguardando o Scrum Master avançar…</span>`}
         </div>
       </div>
-    `;
+    `; }); // end preserveInputs
 
     attachEvents(prefill);
   }
