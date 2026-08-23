@@ -7,7 +7,7 @@ import {
 } from '../state/store.js';
 import { xpForSolution } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
-import { uid } from '../utils/dom.js';
+import { uid, escapeHTML } from '../utils/dom.js';
 import { getStrategyLabel } from '../utils/format.js';
 
 const STRATEGIES = [
@@ -65,7 +65,7 @@ export function renderCombat(root) {
         <div class="combat-monster-banner">
           <span class="combat-monster-icon">👹</span>
           <div>
-            <h3 style="color:var(--danger);margin-bottom:4px">${monster.text}</h3>
+            <h3 style="color:var(--danger);margin-bottom:4px">${escapeHTML(monster.text)}</h3>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               <span class="badge badge-danger">🔥 ${monster.reactions.fire || 0} impacto</span>
               <span class="badge badge-info">👀 ${monster.reactions.eyes || 0} discussões</span>
@@ -107,11 +107,11 @@ export function renderCombat(root) {
             <div class="solutions-list">
               ${solutions.map((sol) => `
                 <div class="solution-card">
-                  <span class="solution-text">${sol.text}</span>
-                  <button class="vote-btn" data-vote="${sol.id}">
+                  <span class="solution-text">${escapeHTML(sol.text)}</span>
+                  <button class="vote-btn" data-vote="${escapeHTML(sol.id)}">
                     👍 ${sol.votes || 0}
                   </button>
-                  <button class="btn btn-ghost btn-sm" data-to-mission="${sol.id}" title="Transformar em Missão">
+                  <button class="btn btn-ghost btn-sm" data-to-mission="${escapeHTML(sol.id)}" title="Transformar em Missão">
                     🚀
                   </button>
                 </div>

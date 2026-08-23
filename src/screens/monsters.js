@@ -8,7 +8,7 @@ import {
 } from '../state/store.js';
 import { xpForMonster } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
-import { uid } from '../utils/dom.js';
+import { uid, escapeHTML } from '../utils/dom.js';
 
 const SUGGESTIONS = [
   'Dependências externas', 'Problemas técnicos', 'Comunicação',
@@ -31,17 +31,17 @@ function buildMonsterCard(m) {
     <div class="card-header" style="align-items:flex-start">
       <span class="card-emoji">👹</span>
       <div style="flex:1">
-        <span class="card-text">${m.text}</span>
+        <span class="card-text">${escapeHTML(m.text)}</span>
         ${m.selected ? '<span class="badge badge-accent" style="margin-top:4px;display:inline-flex">🎯 Selecionado</span>' : ''}
       </div>
     </div>
     <div class="monster-card-actions">
       ${REACTIONS.map((r) => `
-        <button class="reaction-btn" data-id="${m.id}" data-reaction="${r.key}" title="${r.title}">
+        <button class="reaction-btn" data-id="${escapeHTML(m.id)}" data-reaction="${r.key}" title="${r.title}">
           ${r.label} <span>${m.reactions[r.key] || 0}</span>
         </button>
       `).join('')}
-      <button class="btn btn-sm ${m.selected ? 'btn-danger' : 'btn-ghost'}" data-select="${m.id}" style="margin-left:auto">
+      <button class="btn btn-sm ${m.selected ? 'btn-danger' : 'btn-ghost'}" data-select="${escapeHTML(m.id)}" style="margin-left:auto">
         ${m.selected ? '✕ Remover' : '🎯 Selecionar'}
       </button>
     </div>

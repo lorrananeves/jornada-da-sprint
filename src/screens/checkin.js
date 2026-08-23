@@ -7,6 +7,7 @@ import { xpForCheckin } from '../services/xp.js';
 import { calcCheckinStats, getMoodLabel } from '../services/stats.js';
 import { showXPToast } from '../components/xpToast.js';
 import { getScoreEmoji, getScoreLabel } from '../utils/format.js';
+import { escapeHTML } from '../utils/dom.js';
 
 const SCORES = [1, 2, 3, 4, 5];
 
@@ -65,7 +66,7 @@ export function renderCheckin(root) {
     const commentsHTML = comments.length
       ? `<div class="checkin-comments">
           <h4 style="margin-bottom:12px">💬 Comentários anônimos</h4>
-          ${comments.map((c) => `<div class="checkin-comment-item">"${c}"</div>`).join('')}
+          ${comments.map((c) => `<div class="checkin-comment-item">"${escapeHTML(c)}"</div>`).join('')}
         </div>`
       : '';
 

@@ -6,6 +6,7 @@ import { getState, setPhase } from '../state/store.js';
 import { calcSummaryStats, getMoodLabel } from '../services/stats.js';
 import { exportAsPDF, exportAsPNG } from '../services/export.js';
 import { formatDate, formatISO, formatXP, getScoreEmoji, getPriorityLabel, getStrategyLabel } from '../utils/format.js';
+import { escapeHTML } from '../utils/dom.js';
 
 export function renderReport(root) {
   const state = getState();
@@ -21,7 +22,7 @@ export function renderReport(root) {
 
   function renderItemList(items, emoji) {
     if (!items.length) return '<p style="color:var(--text-muted);font-size:0.875rem">Nenhum item registrado.</p>';
-    return items.map((item) => `<div class="report-item">${emoji} ${item.text || item.title}</div>`).join('');
+    return items.map((item) => `<div class="report-item">${emoji} ${escapeHTML(item.text || item.title)}</div>`).join('');
   }
 
   function renderSolutionsForMonster(monsterId) {
@@ -30,7 +31,7 @@ export function renderReport(root) {
     return sols.map((s) => `
       <div class="report-item" style="margin-left:16px;display:flex;gap:10px;align-items:center">
         <span>${getStrategyLabel(s.strategy)}</span>
-        <span style="flex:1">${s.text}</span>
+        <span style="flex:1">${escapeHTML(s.text)}</span>
         <span style="color:var(--success);font-size:0.8125rem;white-space:nowrap">👍 ${s.votes}</span>
       </div>
     `).join('');
@@ -57,9 +58,9 @@ export function renderReport(root) {
         <div class="report-header">
           <div style="font-size:3rem;margin-bottom:8px">⚔️</div>
           <h1 class="report-title">JORNADA DA SPRINT</h1>
-          <h2 style="color:var(--text);margin-bottom:8px">${sprint.name || 'Retrospectiva'}</h2>
+          <h2 style="color:var(--text);margin-bottom:8px">${escapeHTML(sprint.name || 'Retrospectiva')}</h2>
           <p class="text-muted">
-            ${team.name ? `Time: ${team.name}` : ''}
+            ${team.name ? `Time: ${escapeHTML(team.name)}` : ''}
             ${team.participantCount ? ` · ${team.participantCount} participantes` : ''}
           </p>
           ${sprint.startDate || sprint.endDate ? `
@@ -111,7 +112,7 @@ export function renderReport(root) {
             ${checkins.filter((c) => c.comment).length > 0 ? `
               <div style="margin-top:12px">
                 <p style="font-size:0.875rem;font-weight:600;color:var(--text-muted);margin-bottom:8px">💬 Comentários anônimos:</p>
-                ${checkins.filter((c) => c.comment).map((c) => `<div class="report-item">"${c.comment}"</div>`).join('')}
+                ${checkins.filter((c) => c.comment).map((c) => `<div class="report-item">"${escapeHTML(c.comment)}"</div>`).join('')}
               </div>
             ` : ''}
           </div>
@@ -143,7 +144,7 @@ export function renderReport(root) {
             : monsters.map((m) => `
               <div style="margin-bottom:14px">
                 <div class="report-item" style="background:var(--danger-dim);border:1px solid rgba(248,81,73,0.2)">
-                  👹 <strong>${m.text}</strong>
+                  👹 <strong>${escapeHTML(m.text)}</strong>
                   ${m.selected ? ' <span style="color:var(--accent)">🎯</span>' : ''}
                   <span style="float:right;font-size:0.8125rem;color:var(--text-muted)">
                     🔥${m.reactions.fire||0} 👀${m.reactions.eyes||0} 💡${m.reactions.bulb||0}
@@ -164,12 +165,12 @@ export function renderReport(root) {
               <div class="report-item" style="margin-bottom:8px">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
                   <div>
-                    <strong>🚀 ${m.title}</strong>
-                    ${m.description ? `<div style="font-size:0.875rem;color:var(--text-muted);margin-top:2px">${m.description}</div>` : ''}
+                    <strong>🚀 ${escapeHTML(m.title)}</strong>
+                    ${m.description ? `<div style="font-size:0.875rem;color:var(--text-muted);margin-top:2px">${escapeHTML(m.description)}</div>` : ''}
                   </div>
                   <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0">
                     <span style="font-size:0.75rem;font-weight:600">${getPriorityLabel(m.priority)}</span>
-                    ${m.owner ? `<span style="font-size:0.75rem;color:var(--purple)">👤 ${m.owner}</span>` : ''}
+                    ${m.owner ? `<span style="font-size:0.75rem;color:var(--purple)">👤 ${escapeHTML(m.owner)}</span>` : ''}
                     ${m.deadline ? `<span style="font-size:0.75rem;color:var(--accent)">📅 ${formatDate(m.deadline)}</span>` : ''}
                   </div>
                 </div>

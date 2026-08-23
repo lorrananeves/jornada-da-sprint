@@ -2,7 +2,7 @@
  * XP Toast — animated notification when XP is earned
  */
 
-import { qs } from '../utils/dom.js';
+import { qs, escapeHTML } from '../utils/dom.js';
 
 let hideTimer = null;
 
@@ -23,7 +23,7 @@ export function showXPToast(amount, reason = '') {
   toast.className = 'xp-toast xp-toast-enter';
   toast.innerHTML = `
     <span class="xp-toast-icon">⭐</span>
-    <span>+${amount} XP${reason ? ` — ${reason}` : ''}</span>
+    <span>+${amount} XP${reason ? ` — ${escapeHTML(reason)}` : ''}</span>
   `;
 
   root.appendChild(toast);

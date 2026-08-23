@@ -3,6 +3,7 @@
  */
 
 import { getState, setState, setPhase, completePhase } from '../state/store.js';
+import { escapeHTML } from '../utils/dom.js';
 
 export function renderSetup(root) {
   const state = getState();
@@ -25,7 +26,7 @@ export function renderSetup(root) {
           <div class="form-group">
             <label class="form-label" for="sprint-name">Nome da Sprint *</label>
             <input class="form-input" type="text" id="sprint-name" placeholder="Ex: Sprint 42"
-              value="${s.name || ''}" required />
+              value="${escapeHTML(s.name || '')}" required />
           </div>
           <div class="form-row">
             <div class="form-group">
@@ -46,7 +47,7 @@ export function renderSetup(root) {
           <div class="form-group">
             <label class="form-label" for="team-name">Nome do Time</label>
             <input class="form-input" type="text" id="team-name" placeholder="Ex: Time Fênix"
-              value="${t.name || ''}" />
+              value="${escapeHTML(t.name || '')}" />
           </div>
           <div class="form-group">
             <label class="form-label" for="participant-count">Número de Participantes</label>

@@ -8,7 +8,7 @@ import {
 import { xpForMission } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
 import { showModal } from '../components/modal.js';
-import { uid } from '../utils/dom.js';
+import { uid, escapeHTML } from '../utils/dom.js';
 import { getPriorityLabel, getStrategyLabel, formatDate } from '../utils/format.js';
 
 const PRIORITIES = [
@@ -56,7 +56,7 @@ export function renderMissions(root) {
               <label class="form-label">Título *</label>
               <input class="form-input" type="text" id="mission-title"
                 placeholder="Ex: Estabelecer cerimônia de alinhamento semanal"
-                value="${prefill ? prefill.text : ''}" />
+                value="${escapeHTML(prefill ? prefill.text : '')}" />
             </div>
             <div class="form-group">
               <label class="form-label">Descrição</label>
@@ -107,17 +107,17 @@ export function renderMissions(root) {
                 <div class="card mission-card">
                   <div class="mission-header">
                     <div>
-                      <div class="mission-title">🚀 ${m.title}</div>
-                      ${m.description ? `<p style="font-size:0.875rem;color:var(--text-muted);margin-top:4px">${m.description}</p>` : ''}
+                      <div class="mission-title">🚀 ${escapeHTML(m.title)}</div>
+                      ${m.description ? `<p style="font-size:0.875rem;color:var(--text-muted);margin-top:4px">${escapeHTML(m.description)}</p>` : ''}
                     </div>
-                    <button class="btn btn-danger btn-sm btn-icon" data-remove="${m.id}" title="Remover missão">🗑️</button>
+                    <button class="btn btn-danger btn-sm btn-icon" data-remove="${escapeHTML(m.id)}" title="Remover missão">🗑️</button>
                   </div>
                   <div class="mission-meta">
                     <span class="badge ${PRIORITIES.find((p) => p.id === m.priority)?.class || 'badge-info'}">
                       ${getPriorityLabel(m.priority)}
                     </span>
                     ${m.strategy ? `<span class="badge badge-info">${getStrategyLabel(m.strategy)}</span>` : ''}
-                    ${m.owner ? `<span class="badge" style="background:var(--purple-dim);color:var(--purple)">👤 ${m.owner}</span>` : ''}
+                    ${m.owner ? `<span class="badge" style="background:var(--purple-dim);color:var(--purple)">👤 ${escapeHTML(m.owner)}</span>` : ''}
                     ${m.deadline ? `<span class="badge badge-accent">📅 ${formatDate(m.deadline)}</span>` : ''}
                   </div>
                 </div>

@@ -11,6 +11,7 @@
 import { getState, setState, setPhase } from '../state/store.js';
 import { getRole } from '../state/store.js';
 import { getSessionUrl, subscribeParticipants } from '../services/presence.js';
+import { escapeHTML } from '../utils/dom.js';
 
 let _unsubscribe = null;
 
@@ -22,7 +23,7 @@ export function renderLobby(root) {
   const sessionUrl = getSessionUrl();
 
   const sprintLabel = sprint.name
-    ? `${sprint.name}${sprint.startDate ? ` · ${formatDate(sprint.startDate)} – ${formatDate(sprint.endDate)}` : ''}`
+    ? `${escapeHTML(sprint.name)}${sprint.startDate ? ` · ${formatDate(sprint.startDate)} – ${formatDate(sprint.endDate)}` : ''}`
     : 'Sprint';
 
   if (isSM) {
@@ -43,7 +44,7 @@ export function renderLobby(root) {
           <div class="lobby-share">
             <p class="lobby-share-label">🔗 Compartilhe este link com o time:</p>
             <div class="lobby-link-row">
-              <input class="form-input lobby-link-input" id="session-link" readonly value="${sessionUrl}" />
+              <input class="form-input lobby-link-input" id="session-link" readonly value="${escapeHTML(sessionUrl)}" />
               <button class="btn btn-ghost btn-sm" id="btn-copy">📋 Copiar</button>
             </div>
             <p class="lobby-share-hint text-muted" id="copy-feedback"></p>

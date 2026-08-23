@@ -2,7 +2,7 @@
  * Modal Component — confirmation dialogs
  */
 
-import { qs } from '../utils/dom.js';
+import { qs, escapeHTML } from '../utils/dom.js';
 
 let activeModal = null;
 
@@ -30,11 +30,11 @@ export function showModal({
     backdrop.className = 'modal-backdrop';
     backdrop.innerHTML = `
       <div class="modal" role="dialog" aria-modal="true">
-        <h3 class="modal-title">${title}</h3>
-        <p class="modal-body">${body}</p>
+        <h3 class="modal-title">${escapeHTML(title)}</h3>
+        <p class="modal-body">${escapeHTML(body)}</p>
         <div class="modal-actions">
-          <button class="btn btn-ghost" id="modal-cancel">${cancelLabel}</button>
-          <button class="${confirmClass}" id="modal-confirm">${confirmLabel}</button>
+          <button class="btn btn-ghost" id="modal-cancel">${escapeHTML(cancelLabel)}</button>
+          <button class="${confirmClass}" id="modal-confirm">${escapeHTML(confirmLabel)}</button>
         </div>
       </div>
     `;

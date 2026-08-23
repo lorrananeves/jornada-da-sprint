@@ -2,6 +2,21 @@
  * DOM Utility Helpers
  */
 
+/**
+ * Escape a string for safe insertion into HTML.
+ * Converts &, <, >, ", ' to their HTML entities.
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function escapeHTML(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /** Query selector shorthand */
 export const qs = (selector, root = document) => root.querySelector(selector);
 

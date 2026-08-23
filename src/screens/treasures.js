@@ -7,7 +7,7 @@ import {
 } from '../state/store.js';
 import { xpForTreasure } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
-import { uid } from '../utils/dom.js';
+import { uid, escapeHTML } from '../utils/dom.js';
 
 const CATEGORIES = [
   { id: 'treasure',    emoji: '💎', label: 'Tesouro',        question: 'O que funcionou bem nessa Sprint?' },
@@ -54,11 +54,11 @@ function buildColumn(cat, treasures) {
     card.innerHTML = `
       <div class="card-header">
         <span class="card-emoji">${cat.emoji}</span>
-        <span class="card-text">${item.text}</span>
+        <span class="card-text">${escapeHTML(item.text)}</span>
       </div>
       <div class="card-reactions">
         ${REACTIONS.map((r) => `
-          <button class="reaction-btn" data-id="${item.id}" data-reaction="${r.key}">
+          <button class="reaction-btn" data-id="${escapeHTML(item.id)}" data-reaction="${r.key}">
             ${r.label} <span>${item.reactions[r.key] || 0}</span>
           </button>
         `).join('')}
