@@ -165,6 +165,22 @@ function setScalarState(scalars) {
   notify();
 }
 
+// ── Collection sort helpers ───────────────────────────────────────────────────
+
+/**
+ * Ordena uma coleção recebida do Firestore respeitando priorityRank quando
+ * disponível. Usado para monsters (e extensível a outras coleções no futuro).
+ */
+function sortCollection(col, items) {
+  if (col !== 'monsters') return items;
+  const ranked = items.filter((m) => m.priorityRank != null);
+  if (ranked.length === 0) return items;
+  // Se pelo menos um item tem rank, ordena toda a lista (itens sem rank vão para o final)
+  return [...items].sort(
+    (a, b) => (a.priorityRank ?? Infinity) - (b.priorityRank ?? Infinity)
+  );
+}
+
 // ── Firebase init ─────────────────────────────────────────────────────────────
 
 async function initFirebase() {
@@ -230,7 +246,7 @@ async function initFirebase() {
         for (const col of COLLECTIONS) {
           _unsubs.push(
             subscribeCollection(_sessionId, col, (items) => {
-              _state = { ..._state, [col]: items };
+              _state = { ..._state, [col]: sortCollection(col, items) };
               saveToStorage(_state);
               notify();
             })
@@ -245,7 +261,7 @@ async function initFirebase() {
     for (const col of COLLECTIONS) {
       _unsubs.push(
         subscribeCollection(_sessionId, col, (items) => {
-          _state = { ..._state, [col]: items };
+          _state = { ..._state, [col]: sortCollection(col, items) };
           saveToStorage(_state);
           notify();
         })
@@ -343,13 +359,19 @@ export function selectMonster(id) {
 }
 
 export function prioritizeMonsters() {
-  // Reordenação é apenas local/visual — não há campo de ordem no Firestore
-  _state = {
-    ..._state,
-    monsters: [..._state.monsters].sort(
-      (a, b) => (b.reactions?.fire || 0) - (a.reactions?.fire || 0)
-    ),
-  };
+  if (!_sessionId) return;
+  const sorted = [..._state.monsters].sort(
+    (a, b) => (b.reactions?.fire || 0) - (a.reactions?.fire || 0)
+  );
+  // Persiste a ordem como priorityRank em cada documento para que todos os
+  // participantes vejam a mesma ordem.
+  sorted.forEach((m, i) => {
+    patchItem(_sessionId, 'monsters', m.id, { priorityRank: i }).catch((e) =>
+      console.warn('Firestore prioritizeMonsters failed:', e)
+    );
+  });
+  // Optimistic local update — subscribeCollection vai confirmar com os dados reais
+  _state = { ..._state, monsters: sorted.map((m, i) => ({ ...m, priorityRank: i })) };
   notify();
 }
 

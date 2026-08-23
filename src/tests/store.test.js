@@ -10,20 +10,29 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+// ── Hoisted shared state (disponível dentro de vi.mock antes dos imports) ─────
+
+const { _mocks } = vi.hoisted(() => {
+  const _mocks = {
+    currentDeviceId: 'device-sm-aabbcc',
+    // Captura callbacks registados pelo store em subscribeCollection, por coleção.
+    colCallbacks: {},
+  };
+  return { _mocks };
+});
+
 // ── Mocks (declarados antes de qualquer import do módulo testado) ─────────────
 
 const DEVICE_SM   = 'device-sm-aabbcc';
 const DEVICE_TEAM = 'device-team-ddeeff';
 
-let _currentDeviceId = DEVICE_SM;
-
 vi.mock('../services/presence.js', () => ({
-  getDeviceId: () => _currentDeviceId,
+  getDeviceId: () => _mocks.currentDeviceId,
 }));
 
 vi.mock('../services/firebase.js', () => ({
   getOrCreateSessionId: () => 'test-session-id',
-  loadSession:          vi.fn().mockResolvedValue(null),
+  loadSession:          vi.fn().mockResolvedValue({ currentPhase: 'home', updatedAt: '1970-01-01T00:00:00.000Z' }),
   loadCollection:       vi.fn().mockResolvedValue([]),
   saveSession:          vi.fn().mockResolvedValue(undefined),
   incrementXP:          vi.fn().mockResolvedValue(undefined),
@@ -31,7 +40,10 @@ vi.mock('../services/firebase.js', () => ({
   patchItem:            vi.fn().mockResolvedValue(undefined),
   removeItem:           vi.fn().mockResolvedValue(undefined),
   subscribeSession:     vi.fn().mockReturnValue(() => {}),
-  subscribeCollection:  vi.fn().mockReturnValue(() => {}),
+  subscribeCollection:  vi.fn().mockImplementation((_, col, cb) => {
+    _mocks.colCallbacks[col] = cb;
+    return () => {};
+  }),
   increment:            (n) => ({ _increment: n }),
 }));
 
@@ -49,11 +61,13 @@ import {
   resetState,
 } from '../state/store.js';
 
+import { patchItem } from '../services/firebase.js';
+
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
   resetState();
-  _currentDeviceId = DEVICE_SM;
+  _mocks.currentDeviceId = DEVICE_SM;
 });
 
 // ── isSM ─────────────────────────────────────────────────────────────────────
@@ -65,13 +79,13 @@ describe('isSM', () => {
 
   it('retorna true quando deviceId bate com smDeviceId no estado', () => {
     setState({ smDeviceId: DEVICE_SM });
-    _currentDeviceId = DEVICE_SM;
+    _mocks.currentDeviceId = DEVICE_SM;
     expect(isSM()).toBe(true);
   });
 
   it('retorna false quando deviceId é diferente do smDeviceId', () => {
     setState({ smDeviceId: DEVICE_SM });
-    _currentDeviceId = DEVICE_TEAM;
+    _mocks.currentDeviceId = DEVICE_TEAM;
     expect(isSM()).toBe(false);
   });
 });
@@ -81,7 +95,7 @@ describe('isSM', () => {
 describe('setPhase', () => {
   beforeEach(() => {
     setState({ smDeviceId: DEVICE_SM });
-    _currentDeviceId = DEVICE_SM;
+    _mocks.currentDeviceId = DEVICE_SM;
   });
 
   it('SM consegue avançar para qualquer fase', () => {
@@ -91,7 +105,7 @@ describe('setPhase', () => {
 
   it('membro do time não pode alterar a fase atual', () => {
     setPhase('checkin');             // SM avança
-    _currentDeviceId = DEVICE_TEAM; // simula outro device
+    _mocks.currentDeviceId = DEVICE_TEAM; // simula outro device
     setPhase('treasures');           // tentativa bloqueada
     expect(getState().currentPhase).toBe('checkin');
   });
@@ -110,7 +124,7 @@ describe('setPhase', () => {
 describe('completePhase', () => {
   beforeEach(() => {
     setState({ smDeviceId: DEVICE_SM });
-    _currentDeviceId = DEVICE_SM;
+    _mocks.currentDeviceId = DEVICE_SM;
   });
 
   it('adiciona fase à lista de completedPhases', () => {
@@ -126,7 +140,7 @@ describe('completePhase', () => {
   });
 
   it('membro do time não pode completar fase', () => {
-    _currentDeviceId = DEVICE_TEAM;
+    _mocks.currentDeviceId = DEVICE_TEAM;
     completePhase('checkin');
     expect(getState().completedPhases).not.toContain('checkin');
   });
@@ -222,25 +236,76 @@ describe('subscribe', () => {
 
 // ── prioritizeMonsters ────────────────────────────────────────────────────────
 
+// Helper: injeta monstros no estado via o callback capturado de subscribeCollection,
+// simulando uma atualização em tempo real do Firestore.
+function seedMonsters(monsters) {
+  _mocks.colCallbacks.monsters?.(monsters);
+}
+
 describe('prioritizeMonsters', () => {
-  it('algoritmo de sort ordena por fire decrescente', () => {
-    // O store não expõe injeção direta de coleção sem passar pelo Firestore,
-    // então testamos o invariante do algoritmo de sort que prioritizeMonsters
-    // usa internamente (mesma expressão do store.js).
-    const monsters = [
-      { id: 'a', reactions: { fire: 1 } },
-      { id: 'b', reactions: { fire: 5 } },
-      { id: 'c', reactions: { fire: 3 } },
-    ];
-    const sorted = [...monsters].sort(
-      (a, b) => (b.reactions?.fire || 0) - (a.reactions?.fire || 0)
-    );
-    expect(sorted[0].id).toBe('b');
-    expect(sorted[1].id).toBe('c');
-    expect(sorted[2].id).toBe('a');
+  beforeEach(() => {
+    setState({ smDeviceId: DEVICE_SM });
+    _mocks.currentDeviceId = DEVICE_SM;
+    patchItem.mockClear();
   });
 
   it('não lança erro quando monsters está vazio', () => {
     expect(() => prioritizeMonsters()).not.toThrow();
+    expect(patchItem).not.toHaveBeenCalled();
+  });
+
+  it('persiste priorityRank no Firestore em ordem fire decrescente', () => {
+    seedMonsters([
+      { id: 'a', text: 'A', reactions: { fire: 1, eyes: 0, bulb: 0 }, selected: false },
+      { id: 'b', text: 'B', reactions: { fire: 5, eyes: 0, bulb: 0 }, selected: false },
+      { id: 'c', text: 'C', reactions: { fire: 3, eyes: 0, bulb: 0 }, selected: false },
+    ]);
+    patchItem.mockClear(); // descarta os calls do seedMonsters se houver
+
+    prioritizeMonsters();
+
+    // Deve ter chamado patchItem para cada monstro com o campo priorityRank
+    expect(patchItem).toHaveBeenCalledTimes(3);
+    expect(patchItem).toHaveBeenCalledWith('test-session-id', 'monsters', 'b', { priorityRank: 0 });
+    expect(patchItem).toHaveBeenCalledWith('test-session-id', 'monsters', 'c', { priorityRank: 1 });
+    expect(patchItem).toHaveBeenCalledWith('test-session-id', 'monsters', 'a', { priorityRank: 2 });
+  });
+
+  it('reordena o estado local na mesma ordem', () => {
+    seedMonsters([
+      { id: 'a', text: 'A', reactions: { fire: 1, eyes: 0, bulb: 0 }, selected: false },
+      { id: 'b', text: 'B', reactions: { fire: 5, eyes: 0, bulb: 0 }, selected: false },
+      { id: 'c', text: 'C', reactions: { fire: 3, eyes: 0, bulb: 0 }, selected: false },
+    ]);
+
+    prioritizeMonsters();
+
+    const ids = getState().monsters.map((m) => m.id);
+    expect(ids).toEqual(['b', 'c', 'a']);
+  });
+
+  it('atribui priorityRank ao estado local', () => {
+    seedMonsters([
+      { id: 'x', text: 'X', reactions: { fire: 2, eyes: 0, bulb: 0 }, selected: false },
+      { id: 'y', text: 'Y', reactions: { fire: 7, eyes: 0, bulb: 0 }, selected: false },
+    ]);
+
+    prioritizeMonsters();
+
+    const { monsters } = getState();
+    expect(monsters.find((m) => m.id === 'y').priorityRank).toBe(0);
+    expect(monsters.find((m) => m.id === 'x').priorityRank).toBe(1);
+  });
+
+  it('ordena por priorityRank ao receber snapshot remoto do Firestore', () => {
+    // Simula o SM ter executado prioritizeMonsters — Firestore entrega com ranks
+    seedMonsters([
+      { id: 'a', text: 'A', reactions: { fire: 1 }, selected: false, priorityRank: 2 },
+      { id: 'b', text: 'B', reactions: { fire: 5 }, selected: false, priorityRank: 0 },
+      { id: 'c', text: 'C', reactions: { fire: 3 }, selected: false, priorityRank: 1 },
+    ]);
+
+    const ids = getState().monsters.map((m) => m.id);
+    expect(ids).toEqual(['b', 'c', 'a']);
   });
 });
