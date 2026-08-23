@@ -180,11 +180,12 @@ function isValidTreasure(data) {
 }
 
 function isValidMonster(data) {
-  return data.keys().hasOnly(['text', 'reactions', 'selected'])
+  return data.keys().hasOnly(['text', 'reactions', 'selected', 'priorityRank'])
     && data.text is string
     && data.text.size() >= 1 && data.text.size() <= 1000
     && data.reactions is map
-    && data.selected is bool;
+    && data.selected is bool
+    && (data.get('priorityRank', null) == null || data.get('priorityRank', null) is number);
 }
 
 function isValidSolution(data) {
@@ -222,10 +223,12 @@ function isReactionUpdate(newData, oldData, immutableFields) {
        );
 }
 
-// Monstro: permite mudar reactions.* e selected, nada mais
+// Monstro: permite mudar reactions.*, selected e priorityRank (se presente, deve ser number)
 function isMonsterUpdate(newData, oldData) {
   return newData.get('text', '') == oldData.get('text', '')
-    && newData.get('text', '') is string;
+    && newData.get('text', '') is string
+    && (!('priorityRank' in newData.diff(oldData).affectedKeys())
+        || newData.get('priorityRank', null) is number);
 }
 
 // Solução: só votes pode aumentar (nunca diminuir)
