@@ -3,6 +3,7 @@
  */
 
 import { getState, subscribe, setPhase } from '../state/store.js';
+import { subscribeParticipants } from '../services/presence.js';
 import { qs } from '../utils/dom.js';
 
 const PHASES = [
@@ -19,6 +20,9 @@ const PHASES = [
 // Phases where navbar is hidden (no progress bar needed)
 const HIDDEN_PHASES = new Set(['home', 'roleSelect', 'lobby']);
 
+/** Unsubscribe handle para a assinatura de presença atual */
+let _unsubPresence = null;
+
 function renderNavbar() {
   const root = qs('#navbar-root');
   if (!root) return;
@@ -28,6 +32,7 @@ function renderNavbar() {
 
   // hide navbar on pre-retro screens
   if (HIDDEN_PHASES.has(currentPhase)) {
+    _stopPresence();
     root.innerHTML = '';
     return;
   }
@@ -37,7 +42,13 @@ function renderNavbar() {
       <div class="navbar-inner">
         <div class="navbar-top">
           <span class="navbar-brand">⚔️ Jornada da Sprint</span>
-          <span class="xp-badge">⭐ ${xp.toLocaleString('pt-BR')} XP</span>
+          <div class="navbar-top-right">
+            <span class="online-pill" id="online-pill" title="Participantes online">
+              <span class="online-dot"></span>
+              <span class="online-count">–</span>
+            </span>
+            <span class="xp-badge">⭐ ${xp.toLocaleString('pt-BR')} XP</span>
+          </div>
         </div>
         <div class="progress-bar-track" role="progressbar">
           ${PHASES.map((phase) => {
@@ -58,6 +69,15 @@ function renderNavbar() {
     </nav>
   `;
 
+  // Assina contagem de presença — cancela assinatura anterior se houver
+  _stopPresence();
+  _unsubPresence = subscribeParticipants((count) => {
+    const pill = qs('#online-pill');
+    if (!pill) return;
+    pill.querySelector('.online-count').textContent = count;
+    pill.title = `${count} participante${count !== 1 ? 's' : ''} online`;
+  });
+
   // Phase step click — allow navigating to completed phases
   root.querySelectorAll('.phase-step').forEach((el) => {
     el.addEventListener('click', () => {
@@ -71,6 +91,13 @@ function renderNavbar() {
       }
     });
   });
+}
+
+function _stopPresence() {
+  if (_unsubPresence) {
+    _unsubPresence();
+    _unsubPresence = null;
+  }
 }
 
 export function initNavbar() {

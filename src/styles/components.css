@@ -391,6 +391,44 @@
   box-shadow: var(--glow-accent);
 }
 
+/* Agrupa o pill de presença + badge de XP à direita da navbar */
+.navbar-top-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Pill "N online" */
+.online-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 3px 10px 3px 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: default;
+  user-select: none;
+}
+
+/* Ponto verde pulsante */
+.online-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  flex-shrink: 0;
+  animation: online-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes online-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.75); }
+}
+
 .progress-bar-track {
   display: flex;
   align-items: center;
