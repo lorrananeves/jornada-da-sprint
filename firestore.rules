@@ -84,16 +84,16 @@ service cloud.firestore {
       // ── Presença (lobby) ─────────────────────────────────────────────────
       match /presence/{deviceId} {
         allow read: if true;
-        allow write: if
-          deviceId.matches('^[0-9a-f]{12,32}$')
-          && (
-            request.resource == null
-            || (
-              request.resource.data.keys().hasOnly(['joinedAt', 'deviceId'])
-              && request.resource.data.deviceId is string
-              && request.resource.data.deviceId.size() <= 32
-            )
-          );
+        // delete: permitido (leaveSession melhor esforço)
+        allow delete: if deviceId.matches('^[0-9a-f]{16}$');
+        // create/update: heartbeat — valida schema com lastSeen + expiresAt
+        allow create, update: if
+          deviceId.matches('^[0-9a-f]{16}$')
+          && request.resource.data.keys().hasOnly(['deviceId', 'lastSeen', 'expiresAt'])
+          && request.resource.data.deviceId is string
+          && request.resource.data.deviceId.size() == 16
+          && request.resource.data.expiresAt is number
+          && request.resource.data.expiresAt > request.time.toMillis();
       }
     }
 

@@ -10,7 +10,7 @@
 
 import { getState, setState, setPhase } from '../state/store.js';
 import { getRole } from '../state/store.js';
-import { getSessionUrl, subscribeParticipants } from '../services/presence.js';
+import { getSessionUrl, subscribeParticipants, stopHeartbeat, leaveSession } from '../services/presence.js';
 import { escapeHTML } from '../utils/dom.js';
 
 let _unsubscribe = null;
@@ -121,6 +121,9 @@ function cleanup() {
     _unsubscribe();
     _unsubscribe = null;
   }
+  // Para o heartbeat e remove presença ao sair voluntariamente do lobby
+  stopHeartbeat();
+  leaveSession();
 }
 
 function formatDate(dateStr) {
