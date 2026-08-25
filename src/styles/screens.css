@@ -375,11 +375,111 @@
 .monster-card {
   cursor: pointer;
   position: relative;
+  transition: transform var(--transition), box-shadow var(--transition),
+    border-color var(--transition), opacity var(--transition);
 }
 
 .monster-card.selected-monster {
   border-color: var(--accent);
   box-shadow: var(--glow-accent);
+}
+
+/* ── Drag & Drop states ─────────────────────────────────── */
+
+/* Card sendo arrastado — levemente levantado antes de virar fantasma */
+.monster-card--dragging {
+  cursor: grabbing;
+  box-shadow: var(--shadow-lg);
+  transform: scale(1.03) rotate(1deg);
+  z-index: 10;
+}
+
+/* Fantasma no lugar de origem durante o drag */
+.monster-card--ghost {
+  opacity: 0.35;
+}
+
+/* Zona de drop válida — destaque verde */
+.monster-card--drop-target {
+  border-color: var(--success) !important;
+  box-shadow: 0 0 0 3px rgba(63, 185, 80, 0.35) !important;
+  transform: scale(1.02);
+}
+
+/* Card que já foi mesclado */
+.monster-card--merged {
+  border-color: rgba(163, 113, 247, 0.5);
+}
+
+.monster-drag-handle {
+  font-size: 1.2rem;
+  color: var(--text-muted);
+  cursor: grab;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  user-select: none;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.monster-drag-handle:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.monster-badge-merged {
+  background: var(--purple-dim);
+  color: var(--purple);
+  border: 1px solid rgba(163, 113, 247, 0.3);
+  border-radius: 100px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.merge-hint {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ── Merge modal preview ─────────────────────────────────── */
+.merge-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+}
+
+.merge-preview-card {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.merge-preview-text {
+  font-size: 0.9375rem;
+  color: var(--text);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.merge-preview-plus {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .merge-preview { flex-direction: column; }
+  .merge-preview-plus { align-self: center; }
 }
 
 .monster-card-actions {

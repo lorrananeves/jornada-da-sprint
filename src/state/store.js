@@ -362,6 +362,41 @@ export function selectMonster(id) {
   );
 }
 
+export function mergeMonsters(keepId, dropId, newText) {
+  if (!_sessionId) return;
+  const keep = _state.monsters.find((m) => m.id === keepId);
+  const drop = _state.monsters.find((m) => m.id === dropId);
+  if (!keep || !drop) return;
+
+  // Soma reactions e preserva selected se qualquer um estava selecionado
+  const merged = {
+    ...(newText && newText !== keep.text ? { text: newText } : {}),
+    reactions: {
+      fire: (keep.reactions?.fire || 0) + (drop.reactions?.fire || 0),
+      eyes: (keep.reactions?.eyes || 0) + (drop.reactions?.eyes || 0),
+      bulb: (keep.reactions?.bulb || 0) + (drop.reactions?.bulb || 0),
+    },
+    selected: keep.selected || drop.selected,
+    mergedFrom: [...(keep.mergedFrom || [keep.id]), drop.id],
+  };
+
+  patchItem(_sessionId, 'monsters', keepId, merged).catch((e) =>
+    console.warn('Firestore mergeMonsters patch failed:', e)
+  );
+  removeItem(_sessionId, 'monsters', dropId).catch((e) =>
+    console.warn('Firestore mergeMonsters remove failed:', e)
+  );
+
+  // Optimistic local update
+  _state = {
+    ..._state,
+    monsters: _state.monsters
+      .filter((m) => m.id !== dropId)
+      .map((m) => m.id === keepId ? { ...m, ...merged } : m),
+  };
+  notify();
+}
+
 export function prioritizeMonsters() {
   if (!_sessionId) return;
   const sorted = [..._state.monsters].sort(

@@ -4,7 +4,7 @@
 
 import {
   getState, addMonster, reactToMonster, selectMonster, prioritizeMonsters,
-  addXP, setPhase, completePhase, isSM,
+  mergeMonsters, addXP, setPhase, completePhase, isSM,
 } from '../state/store.js';
 import { xpForMonster } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
@@ -23,18 +23,25 @@ const REACTIONS = [
   { key: 'bulb', label: '💡', title: 'Tenho uma ideia' },
 ];
 
-function buildMonsterCard(m) {
+function buildMonsterCard(m, draggable) {
   const card = document.createElement('div');
-  card.className = `card card-sm monster-card card-appear${m.selected ? ' selected-monster' : ''}`;
+  card.className = `card card-sm monster-card card-appear${m.selected ? ' selected-monster' : ''}${m.mergedFrom?.length ? ' monster-card--merged' : ''}`;
   card.dataset.id = m.id;
+
+  if (draggable) {
+    card.setAttribute('draggable', 'true');
+    card.setAttribute('aria-grabbed', 'false');
+  }
 
   card.innerHTML = `
     <div class="card-header" style="align-items:flex-start">
-      <span class="card-emoji">👹</span>
+      <span class="card-emoji">${m.mergedFrom?.length ? '🔗' : '👹'}</span>
       <div style="flex:1">
         <span class="card-text">${escapeHTML(m.text)}</span>
+        ${m.mergedFrom?.length ? `<span class="badge monster-badge-merged" style="margin-top:4px;display:inline-flex" title="Agrupa ${m.mergedFrom.length} monstros">🔗 Mesclado (${m.mergedFrom.length + 1})</span>` : ''}
         ${m.selected ? '<span class="badge badge-accent" style="margin-top:4px;display:inline-flex">🎯 Selecionado</span>' : ''}
       </div>
+      ${draggable ? '<span class="monster-drag-handle" title="Arraste sobre outro card para mesclar">⠿</span>' : ''}
     </div>
     <div class="monster-card-actions">
       ${REACTIONS.map((r) => `
@@ -51,13 +58,94 @@ function buildMonsterCard(m) {
   return card;
 }
 
+/**
+ * Modal de confirmação de merge.
+ * Retorna Promise<{ confirmed: boolean, keepText: string }> — o keepText é o
+ * texto que o SM escolheu usar como nome do card resultante.
+ */
+function showMergeModal(keepMonster, dropMonster) {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="merge-modal-title" style="max-width:500px">
+        <h2 class="modal-title" id="merge-modal-title">🔗 Mesclar Monstros?</h2>
+        <p class="modal-body" style="margin-bottom:16px">
+          Os dois cards serão unidos em um só. As reactions serão somadas.
+          Edite o nome do card resultante se quiser.
+        </p>
+
+        <div class="merge-preview">
+          <div class="merge-preview-card">
+            <span style="font-size:0.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Card A</span>
+            <p class="merge-preview-text">${escapeHTML(keepMonster.text)}</p>
+          </div>
+          <div class="merge-preview-plus">+</div>
+          <div class="merge-preview-card">
+            <span style="font-size:0.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Card B</span>
+            <p class="merge-preview-text">${escapeHTML(dropMonster.text)}</p>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin:16px 0">
+          <label class="form-label" for="merge-name-input">Nome do card mesclado</label>
+          <input class="form-input" id="merge-name-input" type="text" value="${escapeHTML(keepMonster.text)}" />
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn btn-ghost" id="btn-merge-cancel">Cancelar</button>
+          <button class="btn btn-primary" id="btn-merge-confirm">🔗 Mesclar</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(backdrop);
+
+    const input = backdrop.querySelector('#merge-name-input');
+    input.focus();
+    input.select();
+
+    backdrop.querySelector('#btn-merge-cancel').addEventListener('click', () => {
+      backdrop.remove();
+      resolve({ confirmed: false, keepText: '' });
+    });
+
+    backdrop.querySelector('#btn-merge-confirm').addEventListener('click', () => {
+      const keepText = input.value.trim() || keepMonster.text;
+      backdrop.remove();
+      resolve({ confirmed: true, keepText });
+    });
+
+    // Fechar clicando fora
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) {
+        backdrop.remove();
+        resolve({ confirmed: false, keepText: '' });
+      }
+    });
+
+    // Fechar com Escape
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        backdrop.remove();
+        document.removeEventListener('keydown', onKey);
+        resolve({ confirmed: false, keepText: '' });
+      }
+    };
+    document.addEventListener('keydown', onKey);
+  });
+}
+
 export function renderMonsters(root) {
   let _timer = null;
+  // Id do card sendo arrastado (só relevante para o SM)
+  let _dragId = null;
 
   function render() {
     const state = getState();
     const monsters = state.monsters;
     const selectedCount = monsters.filter((m) => m.selected).length;
+    const sm = isSM();
 
     preserveInputs(root, () => { root.innerHTML = `
       <div class="screen-monsters screen-enter">
@@ -68,6 +156,7 @@ export function renderMonsters(root) {
           </div>
           <p class="phase-description">
             O que atrapalhou a equipe? Identifique os problemas e priorize os mais críticos.
+            ${sm ? '<span class="merge-hint">Arraste um card sobre outro para mesclar duplicados.</span>' : ''}
           </p>
         </div>
 
@@ -87,7 +176,7 @@ export function renderMonsters(root) {
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <h4>Monstros identificados <span class="badge badge-info">${monsters.length}</span></h4>
           <div style="display:flex;gap:8px;align-items:center">
-            ${selectedCount > 0 ? `<span class="badge badge-accent">🎯 ${selectedCount} selecionado${selectedCount !== 1 ? 's' : ''}</span>` : ''}
+            ${selectedCount > 0 ? `<span class="badge badge-accent" data-selected-count>🎯 ${selectedCount} selecionado${selectedCount !== 1 ? 's' : ''}</span>` : ''}
             <button class="btn btn-ghost btn-sm" id="btn-prioritize">🔥 PRIORIZAR AUTOMATICAMENTE</button>
           </div>
         </div>
@@ -98,7 +187,7 @@ export function renderMonsters(root) {
 
         <div class="phase-nav">
           <button class="btn btn-ghost" id="btn-back">← Voltar</button>
-          ${isSM()
+          ${sm
             ? `<button class="btn btn-primary" id="btn-next" ${selectedCount > 0 ? '' : 'disabled'}>🛡️ IR PARA COMBATE →</button>`
             : `<span class="text-muted" style="font-size:0.875rem">Aguardando o Scrum Master avançar…</span>`}
         </div>
@@ -106,7 +195,7 @@ export function renderMonsters(root) {
     `; // end preserveInputs
       const grid = root.querySelector('#monsters-grid');
       if (monsters.length > 0) {
-        monsters.forEach((m) => grid.appendChild(buildMonsterCard(m)));
+        monsters.forEach((m) => grid.appendChild(buildMonsterCard(m, sm)));
       }
     });
 
@@ -117,6 +206,8 @@ export function renderMonsters(root) {
   }
 
   function attachEvents() {
+    const sm = isSM();
+
     // Suggestion chips
     root.querySelectorAll('[data-suggestion]').forEach((chip) => {
       chip.addEventListener('click', () => {
@@ -149,7 +240,7 @@ export function renderMonsters(root) {
       render();
     });
 
-    // Reactions — patch cirúrgico: incrementa o contador sem render completo
+    // Reactions — patch cirúrgico
     root.querySelectorAll('.reaction-btn[data-reaction]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -159,13 +250,12 @@ export function renderMonsters(root) {
       });
     });
 
-    // Select — só altera aparência do card, não destrói o input
+    // Select — patch cirúrgico
     root.querySelectorAll('[data-select]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const id = btn.dataset.select;
         selectMonster(id);
-        // Patch visual do card: inverte classes selected e texto do botão
         const card = root.querySelector(`.monster-card[data-id="${CSS.escape(id)}"]`);
         if (card) {
           const isNowSelected = !card.classList.contains('selected-monster');
@@ -184,15 +274,69 @@ export function renderMonsters(root) {
           } else if (!isNowSelected && badge) {
             badge.remove();
           }
-          // Atualiza o contador e botão "ir para combate" sem re-render
           const newCount = root.querySelectorAll('.monster-card.selected-monster').length;
           const nextBtn = root.querySelector('#btn-next');
           if (nextBtn) nextBtn.disabled = newCount === 0;
-          const countBadge = root.querySelector('.badge-accent[data-selected-count]');
+          const countBadge = root.querySelector('[data-selected-count]');
           if (countBadge) countBadge.textContent = `🎯 ${newCount} selecionado${newCount !== 1 ? 's' : ''}`;
         }
       });
     });
+
+    // ── Drag & Drop (SM only) ──────────────────────────────────────────────
+    if (sm) {
+      root.querySelectorAll('.monster-card[draggable]').forEach((card) => {
+        card.addEventListener('dragstart', (e) => {
+          _dragId = card.dataset.id;
+          card.setAttribute('aria-grabbed', 'true');
+          card.classList.add('monster-card--dragging');
+          e.dataTransfer.effectAllowed = 'move';
+          // Pequeno delay para o browser capturar o snapshot antes de adicionar a classe
+          setTimeout(() => card.classList.add('monster-card--ghost'), 0);
+        });
+
+        card.addEventListener('dragend', () => {
+          _dragId = null;
+          card.setAttribute('aria-grabbed', 'false');
+          card.classList.remove('monster-card--dragging', 'monster-card--ghost');
+          // Remove highlight de todos os alvos
+          root.querySelectorAll('.monster-card--drop-target').forEach((c) =>
+            c.classList.remove('monster-card--drop-target')
+          );
+        });
+
+        card.addEventListener('dragover', (e) => {
+          if (!_dragId || card.dataset.id === _dragId) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          card.classList.add('monster-card--drop-target');
+        });
+
+        card.addEventListener('dragleave', () => {
+          card.classList.remove('monster-card--drop-target');
+        });
+
+        card.addEventListener('drop', async (e) => {
+          e.preventDefault();
+          card.classList.remove('monster-card--drop-target');
+
+          const dropId  = _dragId;
+          const keepId  = card.dataset.id;
+          if (!dropId || dropId === keepId) return;
+
+          const state    = getState();
+          const keepMon  = state.monsters.find((m) => m.id === keepId);
+          const dropMon  = state.monsters.find((m) => m.id === dropId);
+          if (!keepMon || !dropMon) return;
+
+          const { confirmed, keepText } = await showMergeModal(keepMon, dropMon);
+          if (!confirmed) return;
+
+          mergeMonsters(keepId, dropId, keepText);
+          // render() será chamado via subscribeCollection (Firestore) ou pelo optimistic update
+        });
+      });
+    }
 
     root.querySelector('#btn-back').addEventListener('click', () => setPhase('treasures'));
     root.querySelector('#btn-next')?.addEventListener('click', () => {
