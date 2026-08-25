@@ -36,25 +36,33 @@ jobs:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ hashFiles('firebase.json') }}
 
-      - name: Start Firestore Emulator
-        run: npx firebase emulators:start --only firestore --project demo-project &
+      # Força o download dos binários antes do exec para que o cache funcione.
+      # Na segunda rodada em diante esse step é instantâneo (cache hit).
+      - name: Download emulator binaries
+        run: |
+          npx firebase emulators:start --only firestore --project demo-project &
+          EMULATOR_PID=$!
+          sleep 30
+          kill $EMULATOR_PID 2>/dev/null || true
         env:
-          # Sem credenciais reais — o emulador não precisa delas
           FIREBASE_TOKEN: unused
-
-      - name: Wait for emulator to be ready
-        run: npx wait-on tcp:127.0.0.1:8080 --timeout 30000
 
       - name: Build app (emulator mode)
         run: npm run build
         env:
           VITE_FIREBASE_USE_EMULATOR: 'true'
 
-      - name: Run E2E tests
-        run: npm run test:e2e
+      # emulators:exec sobe o emulador, executa o comando e derruba — sem race condition.
+      - name: Run E2E tests (inside emulator)
+        run: |
+          npx firebase emulators:exec \
+            --only firestore \
+            --project demo-project \
+            "npm run test:e2e"
         env:
           CI: 'true'
           VITE_FIREBASE_USE_EMULATOR: 'true'
+          FIREBASE_TOKEN: unused
 
       - name: Upload Playwright report on failure
         if: failure()
