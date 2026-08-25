@@ -52,8 +52,8 @@ test('Membro registra check-in e SM vê indicador atualizado em tempo real', asy
   await memberJoin(memberPage);
   await startRetro(smPage, memberPage);
 
-  // SM vê o indicador com 0 respostas (participantCount=2 foi configurado na fixture)
-  await expect(smPage.getByText(/0 de 2/i)).toBeVisible();
+  // SM vê o indicador com 0 respostas — aguarda participantCount=2 chegar via Firestore
+  await expect(smPage.getByText(/0 de 2/i)).toBeVisible({ timeout: 15_000 });
 
   // Membro registra check-in com nota 4
   await memberPage.locator('.score-btn[data-score="4"]').click();
