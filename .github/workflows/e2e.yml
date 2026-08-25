@@ -36,23 +36,13 @@ jobs:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ hashFiles('firebase.json') }}
 
-      # Força o download dos binários antes do exec para que o cache funcione.
-      # Na segunda rodada em diante esse step é instantâneo (cache hit).
-      - name: Download emulator binaries
-        run: |
-          npx firebase emulators:start --only firestore --project demo-project &
-          EMULATOR_PID=$!
-          sleep 30
-          kill $EMULATOR_PID 2>/dev/null || true
-        env:
-          FIREBASE_TOKEN: unused
-
       - name: Build app (emulator mode)
         run: npm run build
         env:
           VITE_FIREBASE_USE_EMULATOR: 'true'
 
-      # emulators:exec sobe o emulador, executa o comando e derruba — sem race condition.
+      # emulators:exec sobe o emulador, aguarda readiness, roda os testes e derruba.
+      # É o único processo usando a porta 8080 — sem conflito.
       - name: Run E2E tests (inside emulator)
         run: |
           npx firebase emulators:exec \
