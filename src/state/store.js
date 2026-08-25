@@ -57,6 +57,8 @@ const DEFAULT_STATE = () => ({
   xp:               0,
   smDeviceId:       null,
   completedPhases:  [],
+  phaseDurations:   {},   // { checkin: 5, treasures: 10, ... } em minutos; 0 = sem timer
+  phaseStartedAt:   {},   // { checkin: ISOString } — momento em que a fase foi iniciada
   createdAt:        new Date().toISOString(),
   updatedAt:        new Date().toISOString(),
   // ── subcoleções (mantidas em memória como arrays) ──
@@ -277,7 +279,9 @@ export function setPhase(phase) {
     console.warn('[setPhase] bloqueado — somente o Scrum Master pode avançar fases.');
     return;
   }
-  setScalarState({ currentPhase: phase });
+  // Registra o momento de início da fase para o timer
+  const phaseStartedAt = { ..._state.phaseStartedAt, [phase]: new Date().toISOString() };
+  setScalarState({ currentPhase: phase, phaseStartedAt });
 }
 
 export function completePhase(phase) {

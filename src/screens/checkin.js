@@ -8,12 +8,14 @@ import { calcCheckinStats, getMoodLabel } from '../services/stats.js';
 import { showXPToast } from '../components/xpToast.js';
 import { getScoreEmoji, getScoreLabel } from '../utils/format.js';
 import { escapeHTML, preserveInputs } from '../utils/dom.js';
+import { createPhaseTimer } from '../components/phaseTimer.js';
 
 const SCORES = [1, 2, 3, 4, 5];
 
 export function renderCheckin(root) {
   const _state = getState();
   let selectedScore = null;
+  let _timer = null;
 
   function buildCheckinForm() {
     return `
@@ -129,6 +131,9 @@ export function renderCheckin(root) {
         </div>
       </div>
     `; }); // end preserveInputs
+
+    if (_timer) _timer.destroy();
+    _timer = createPhaseTimer(root.querySelector('.screen-checkin'), 'checkin');
 
     attachEvents();
   }

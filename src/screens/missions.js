@@ -10,6 +10,7 @@ import { showXPToast } from '../components/xpToast.js';
 import { showModal } from '../components/modal.js';
 import { uid, escapeHTML, preserveInputs } from '../utils/dom.js';
 import { getPriorityLabel, getStrategyLabel, formatDate } from '../utils/format.js';
+import { createPhaseTimer } from '../components/phaseTimer.js';
 
 const PRIORITIES = [
   { id: 'high',   label: 'Alta',  class: 'priority-badge-high' },
@@ -18,6 +19,8 @@ const PRIORITIES = [
 ];
 
 export function renderMissions(root) {
+  let _timer = null;
+
   function render() {
     const state = getState();
     const missions = state.missions;
@@ -137,6 +140,9 @@ export function renderMissions(root) {
         </div>
       </div>
     `; }); // end preserveInputs
+
+    if (_timer) _timer.destroy();
+    _timer = createPhaseTimer(root.querySelector('.screen-missions'), 'missions');
 
     attachEvents(prefill);
   }

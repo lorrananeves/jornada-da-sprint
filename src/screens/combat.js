@@ -9,6 +9,7 @@ import { xpForSolution } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
 import { uid, escapeHTML, preserveInputs } from '../utils/dom.js';
 import { getStrategyLabel } from '../utils/format.js';
+import { createPhaseTimer } from '../components/phaseTimer.js';
 
 const STRATEGIES = [
   { id: 'prevent', label: '🛡️ PREVENIR',        question: 'Como podemos evitar que isso aconteça?' },
@@ -21,6 +22,7 @@ export function renderCombat(root) {
   const selectedMonsters = state.monsters.filter((m) => m.selected);
   let currentMonsterIdx = 0;
   let currentStrategy = 'prevent';
+  let _timer = null;
 
   if (!selectedMonsters.length) {
     root.innerHTML = `
@@ -126,6 +128,9 @@ export function renderCombat(root) {
         </div>
       </div>
     `; }); // end preserveInputs
+
+    if (_timer) _timer.destroy();
+    _timer = createPhaseTimer(root.querySelector('.screen-combat'), 'combat');
 
     attachEvents(monster);
   }

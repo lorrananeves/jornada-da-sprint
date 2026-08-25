@@ -8,6 +8,7 @@ import {
 import { xpForTreasure } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
 import { uid, escapeHTML, preserveInputs } from '../utils/dom.js';
+import { createPhaseTimer } from '../components/phaseTimer.js';
 
 const CATEGORIES = [
   { id: 'treasure',    emoji: '💎', label: 'Tesouro',        question: 'O que funcionou bem nessa Sprint?' },
@@ -72,6 +73,8 @@ function buildColumn(cat, treasures) {
 }
 
 export function renderTreasures(root) {
+  let _timer = null;
+
   function render() {
     const state = getState();
 
@@ -100,6 +103,9 @@ export function renderTreasures(root) {
         cols.appendChild(buildColumn(cat, state.treasures));
       });
     });
+
+    if (_timer) _timer.destroy();
+    _timer = createPhaseTimer(root.querySelector('.screen-treasures'), 'treasures');
 
     attachEvents();
   }

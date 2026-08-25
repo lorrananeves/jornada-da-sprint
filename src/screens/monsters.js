@@ -9,6 +9,7 @@ import {
 import { xpForMonster } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
 import { uid, escapeHTML, preserveInputs } from '../utils/dom.js';
+import { createPhaseTimer } from '../components/phaseTimer.js';
 
 const SUGGESTIONS = [
   'Dependências externas', 'Problemas técnicos', 'Comunicação',
@@ -51,6 +52,8 @@ function buildMonsterCard(m) {
 }
 
 export function renderMonsters(root) {
+  let _timer = null;
+
   function render() {
     const state = getState();
     const monsters = state.monsters;
@@ -106,6 +109,9 @@ export function renderMonsters(root) {
         monsters.forEach((m) => grid.appendChild(buildMonsterCard(m)));
       }
     });
+
+    if (_timer) _timer.destroy();
+    _timer = createPhaseTimer(root.querySelector('.screen-monsters'), 'monsters');
 
     attachEvents();
   }
