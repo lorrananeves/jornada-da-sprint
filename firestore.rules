@@ -116,7 +116,7 @@ function isValidSessionRoot(data) {
     && data.keys().hasOnly([
       'sprint', 'team', 'currentPhase', 'retroStarted',
       'xp', 'completedPhases', 'createdAt', 'updatedAt', 'smDeviceId',
-      '_prefillMission'
+      '_prefillMission', 'phaseDurations', 'phaseStartedAt'
     ])
     && data.currentPhase is string
     && data.currentPhase.size() <= 32
@@ -144,7 +144,8 @@ function isValidTeam(team) {
   return team is map
     && team.keys().hasOnly(['name', 'participantCount'])
     && team.get('name', '') is string
-    && team.get('name', '').size() <= 120;
+    && team.get('name', '').size() <= 120
+    && (team.get('participantCount', '') is string || team.get('participantCount', 0) is number);
 }
 
 function isChangingPhaseFields(newData, oldData) {
@@ -223,10 +224,11 @@ function isReactionUpdate(newData, oldData, immutableFields) {
        );
 }
 
-// Monstro: permite mudar reactions.*, selected e priorityRank (se presente, deve ser number)
+// Monstro: permite mudar reactions.*, selected, priorityRank, text (merge) e mergedFrom
 function isMonsterUpdate(newData, oldData) {
-  return newData.get('text', '') == oldData.get('text', '')
-    && newData.get('text', '') is string
+  return newData.get('text', '') is string
+    && newData.get('text', '').size() >= 1
+    && newData.get('text', '').size() <= 1000
     && (!('priorityRank' in newData.diff(oldData).affectedKeys())
         || newData.get('priorityRank', null) is number);
 }
