@@ -1,84 +1,80 @@
 /**
  * E2E helpers — fixtures e utilitários compartilhados entre os testes.
  *
- * `twoParticipants` abre dois contextos de browser independentes (cookies, storage
- * e service workers isolados) navegando para a mesma URL de sessão, simulando um
- * Scrum Master e um membro do time em dispositivos distintos.
+ * Estratégia de sessão:
+ *   1. smPage abre a home sem ?s=, clica "COMEÇAR JORNADA", escolhe SM,
+ *      preenche o setup mínimo e chega ao Lobby — isso cria a sessão no Firestore.
+ *   2. A fixture captura o ?s= da URL do smPage.
+ *   3. memberPage abre /?s={id} — a sessão já existe, o store vai direto
+ *      para roleSelect sem precisar clicar em nada.
+ *
+ * Isso reflete o fluxo real: SM cria a sessão e compartilha o link.
  */
 
 import { test as base, expect } from '@playwright/test';
 
 /**
- * Gera um ID de sessão de 32 chars hex — mesmo formato que o app usa.
- */
-export function generateSessionId() {
-  return Array.from({ length: 32 }, () =>
-    Math.floor(Math.random() * 16).toString(16)
-  ).join('');
-}
-
-/**
- * Aguarda o app renderizar (qualquer tela) e garante que não estamos
- * na tela de erro de configuração.
+ * Aguarda o app renderizar e garante que não estamos na tela de erro.
  */
 async function waitForApp(page) {
-  // Espera o #screen-root ter algum conteúdo renderizado
-  await page.waitForSelector('#screen-root > *', { timeout: 15_000 });
-  // Garante que não caímos na tela de erro do Firebase
-  const errorText = page.getByText(/variáveis de ambiente ausentes|erro ao iniciar/i);
-  const hasError = await errorText.isVisible().catch(() => false);
+  await page.waitForSelector('#screen-root > *', { timeout: 20_000 });
+  const hasError = await page.getByText(/variáveis de ambiente ausentes|erro ao iniciar/i)
+    .isVisible().catch(() => false);
   if (hasError) {
-    throw new Error('App renderizou tela de erro do Firebase — emulador não configurado corretamente.');
+    throw new Error('App renderizou tela de erro — verifique a configuração do emulador.');
   }
-}
-
-/**
- * Navega até a tela de seleção de papel.
- * O fluxo é: home → clicar "COMEÇAR JORNADA" → roleSelect.
- * Se já estiver em roleSelect (URL com ?s= pode ir direto), apenas aguarda.
- */
-async function goToRoleSelect(page) {
-  await waitForApp(page);
-  // Se a tela de início estiver visível, clica para avançar
-  const startBtn = page.getByRole('button', { name: /começar jornada/i });
-  if (await startBtn.isVisible().catch(() => false)) {
-    await startBtn.click();
-  }
-  // Aguarda os botões de papel aparecerem
-  await page.waitForSelector('#btn-sm', { timeout: 10_000 });
 }
 
 /**
  * Fixture `twoParticipants`:
- *   - smPage     → contexto do Scrum Master
- *   - memberPage → contexto do membro do time
- *   - sessionId  → ID da sessão compartilhada
+ *   - smPage     → SM, já no Lobby após criar a sessão
+ *   - memberPage → membro, já no roleSelect da mesma sessão
+ *   - sessionId  → ID capturado da URL
  *
- * Ambas as páginas apontam para /?s={sessionId} em contextos isolados,
- * e já chegam à tela de seleção de papel prontas para interação.
+ * O SM está no Lobby; o membro está no roleSelect aguardando escolher papel.
+ * Os testes podem começar a partir desse estado.
  */
 export const test = base.extend({
   // eslint-disable-next-line no-empty-pattern
   twoParticipants: async ({ browser }, use) => {
-    const sessionId = generateSessionId();
-    const sessionUrl = `/?s=${sessionId}`;
+    // ── SM: cria a sessão ────────────────────────────────────────────────
+    const smContext = await browser.newContext();
+    const smPage    = await smContext.newPage();
 
-    const smContext     = await browser.newContext();
+    await smPage.goto('/');
+    await waitForApp(smPage);
+
+    // Sem sessão anterior → clica direto sem modal
+    await smPage.locator('#btn-start').click();
+    await smPage.waitForSelector('#btn-sm', { timeout: 10_000 });
+
+    // Escolhe papel SM → vai para setup
+    await smPage.locator('#btn-sm').click();
+    await smPage.waitForSelector('#sprint-name', { timeout: 10_000 });
+
+    // Preenche o mínimo e cria a sessão no Firestore
+    await smPage.locator('#sprint-name').fill('Sprint E2E');
+    await smPage.locator('#participant-count').fill('2');
+    await smPage.locator('#btn-start-journey').click();
+
+    // Aguarda o Lobby — neste ponto a sessão já existe no Firestore
+    await smPage.waitForSelector('#btn-start-retro', { timeout: 15_000 });
+
+    // ── Captura o sessionId da URL ────────────────────────────────────────
+    const sessionId = new URL(smPage.url()).searchParams.get('s');
+    if (!sessionId) throw new Error('App não gerou ?s= na URL — setup falhou.');
+
+    // ── Membro: entra na sessão já criada ─────────────────────────────────
     const memberContext = await browser.newContext();
+    const memberPage    = await memberContext.newPage();
 
-    const smPage     = await smContext.newPage();
-    const memberPage = await memberContext.newPage();
+    await memberPage.goto(`/?s=${sessionId}`);
+    await waitForApp(memberPage);
 
-    await smPage.goto(sessionUrl);
-    await memberPage.goto(sessionUrl);
+    // Sessão existe → store vai para roleSelect automaticamente
+    await memberPage.waitForSelector('#btn-team', { timeout: 15_000 });
 
-    // Avança ambas as páginas até roleSelect antes de entregar a fixture
-    await Promise.all([
-      goToRoleSelect(smPage),
-      goToRoleSelect(memberPage),
-    ]);
-
-    await use({ smPage, memberPage, sessionId, sessionUrl });
+    await use({ smPage, memberPage, sessionId });
 
     await smContext.close();
     await memberContext.close();
