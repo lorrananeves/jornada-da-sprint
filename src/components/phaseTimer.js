@@ -47,7 +47,7 @@ export function createPhaseTimer(containerEl, phase) {
         osc.start(ctx.currentTime + delay / 1000);
         osc.stop(ctx.currentTime + delay / 1000 + 0.35);
       });
-    } catch (_) { /* sem áudio — sem problema */ }
+    } catch { /* sem áudio — sem problema */ }
   }
 
   function formatTime(totalSecs) {

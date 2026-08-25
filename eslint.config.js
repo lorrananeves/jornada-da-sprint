@@ -40,6 +40,20 @@ export default [
     },
   },
 
+  // Testes E2E — ambiente Node com globals do Playwright
+  {
+    files: ['e2e/**/*.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      'no-console':     'off',
+      'no-unused-vars': ['error', { varsIgnorePattern: '^_', argsIgnorePattern: '^_' }],
+    },
+  },
+
   {
     ignores: ['dist/**', 'node_modules/**'],
   },

@@ -16,6 +16,7 @@
 import { initializeApp } from 'firebase/app';
 import {
   getFirestore,
+  connectFirestoreEmulator,
   doc,
   collection,
   getDoc,
@@ -29,6 +30,8 @@ import {
 
 // ── Validação das variáveis de ambiente ───────────────────────────────────────
 
+const USE_EMULATOR = import.meta.env.VITE_FIREBASE_USE_EMULATOR === 'true';
+
 const REQUIRED_ENV_VARS = [
   'VITE_FIREBASE_API_KEY',
   'VITE_FIREBASE_AUTH_DOMAIN',
@@ -38,26 +41,34 @@ const REQUIRED_ENV_VARS = [
   'VITE_FIREBASE_APP_ID',
 ];
 
-const missing = REQUIRED_ENV_VARS.filter((key) => !import.meta.env[key]);
-
-if (missing.length > 0) {
-  throw new Error(
-    `[Firebase] Variáveis de ambiente ausentes: ${missing.join(', ')}.\n` +
-    'Copie .env.example para .env e preencha com os valores do seu projeto Firebase.'
-  );
+// Em modo emulador as variáveis podem ser valores fictícios — só valida em produção.
+if (!USE_EMULATOR) {
+  const missing = REQUIRED_ENV_VARS.filter((key) => !import.meta.env[key]);
+  if (missing.length > 0) {
+    throw new Error(
+      `[Firebase] Variáveis de ambiente ausentes: ${missing.join(', ')}.\n` +
+      'Copie .env.example para .env e preencha com os valores do seu projeto Firebase.'
+    );
+  }
 }
 
 const firebaseConfig = {
-  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            ?? 'emulator-key',
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN         ?? 'demo-project.firebaseapp.com',
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID          ?? 'demo-project',
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET      ?? 'demo-project.appspot.com',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? '000000000000',
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID              ?? '1:000000000000:web:000000000000',
 };
 
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
+
+// Conecta ao emulador local quando a variável está ativa.
+// connectFirestoreEmulator deve ser chamado antes de qualquer operação.
+if (USE_EMULATOR) {
+  connectFirestoreEmulator(db, 'localhost', 8080);
+}
 
 // ── Session ID ────────────────────────────────────────────────────────────────
 
