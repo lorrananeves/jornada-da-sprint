@@ -17,6 +17,8 @@ const { _mocks } = vi.hoisted(() => {
     currentDeviceId: 'device-sm-aabbcc',
     // Captura callbacks registados pelo store em subscribeCollection, por coleção.
     colCallbacks: {},
+    // Captura o callback de subscribeSession para disparar snapshots nos testes.
+    sessionCallback: null,
   };
   return { _mocks };
 });
@@ -39,7 +41,10 @@ vi.mock('../services/firebase.js', () => ({
   saveItem:             vi.fn().mockResolvedValue(undefined),
   patchItem:            vi.fn().mockResolvedValue(undefined),
   removeItem:           vi.fn().mockResolvedValue(undefined),
-  subscribeSession:     vi.fn().mockReturnValue(() => {}),
+  subscribeSession:     vi.fn().mockImplementation((_, cb) => {
+    _mocks.sessionCallback = cb;
+    return () => {};
+  }),
   subscribeCollection:  vi.fn().mockImplementation((_, col, cb) => {
     _mocks.colCallbacks[col] = cb;
     return () => {};
@@ -54,6 +59,7 @@ import {
   setState,
   isSM,
   setPhase,
+  setLocalPhase,
   completePhase,
   addXP,
   prioritizeMonsters,
@@ -192,6 +198,42 @@ describe('setState', () => {
     expect(typeof getState().updatedAt).toBe('string');
   });
 });
+
+
+// ── subscribeSession guard (roleSelect) ───────────────────────────────────────
+
+describe('subscribeSession — guard de fase local', () => {
+  it('não sobrescreve currentPhase quando membro está em roleSelect', () => {
+    // Simula membro: estado inicial em roleSelect (setLocalPhase não grava updatedAt)
+    setLocalPhase('roleSelect');
+    expect(getState().currentPhase).toBe('roleSelect');
+
+    // SM avança para checkin — subscribeSession do membro recebe esse snapshot
+    _mocks.sessionCallback?.({
+      currentPhase: 'checkin',
+      updatedAt: new Date().toISOString(),
+      smDeviceId: DEVICE_SM,
+    });
+
+    // O membro deve permanecer em roleSelect até clicar no botão de papel
+    expect(getState().currentPhase).toBe('roleSelect');
+  });
+
+  it('aceita mudança de fase quando membro NÃO está em roleSelect', () => {
+    // Membro já escolheu papel e está no lobby
+    setLocalPhase('lobby');
+
+    _mocks.sessionCallback?.({
+      currentPhase: 'checkin',
+      updatedAt: new Date().toISOString(),
+      smDeviceId: DEVICE_SM,
+    });
+
+    // Agora deve seguir o SM para checkin
+    expect(getState().currentPhase).toBe('checkin');
+  });
+});
+
 
 // ── subscribe ─────────────────────────────────────────────────────────────────
 

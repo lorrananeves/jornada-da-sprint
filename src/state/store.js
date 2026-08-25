@@ -238,8 +238,16 @@ async function initFirebase() {
       if (remoteScalars.updatedAt && _state.updatedAt && remoteScalars.updatedAt <= _state.updatedAt) return;
 
       const wasExisting = sessionExists;
-      sessionExists = true;
+      sessionExists     = true;
+
+      // 'roleSelect' é uma fase de onboarding local: o membro ainda não escolheu
+      // papel e não deve ser redirecionado pelo snapshot do SM. Preserva a fase
+      // local até que o membro clique num dos botões de papel.
+      // Qualquer outra fase (incluindo 'lobby') pode ser sobrescrita pelo SM.
+      const keepPhase = _state.currentPhase === 'roleSelect';
+
       _state = { ..._state, ...remoteScalars };
+      if (keepPhase) _state.currentPhase = 'roleSelect';
       delete _state.role;
       saveToStorage(_state);
       notify();
