@@ -79,8 +79,9 @@ export const test = base.extend({
     await memberPage.goto(`/?s=${sessionId}`);
     await waitForApp(memberPage);
 
-    // Sessão existe → store vai para roleSelect automaticamente
-    await memberPage.waitForSelector('#btn-team', { timeout: 15_000 });
+    // Sessão existe → store vai para roleSelect automaticamente.
+    // Pode demorar mais no CI: primeiro request do Firestore num contexto fresh.
+    await memberPage.waitForSelector('#btn-team', { timeout: 25_000 });
 
     await use({ smPage, memberPage, sessionId });
 
