@@ -59,8 +59,11 @@ test('Membro registra check-in e SM vê indicador atualizado em tempo real', asy
   await memberPage.locator('.score-btn[data-score="4"]').click();
   await memberPage.locator('#btn-register').click();
 
-  // SM vê o indicador atualizado para 1 de 2 sem reload
-  await expect(smPage.getByText(/1 de 2/i)).toBeVisible({ timeout: 10_000 });
+  // Aguarda o membro ver o feedback de envio (confirma que o Firestore recebeu)
+  await expect(memberPage.locator('.xp-toast')).toBeVisible({ timeout: 10_000 });
+
+  // SM vê o indicador atualizado para 1 de 2 via subscription em tempo real
+  await expect(smPage.getByText(/1 de 2/i)).toBeVisible({ timeout: 20_000 });
 });
 
 // ── 4. SM avança fase; membro segue automaticamente ──────────────────────────
@@ -74,8 +77,10 @@ test('SM avança para Tesouros e membro é redirecionado automaticamente', async
   // SM avança para Tesouros
   await smPage.locator('#btn-next').click();
 
+  // SM chega imediatamente (navegação local)
   await expect(smPage.getByText(/tesouros da sprint/i)).toBeVisible({ timeout: 10_000 });
-  await expect(memberPage.getByText(/tesouros da sprint/i)).toBeVisible({ timeout: 10_000 });
+  // Membro recebe o redirect via Firestore subscription — pode levar mais tempo no CI
+  await expect(memberPage.getByText(/tesouros da sprint/i)).toBeVisible({ timeout: 20_000 });
 });
 
 // ── 5. Membro NÃO pode avançar de fase ───────────────────────────────────────
