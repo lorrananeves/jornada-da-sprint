@@ -284,6 +284,15 @@ export function setPhase(phase) {
   setScalarState({ currentPhase: phase, phaseStartedAt });
 }
 
+/**
+ * Navega localmente para uma fase sem persistir no Firestore e sem checar SM.
+ * Usado pelo membro do time para mudar de tela localmente (ex: roleSelect → lobby).
+ */
+export function setLocalPhase(phase) {
+  _state = { ..._state, currentPhase: phase };
+  notify();
+}
+
 export function completePhase(phase) {
   if (!isSM()) return;
   const completedPhases = _state.completedPhases.includes(phase)

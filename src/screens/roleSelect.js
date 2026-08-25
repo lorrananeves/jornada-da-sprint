@@ -3,8 +3,7 @@
  * Asks: "Are you the Scrum Master or a team member?"
  */
 
-import { setPhase } from '../state/store.js';
-import { setRole } from '../state/store.js';
+import { setPhase, setLocalPhase, setRole } from '../state/store.js';
 import { joinSession } from '../services/presence.js';
 
 export function renderRoleSelect(root) {
@@ -44,6 +43,7 @@ export function renderRoleSelect(root) {
     setRole('team_member');
     // Register presence then go to lobby (waiting room for the team)
     await joinSession();
-    setPhase('lobby');
+    // setLocalPhase: navegação local — não persiste no Firestore, não exige SM
+    setLocalPhase('lobby');
   });
 }
