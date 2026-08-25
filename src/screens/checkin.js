@@ -98,8 +98,27 @@ export function renderCheckin(root) {
     `;
   }
 
+  function buildResponseIndicator(answered, total) {
+    if (!total) return '';
+    const allDone = answered >= total;
+    const pct = Math.round((answered / total) * 100);
+    return `
+      <div class="checkin-progress${allDone ? ' checkin-progress--done' : ''}">
+        <div class="checkin-progress-label">
+          <span>${allDone ? '✅' : '⏳'} <strong>${answered} de ${total}</strong> pessoa${total !== 1 ? 's' : ''} respondeu${answered !== 1 ? 'ram' : ''}</span>
+          <span class="checkin-progress-pct">${pct}%</span>
+        </div>
+        <div class="checkin-progress-track">
+          <div class="checkin-progress-fill${allDone ? ' checkin-progress-fill--done' : ''}" style="width:${pct}%"></div>
+        </div>
+      </div>
+    `;
+  }
+
   function render() {
-    const checkins = getState().checkins;
+    const state = getState();
+    const checkins = state.checkins;
+    const participantCount = parseInt(state.team?.participantCount, 10) || 0;
     preserveInputs(root, () => { root.innerHTML = `
       <div class="screen-checkin screen-enter">
         <div class="phase-header">
@@ -111,6 +130,8 @@ export function renderCheckin(root) {
             Como cada pessoa está se sentindo sobre essa Sprint? Respostas anônimas.
           </p>
         </div>
+
+        ${buildResponseIndicator(checkins.length, participantCount)}
 
         <div id="checkin-form-area">
           ${buildCheckinForm()}

@@ -724,6 +724,61 @@
 }
 
 /* ============================================================
+   Check-in Response Indicator
+   ============================================================ */
+.checkin-progress {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checkin-progress--done {
+  background: var(--success-dim);
+  border-color: rgba(63, 185, 80, 0.4);
+}
+
+.checkin-progress-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+.checkin-progress--done .checkin-progress-label {
+  color: var(--success);
+}
+
+.checkin-progress-pct {
+  font-weight: 700;
+  font-size: 0.875rem;
+}
+
+.checkin-progress-track {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.checkin-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 0.5s ease;
+}
+
+.checkin-progress-fill--done {
+  background: var(--success);
+}
+
+
+/* ============================================================
    Phase Timer (timebox)
    ============================================================ */
 .phase-timer {
