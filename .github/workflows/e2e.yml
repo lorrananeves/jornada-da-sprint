@@ -43,7 +43,7 @@ jobs:
           FIREBASE_TOKEN: unused
 
       - name: Wait for emulator to be ready
-        run: npx wait-on http://127.0.0.1:4400 --timeout 30000
+        run: npx wait-on tcp:127.0.0.1:8080 --timeout 30000
 
       - name: Build app (emulator mode)
         run: npm run build
