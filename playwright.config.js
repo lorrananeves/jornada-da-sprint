@@ -2,8 +2,9 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
-  // Cada teste tem até 30s — o emulador + Vite podem demorar um pouco no CI
-  timeout: 30_000,
+  // Cada teste tem até 60s — a fixture do CI consome ~15-20s só no setup do SM
+  // (goto, click, waitForSelector para lobby) antes de o membro sequer abrir a URL.
+  timeout: 60_000,
   // Sem retries em ambiente local; CI usa 1 retry para flakiness de rede
   retries: process.env.CI ? 1 : 0,
   // Roda testes em paralelo mas limita workers no CI para evitar saturação

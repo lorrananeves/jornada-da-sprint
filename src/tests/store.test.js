@@ -185,11 +185,11 @@ describe('setState', () => {
     expect(getState().xp).toBe(15);
   });
 
-  it('atualiza updatedAt a cada chamada', () => {
-    const t1 = getState().updatedAt;
+  it('preenche updatedAt após a primeira chamada', () => {
+    expect(getState().updatedAt).toBeNull();
     setState({ retroStarted: true });
-    const t2 = getState().updatedAt;
-    expect(t2 >= t1).toBe(true);
+    expect(getState().updatedAt).not.toBeNull();
+    expect(typeof getState().updatedAt).toBe('string');
   });
 });
 

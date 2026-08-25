@@ -59,8 +59,8 @@ const DEFAULT_STATE = () => ({
   completedPhases:  [],
   phaseDurations:   {},   // { checkin: 5, treasures: 10, ... } em minutos; 0 = sem timer
   phaseStartedAt:   {},   // { checkin: ISOString } — momento em que a fase foi iniciada
-  createdAt:        new Date().toISOString(),
-  updatedAt:        new Date().toISOString(),
+  createdAt:        null, // preenchido na primeira gravação real
+  updatedAt:        null, // null = nunca salvo localmente; qualquer update remoto passa
   // ── subcoleções (mantidas em memória como arrays) ──
   checkins:   [],
   treasures:  [],
@@ -148,7 +148,8 @@ export function setState(partial) {
 }
 
 function setScalarState(scalars) {
-  _state = { ..._state, ...scalars, updatedAt: new Date().toISOString() };
+  const now = new Date().toISOString();
+  _state = { ..._state, ...scalars, updatedAt: now, createdAt: _state.createdAt ?? now };
   saveToStorage(_state);
 
   if (_sessionId) {
@@ -232,8 +233,9 @@ async function initFirebase() {
   //    Sempre abrimos — permite detectar quando o SM cria a sessão remotamente.
   _unsubs.push(
     subscribeSession(_sessionId, (remoteScalars) => {
-      // Ignora se não há timestamp ou se não é mais recente
-      if (remoteScalars.updatedAt && remoteScalars.updatedAt <= _state.updatedAt) return;
+      // Ignora se não há timestamp ou se o dado remoto não é mais recente que o local.
+      // Quando _state.updatedAt é null (estado padrão, sem gravação local), aceita sempre.
+      if (remoteScalars.updatedAt && _state.updatedAt && remoteScalars.updatedAt <= _state.updatedAt) return;
 
       const wasExisting = sessionExists;
       sessionExists = true;
