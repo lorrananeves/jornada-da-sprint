@@ -44,8 +44,16 @@ export const test = base.extend({
     await smPage.goto('/');
     await waitForApp(smPage);
 
-    // Sem sessão anterior → clica direto sem modal
+    // Clica em COMEÇAR JORNADA — se o app já inseriu ?s= na URL (comportamento
+    // normal do getOrCreateSessionId), o modal de confirmação pode aparecer.
     await smPage.locator('#btn-start').click();
+
+    // Confirma o modal caso tenha aparecido
+    const confirmBtn = smPage.getByRole('button', { name: /sim, nova jornada/i });
+    if (await confirmBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await confirmBtn.click();
+    }
+
     await smPage.waitForSelector('#btn-sm', { timeout: 10_000 });
 
     // Escolhe papel SM → vai para setup
