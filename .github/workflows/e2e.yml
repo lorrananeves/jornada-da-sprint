@@ -42,11 +42,11 @@ jobs:
           VITE_FIREBASE_USE_EMULATOR: 'true'
 
       # emulators:exec sobe o emulador, aguarda readiness, roda os testes e derruba.
-      # É o único processo usando a porta 8080 — sem conflito.
+      # Auth (9099) é necessário para o fluxo de login do Scrum Master nos testes E2E.
       - name: Run E2E tests (inside emulator)
         run: |
           npx firebase emulators:exec \
-            --only firestore \
+            --only firestore,auth \
             --project demo-project \
             "npm run test:e2e"
         env:
