@@ -332,10 +332,13 @@ export function addXP(amount) {
 
 export function addCheckin(checkin) {
   if (!_sessionId) return;
-  saveItem(_sessionId, 'checkins', checkin).catch((e) => {
-    console.warn('Firestore addCheckin failed:', e);
-    showErrorToast('Check-in não foi salvo — verifique sua conexão.');
-  });
+  console.log('[addCheckin] sessionId:', _sessionId, 'checkin id:', checkin.id, 'score:', checkin.score);
+  saveItem(_sessionId, 'checkins', checkin)
+    .then(() => console.log('[addCheckin] gravado no Firestore ✓'))
+    .catch((e) => {
+      console.warn('[addCheckin] FALHOU:', e.code, e.message);
+      showErrorToast('Check-in não foi salvo — verifique sua conexão.');
+    });
 }
 
 // ── Treasures ─────────────────────────────────────────────────────────────────
