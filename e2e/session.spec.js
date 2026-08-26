@@ -62,6 +62,13 @@ test('Membro registra check-in e SM vê indicador atualizado em tempo real', asy
   // Aguarda o membro ver o feedback de envio (confirma que o Firestore recebeu)
   await expect(memberPage.locator('.xp-toast')).toBeVisible({ timeout: 10_000 });
 
+  // Aguarda mais um pouco para o Firestore propagar e o SM receber o snapshot
+  await smPage.waitForTimeout(3_000);
+
+  // Dump diagnóstico: o que o SM vê no momento da falha?
+  const smHTML = await smPage.locator('#screen-root').innerHTML();
+  console.log('[DIAG] SM screen-root HTML:', smHTML.slice(0, 2000));
+
   // SM vê o indicador atualizado para 1 de 2 via subscription em tempo real
   await expect(smPage.getByText(/1 de 2/i)).toBeVisible({ timeout: 20_000 });
 });
