@@ -3,33 +3,27 @@
  * Asks: "Are you the Scrum Master or a team member?"
  *
  * Fluxo do membro do time:
- *   Link compartilhado (?s= cujo doc existe no Firestore) → entra direto no lobby
- *   Acesso direto sem sessão ativa                        → mostra tela de seleção
+ *   Link compartilhado (sessão já existe no Firestore) → store seta _guestAutoJoin=true
+ *     → renderRoleSelect entra direto no lobby de forma síncrona
+ *   Acesso direto / SM iniciando sessão nova → mostra tela de seleção normalmente
  */
 
-import { setLocalPhase, setRole } from '../state/store.js';
+import { setLocalPhase, setRole, getState } from '../state/store.js';
 import { joinSession } from '../services/presence.js';
 import { getCurrentUser } from '../services/auth.js';
-import { loadSession, getOrCreateSessionId } from '../services/firebase.js';
+import { loadSession } from '../services/firebase.js';
 
 export function renderRoleSelect(root) {
-  // Renderiza a tela de seleção imediatamente (sem flash de tela vazia)
-  _renderSelectionScreen(root);
+  // O store.initFirebase seta _guestAutoJoin=true quando:
+  //   - a sessão existe no Firestore E
+  //   - nenhum role foi definido neste dispositivo (ou seja, veio de um link)
+  // Leitura síncrona — sem async no renderer, sem race condition de DOM.
+  if (getState()._guestAutoJoin) {
+    _enterAsTeamMember();
+    return;
+  }
 
-  // Verifica assincronamente se a sessão do ?s= já existe no Firestore.
-  // Se existir, significa que alguém compartilhou o link → entra direto como membro.
-  // Se não existir, é o SM iniciando uma nova jornada → mantém a tela de seleção.
-  const sessionId = getOrCreateSessionId();
-  loadSession(sessionId).then((session) => {
-    // Só entra automaticamente se a sessão existe E ainda está em andamento (não concluída)
-    // e o usuário não é um SM autenticado neste dispositivo.
-    const user = getCurrentUser();
-    if (session && !user) {
-      _enterAsTeamMember();
-    }
-  }).catch(() => {
-    // Falha de rede — mantém tela de seleção, usuário escolhe manualmente
-  });
+  _renderSelectionScreen(root);
 }
 
 // ── Tela de seleção de papel ──────────────────────────────────────────────────

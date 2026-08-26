@@ -127,8 +127,9 @@ function loadFromStorage() {
 }
 
 function saveToStorage(state) {
+  const { _guestAutoJoin: _g, ...storableState } = state;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(storableState));
   } catch (e) {
     console.warn('Could not save session:', e);
   }
@@ -175,10 +176,11 @@ function setScalarState(scalars) {
   saveToStorage(_state);
 
   if (_sessionId) {
-    // Extrai apenas os campos do doc raiz (sem arrays nem role local)
+    // Extrai apenas os campos do doc raiz (sem arrays, flags locais nem role)
     const {
       checkins: _c, treasures: _t, monsters: _m, solutions: _s, missions: _mi,
       role: _r,
+      _guestAutoJoin: _g,
       ..._firestoreScalars
     } = _state;
     saveSession(_sessionId, _firestoreScalars).catch((e) => {
@@ -247,7 +249,12 @@ async function initFirebase() {
     if (remote) {
       sessionExists = true;
       _state = { ..._state, ...remote };
-      if (!getRole()) _state.currentPhase = 'roleSelect';
+      if (!getRole()) {
+        // Sessão existe e nenhum role definido: veio de um link compartilhado.
+        // Marca flag local (não persistida) para o renderRoleSelect entrar direto.
+        _state.currentPhase = 'roleSelect';
+        _state._guestAutoJoin = true;
+      }
     }
   } catch (e) {
     console.warn('Could not load session root from Firestore:', e);
