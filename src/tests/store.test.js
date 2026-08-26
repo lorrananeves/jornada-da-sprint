@@ -34,6 +34,7 @@ vi.mock('../services/presence.js', () => ({
 
 vi.mock('../services/firebase.js', () => ({
   getOrCreateSessionId: () => 'test-session-id',
+  generateId:           () => 'new-generated-id',
   loadSession:          vi.fn().mockResolvedValue({ currentPhase: 'home', updatedAt: '1970-01-01T00:00:00.000Z' }),
   loadCollection:       vi.fn().mockResolvedValue([]),
   saveSession:          vi.fn().mockResolvedValue(undefined),
@@ -50,6 +51,14 @@ vi.mock('../services/firebase.js', () => ({
     return () => {};
   }),
   increment:            (n) => ({ _increment: n }),
+  saveSmProfile:        vi.fn().mockResolvedValue(undefined),
+  upsertSmSession:      vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../services/auth.js', () => ({
+  initAuth:       vi.fn().mockResolvedValue(null),
+  getCurrentUser: vi.fn().mockReturnValue(null),
+  onAuthChange:   vi.fn().mockReturnValue(() => {}),
 }));
 
 // ── Import do store após os mocks ─────────────────────────────────────────────
