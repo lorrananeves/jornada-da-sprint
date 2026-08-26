@@ -498,31 +498,33 @@ export function resetState() {
  * Chamado pelo dashboard do SM ao criar uma nova retrospectiva.
  */
 export function startNewSession() {
-  // Limpa unsubs da sessão anterior
+  // Cancela subscrições da sessão anterior
   _unsubs.forEach((u) => u());
   _unsubs.length = 0;
 
-  // Gera novo ID e atualiza URL
+  // Gera novo sessionId e atualiza a URL
   const newId = generateId();
   const params = new URLSearchParams(window.location.search);
   params.set('s', newId);
   window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
   _sessionId = newId;
 
-  // Reseta estado da sessão mas mantém role (SM autenticado)
+  // Reseta estado da sessão mas mantém o usuário autenticado
   _state = DEFAULT_STATE();
-  _state.currentPhase = 'setup';
   localStorage.removeItem(STORAGE_KEY);
 
-  // Aplica o role de SM na nova sessão
+  // Grava os campos iniciais do SM no Firestore e define role
   const user = getCurrentUser();
   setScalarState({
     smDeviceId: getDeviceId(),
-    smUid: user ? user.uid : null,
+    smUid:      user ? user.uid : null,
     currentPhase: 'setup',
-    createdAt: new Date().toISOString(),
+    createdAt:  new Date().toISOString(),
   });
   sessionStorage.setItem(ROLE_KEY, 'scrum_master');
+
+  // Reabre as subscriptions Firestore para a nova sessão
+  initFirebase();
 }
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
