@@ -197,17 +197,10 @@ async function initFirebase() {
       sessionExists = true;
       _state = { ..._state, ...remote };
       if (!getRole()) _state.currentPhase = 'roleSelect';
-    } else if (_state.sprint?.name) {
-      // Sessão nova com dados no localStorage — faz upload inicial dos escalares
-      const {
-        checkins: _c, treasures: _t, monsters: _m, solutions: _s, missions: _mi,
-        ..._scalars
-      } = _state;
-      await saveSession(_sessionId, _scalars);
-      sessionExists = true;
     }
-    // Se não há sessão remota nem dados locais, o usuário está na tela home —
-    // não há documento no Firestore ainda, portanto não abrimos subscriptions.
+    // Se não há sessão remota nem dados locais, o usuário ainda não criou a sessão —
+    // não há documento no Firestore ainda, portanto não abrimos subscriptions aqui.
+    // O subscribeSession detectará a criação e abrirá as subcoleções.
   } catch (e) {
     console.warn('Could not load session root from Firestore:', e);
   }
@@ -229,32 +222,20 @@ async function initFirebase() {
   saveToStorage(_state);
   notify();
 
-  // 3. Subscription ao doc raiz (fases, sprint, time…)
-  //    Sempre abrimos — permite detectar quando o SM cria a sessão remotamente.
+  // 3. Subscription ao doc raiz (fases, sprint, time…).
+  //    Sempre abrimos — permite detectar quando o SM cria a sessão e redirecionar membros.
+  //    O guard de updatedAt evita processar o próprio echo do SM, MAS não pode bloquear
+  //    a abertura das subcoleções. Por isso a abertura das subcoleções é separada e
+  //    controlada pela flag `subcollsOpen` — abre exatamente uma vez, independentemente
+  //    de quantas vezes o guard bloqueia o notify.
+  let subcollsOpen = sessionExists; // já abre se a sessão existia ao carregar
+
   _unsubs.push(
     subscribeSession(_sessionId, (remoteScalars) => {
-      // Ignora se não há timestamp ou se o dado remoto não é mais recente que o local.
-      // Quando _state.updatedAt é null (estado padrão, sem gravação local), aceita sempre.
-      if (remoteScalars.updatedAt && _state.updatedAt && remoteScalars.updatedAt <= _state.updatedAt) return;
-
-      const wasExisting = sessionExists;
-      sessionExists     = true;
-
-      // 'roleSelect' é uma fase de onboarding local: o membro ainda não escolheu
-      // papel e não deve ser redirecionado pelo snapshot do SM. Preserva a fase
-      // local até que o membro clique num dos botões de papel.
-      // Qualquer outra fase (incluindo 'lobby') pode ser sobrescrita pelo SM.
-      const keepPhase = _state.currentPhase === 'roleSelect';
-
-      _state = { ..._state, ...remoteScalars };
-      if (keepPhase) _state.currentPhase = 'roleSelect';
-      delete _state.role;
-      saveToStorage(_state);
-      notify();
-
-      // 4. Se as subscriptions de subcoleção ainda não foram abertas
-      //    (sessão criada remotamente após o carregamento inicial), abre agora.
-      if (!wasExisting) {
+      // Abre subcoleções na primeira vez que o Firestore confirma a sessão existe,
+      // mesmo que o guard de updatedAt vá bloquear o notify logo abaixo.
+      if (!subcollsOpen) {
+        subcollsOpen = true;
         for (const col of COLLECTIONS) {
           _unsubs.push(
             subscribeCollection(_sessionId, col, (items) => {
@@ -265,11 +246,26 @@ async function initFirebase() {
           );
         }
       }
+
+      // Ignora se não há timestamp ou se o dado remoto não é mais recente que o local.
+      // Quando _state.updatedAt é null (estado padrão, sem gravação local), aceita sempre.
+      if (remoteScalars.updatedAt && _state.updatedAt && remoteScalars.updatedAt <= _state.updatedAt) return;
+
+      // 'roleSelect' é uma fase de onboarding local: o membro ainda não escolheu
+      // papel e não deve ser redirecionado pelo snapshot do SM.
+      const keepPhase = _state.currentPhase === 'roleSelect';
+
+      _state = { ..._state, ...remoteScalars };
+      if (keepPhase) _state.currentPhase = 'roleSelect';
+      delete _state.role;
+      saveToStorage(_state);
+      notify();
     })
   );
 
-  // 4. Subscriptions às subcoleções — só se a sessão já existia ao carregar
+  // Subcoleções para quem já tinha sessão ao carregar (loadSession retornou dados).
   if (sessionExists) {
+    subcollsOpen = true;
     for (const col of COLLECTIONS) {
       _unsubs.push(
         subscribeCollection(_sessionId, col, (items) => {
@@ -332,13 +328,10 @@ export function addXP(amount) {
 
 export function addCheckin(checkin) {
   if (!_sessionId) return;
-  console.log('[addCheckin] sessionId:', _sessionId, 'checkin id:', checkin.id, 'score:', checkin.score);
-  saveItem(_sessionId, 'checkins', checkin)
-    .then(() => console.log('[addCheckin] gravado no Firestore ✓'))
-    .catch((e) => {
-      console.warn('[addCheckin] FALHOU:', e.code, e.message);
-      showErrorToast('Check-in não foi salvo — verifique sua conexão.');
-    });
+  saveItem(_sessionId, 'checkins', checkin).catch((e) => {
+    console.warn('Firestore addCheckin failed:', e);
+    showErrorToast('Check-in não foi salvo — verifique sua conexão.');
+  });
 }
 
 // ── Treasures ─────────────────────────────────────────────────────────────────
