@@ -3,7 +3,7 @@
  */
 
 import {
-  getState, setState, addSolution, voteSolution, addXP, setPhase, setLocalPhase, completePhase, isSM,
+  getState, subscribe, setState, addSolution, voteSolution, addXP, setPhase, setLocalPhase, completePhase, isSM,
 } from '../state/store.js';
 import { xpForSolution } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
@@ -23,6 +23,7 @@ export function renderCombat(root) {
   let currentMonsterIdx = 0;
   let currentStrategy = 'prevent';
   let _timer = null;
+  let _unsub = null;
 
   if (!selectedMonsters.length) {
     root.innerHTML = `
@@ -208,6 +209,20 @@ export function renderCombat(root) {
       setPhase('missions');
     });
   }
+
+  // Subscription em tempo real: re-renderiza quando soluções mudam remotamente
+  let _lastCount = getState().solutions.length;
+  _unsub = subscribe((state) => {
+    if (state.currentPhase !== 'combat') {
+      _unsub?.();
+      _unsub = null;
+      return;
+    }
+    if (state.solutions.length !== _lastCount) {
+      _lastCount = state.solutions.length;
+      render();
+    }
+  });
 
   render();
 }

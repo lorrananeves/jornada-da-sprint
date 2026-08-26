@@ -3,7 +3,7 @@
  */
 
 import {
-  getState, addMission, removeMission, addXP, setPhase, setLocalPhase, completePhase, setState, isSM,
+  getState, subscribe, addMission, removeMission, addXP, setPhase, setLocalPhase, completePhase, setState, isSM,
 } from '../state/store.js';
 import { xpForMission } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
@@ -20,6 +20,7 @@ const PRIORITIES = [
 
 export function renderMissions(root) {
   let _timer = null;
+  let _unsub = null;
 
   function render() {
     const state = getState();
@@ -201,6 +202,20 @@ export function renderMissions(root) {
       setPhase('complete');
     });
   }
+
+  // Subscription em tempo real: re-renderiza quando missões mudam remotamente
+  let _lastCount = getState().missions.length;
+  _unsub = subscribe((state) => {
+    if (state.currentPhase !== 'missions') {
+      _unsub?.();
+      _unsub = null;
+      return;
+    }
+    if (state.missions.length !== _lastCount) {
+      _lastCount = state.missions.length;
+      render();
+    }
+  });
 
   render();
 }

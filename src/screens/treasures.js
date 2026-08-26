@@ -3,7 +3,7 @@
  */
 
 import {
-  getState, addTreasure, reactToTreasure, addXP, setPhase, setLocalPhase, completePhase, isSM,
+  getState, subscribe, addTreasure, reactToTreasure, addXP, setPhase, setLocalPhase, completePhase, isSM,
 } from '../state/store.js';
 import { xpForTreasure } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
@@ -74,6 +74,7 @@ function buildColumn(cat, treasures) {
 
 export function renderTreasures(root) {
   let _timer = null;
+  let _unsub = null;
 
   function render() {
     const state = getState();
@@ -161,6 +162,20 @@ export function renderTreasures(root) {
       setPhase('monsters');
     });
   }
+
+  // Subscription em tempo real: re-renderiza quando tesouros mudam remotamente
+  let _lastCount = getState().treasures.length;
+  _unsub = subscribe((state) => {
+    if (state.currentPhase !== 'treasures') {
+      _unsub?.();
+      _unsub = null;
+      return;
+    }
+    if (state.treasures.length !== _lastCount) {
+      _lastCount = state.treasures.length;
+      render();
+    }
+  });
 
   render();
 }

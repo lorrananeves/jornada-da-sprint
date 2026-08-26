@@ -3,7 +3,7 @@
  */
 
 import {
-  getState, addMonster, reactToMonster, selectMonster, prioritizeMonsters,
+  getState, subscribe, addMonster, reactToMonster, selectMonster, prioritizeMonsters,
   mergeMonsters, addXP, setPhase, setLocalPhase, completePhase, isSM,
 } from '../state/store.js';
 import { xpForMonster } from '../services/xp.js';
@@ -138,6 +138,7 @@ function showMergeModal(keepMonster, dropMonster) {
 
 export function renderMonsters(root) {
   let _timer = null;
+  let _unsub = null;
   // Id do card sendo arrastado (só relevante para o SM)
   let _dragId = null;
 
@@ -347,6 +348,20 @@ export function renderMonsters(root) {
       setPhase('combat');
     });
   }
+
+  // Subscription em tempo real: re-renderiza quando monstros mudam remotamente
+  let _lastCount = getState().monsters.length;
+  _unsub = subscribe((state) => {
+    if (state.currentPhase !== 'monsters') {
+      _unsub?.();
+      _unsub = null;
+      return;
+    }
+    if (state.monsters.length !== _lastCount) {
+      _lastCount = state.monsters.length;
+      render();
+    }
+  });
 
   render();
 }
