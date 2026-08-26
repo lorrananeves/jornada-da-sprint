@@ -66,7 +66,7 @@ export function signalTyping(phase) {
         phase,
         expiresAt: Date.now() + EXPIRE_MS,
       });
-    } catch (e) {
+    } catch {
       // Silencioso — indicador de digitação é melhor-esforço
     }
   }, DEBOUNCE_MS);
