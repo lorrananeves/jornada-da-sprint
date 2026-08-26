@@ -3,10 +3,10 @@
  *
  * A fixture `twoParticipants` entrega:
  *   - smPage     → SM no Lobby (sessão já criada no Firestore)
- *   - memberPage → membro no roleSelect, pronto para escolher papel
+ *   - memberPage → membro já no Lobby de espera (entrou direto via ?s=)
  *
  * Cenários cobertos:
- *   1. Membro entra no lobby após escolher papel
+ *   1. Membro entra no lobby após abrir o link
  *   2. SM inicia retro; membro é redirecionado automaticamente (tempo real)
  *   3. Membro registra check-in; indicador atualiza para o SM (tempo real)
  *   4. SM avança para Tesouros; membro segue automaticamente (tempo real)
@@ -15,9 +15,8 @@
 
 import { test, expect } from './fixtures.js';
 
-// Helper: membro escolhe papel e chega ao lobby de espera
+// Helper: confirma que o membro já está no lobby de espera (fixture já garante isso)
 async function memberJoin(memberPage) {
-  await memberPage.locator('#btn-team').click();
   await expect(memberPage.getByText(/aguardando início/i)).toBeVisible({ timeout: 10_000 });
 }
 
@@ -30,7 +29,7 @@ async function startRetro(smPage, memberPage) {
 
 // ── 1. Membro entra no lobby ──────────────────────────────────────────────────
 
-test('Membro entra no lobby após escolher papel', async ({ twoParticipants }) => {
+test('Membro entra no lobby ao abrir o link da retrospectiva', async ({ twoParticipants }) => {
   const { memberPage } = twoParticipants;
   await memberJoin(memberPage);
 });

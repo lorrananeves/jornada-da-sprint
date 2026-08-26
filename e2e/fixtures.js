@@ -72,10 +72,11 @@ async function authenticateSM(page) {
 /**
  * Fixture `twoParticipants`:
  *   - smPage     → SM, já no Lobby após criar a sessão
- *   - memberPage → membro, já no roleSelect da mesma sessão
+ *   - memberPage → membro, já no Lobby de espera da mesma sessão
  *   - sessionId  → ID capturado da URL
  *
- * O SM está no Lobby; o membro está no roleSelect aguardando escolher papel.
+ * O SM está no Lobby com o botão de iniciar; o membro está no Lobby aguardando.
+ * Como o membro abre /?s=ID, o novo fluxo entra direto no lobby sem roleSelect.
  * Os testes podem começar a partir desse estado.
  */
 export const test = base.extend({
@@ -130,9 +131,9 @@ export const test = base.extend({
     await memberPage.goto(`/?s=${sessionId}`);
     await waitForApp(memberPage);
 
-    // Sessão existe → store vai para roleSelect automaticamente.
-    // Pode demorar mais no CI: primeiro request do Firestore num contexto fresh.
-    await memberPage.waitForSelector('#btn-team', { timeout: 40_000 });
+    // Com ?s= na URL o novo fluxo entra direto no lobby de espera sem exibir roleSelect.
+    // Aguarda o texto de espera aparecer — pode demorar mais no CI.
+    await memberPage.waitForSelector('.lobby-title-wait', { timeout: 40_000 });
 
     await use({ smPage, memberPage, sessionId });
 

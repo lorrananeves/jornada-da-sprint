@@ -18,7 +18,7 @@ export function renderRoleSelect(root) {
 
   // ── Se já tem ?s= na URL, entra direto como membro ──────────────────────────
   if (hasSession) {
-    _enterAsTeamMember(root);
+    _enterAsTeamMember();
     return;
   }
 
@@ -145,7 +145,7 @@ function _showJoinForm(root) {
     url.searchParams.set('s', sessionId);
     window.history.replaceState({}, '', url.toString());
 
-    await _enterAsTeamMember(root);
+    await _enterAsTeamMember();
   });
 
   input.focus();
@@ -153,7 +153,7 @@ function _showJoinForm(root) {
 
 // ── Entrada efetiva como membro do time ──────────────────────────────────────
 
-async function _enterAsTeamMember(root) {
+async function _enterAsTeamMember() {
   setRole('team_member');
   await joinSession();
   setLocalPhase('lobby');
