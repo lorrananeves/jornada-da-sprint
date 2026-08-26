@@ -42,3 +42,40 @@ jobs:
 
       - uses: actions/deploy-pages@v4
         id: deployment
+
+  deploy-firestore-rules:
+    name: Deploy Firestore Rules
+    runs-on: ubuntu-latest
+    # Roda sempre que o arquivo de regras (ou este workflow) mudar no main.
+    # O filtro de paths é avaliado pelo GitHub: o job só é enfileirado quando
+    # pelo menos um dos arquivos listados foi alterado no push.
+    if: |
+      contains(github.event.commits.*.modified, 'firestore.rules') ||
+      contains(github.event.commits.*.added,    'firestore.rules') ||
+      contains(github.event.commits.*.modified, '.github/workflows/deploy.yml')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Autentica com a service account do Firebase (JSON armazenado como secret).
+      # Para criar o secret: Firebase Console → Configurações do projeto →
+      # Contas de serviço → Gerar nova chave privada → copie o JSON completo
+      # e salve como secret FIREBASE_SERVICE_ACCOUNT no GitHub.
+      #
+      # A firebase-tools requer que GOOGLE_APPLICATION_CREDENTIALS aponte para
+      # um arquivo em disco — não aceita o JSON inline. Escrevemos o conteúdo
+      # do secret num arquivo temporário e apontamos a variável para ele.
+      - name: Deploy Firestore security rules
+        run: |
+          echo "$SA_JSON" > /tmp/sa.json
+          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json \
+            npx firebase-tools deploy --only firestore:rules --project "$PROJECT_ID"
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}

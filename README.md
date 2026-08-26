@@ -132,6 +132,22 @@ cp .env.example .env
 
 As regras de segurança estão em [`firestore.rules`](firestore.rules) e **precisam ser deployadas** para o seu projeto — caso contrário o Firestore usará as regras padrão (que bloqueiam tudo após 30 dias em modo teste).
 
+> **Atenção:** sem este passo, o app receberá erros `permission-denied` ao tentar ler ou escrever no Firestore.
+
+#### Deploy automático via CI (recomendado)
+
+O workflow [`deploy.yml`](.github/workflows/deploy.yml) publica as regras automaticamente sempre que `firestore.rules` é alterado no `main`. Para isso funcionar, adicione o secret `FIREBASE_SERVICE_ACCOUNT` no repositório do GitHub:
+
+1. Acesse o [Firebase Console](https://console.firebase.google.com) → **Configurações do projeto** → **Contas de serviço**
+2. Clique em **Gerar nova chave privada** → baixe o arquivo JSON
+3. No GitHub: **Settings → Secrets and variables → Actions → New repository secret**
+   - Nome: `FIREBASE_SERVICE_ACCOUNT`
+   - Valor: cole o conteúdo completo do JSON baixado
+
+A partir do próximo push que alterar `firestore.rules`, o CI fará o deploy automaticamente.
+
+#### Deploy manual (primeira vez ou emergência)
+
 ```bash
 # Instale a Firebase CLI (se ainda não tiver)
 npm install -g firebase-tools
@@ -145,8 +161,6 @@ firebase use --add
 # Publique as regras
 firebase deploy --only firestore:rules
 ```
-
-> **Atenção:** sem este passo, o app receberá erros `permission-denied` ao tentar ler ou escrever no Firestore.
 
 ## 🏗️ Arquitetura
 
