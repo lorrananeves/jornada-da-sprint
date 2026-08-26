@@ -3,26 +3,38 @@
  * Asks: "Are you the Scrum Master or a team member?"
  *
  * Fluxo do membro do time:
- *   COM ?s= na URL  → entra direto no lobby sem perguntar
- *   SEM ?s= na URL  → mostra campo para colar o link ou ID da retrospectiva
+ *   Link compartilhado (?s= cujo doc existe no Firestore) → entra direto no lobby
+ *   Acesso direto sem sessão ativa                        → mostra tela de seleção
  */
 
 import { setLocalPhase, setRole } from '../state/store.js';
 import { joinSession } from '../services/presence.js';
 import { getCurrentUser } from '../services/auth.js';
-import { loadSession } from '../services/firebase.js';
+import { loadSession, getOrCreateSessionId } from '../services/firebase.js';
 
 export function renderRoleSelect(root) {
-  const params = new URLSearchParams(window.location.search);
-  const hasSession = params.has('s');
+  // Renderiza a tela de seleção imediatamente (sem flash de tela vazia)
+  _renderSelectionScreen(root);
 
-  // ── Se já tem ?s= na URL, entra direto como membro ──────────────────────────
-  if (hasSession) {
-    _enterAsTeamMember();
-    return;
-  }
+  // Verifica assincronamente se a sessão do ?s= já existe no Firestore.
+  // Se existir, significa que alguém compartilhou o link → entra direto como membro.
+  // Se não existir, é o SM iniciando uma nova jornada → mantém a tela de seleção.
+  const sessionId = getOrCreateSessionId();
+  loadSession(sessionId).then((session) => {
+    // Só entra automaticamente se a sessão existe E ainda está em andamento (não concluída)
+    // e o usuário não é um SM autenticado neste dispositivo.
+    const user = getCurrentUser();
+    if (session && !user) {
+      _enterAsTeamMember();
+    }
+  }).catch(() => {
+    // Falha de rede — mantém tela de seleção, usuário escolhe manualmente
+  });
+}
 
-  // ── Sem sessão: mostra tela de seleção de papel ──────────────────────────────
+// ── Tela de seleção de papel ──────────────────────────────────────────────────
+
+function _renderSelectionScreen(root) {
   root.innerHTML = `
     <div class="screen-role-select">
       <div class="role-select-card screen-enter">
@@ -96,7 +108,7 @@ function _showJoinForm(root) {
   const joinBtn = root.querySelector('#btn-join');
 
   root.querySelector('#btn-back').addEventListener('click', () => {
-    renderRoleSelect(root);
+    _renderSelectionScreen(root);
   });
 
   // Permite pressionar Enter para confirmar
