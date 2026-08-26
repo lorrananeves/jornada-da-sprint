@@ -182,8 +182,12 @@ export function renderCheckin(root) {
     if (regBtn) {
       regBtn.addEventListener('click', () => {
         if (!selectedScore) return;
-        const comment = root.querySelector('#checkin-comment').value.trim() || null;
-        addCheckin({ id: uid(), score: selectedScore, comment });
+        const commentText = root.querySelector('#checkin-comment').value.trim();
+        // Não envia o campo comment quando vazio — evita ambiguidade com null nas regras Firestore
+        const checkin = commentText
+          ? { id: uid(), score: selectedScore, comment: commentText }
+          : { id: uid(), score: selectedScore };
+        addCheckin(checkin);
         addXP(xpForCheckin());
         showXPToast(xpForCheckin(), 'Check-in registrado');
         selectedScore = null;
