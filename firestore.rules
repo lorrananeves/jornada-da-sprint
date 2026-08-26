@@ -3,6 +3,17 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ── Perfis de Scrum Masters ───────────────────────────────────────────────
+    // Apenas o próprio SM (autenticado) pode ler/escrever seu perfil.
+    match /smProfiles/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      // Sub-coleção de sessões salvas no perfil do SM
+      match /sessions/{sessionId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
     // ── Sessões de retrospectiva ──────────────────────────────────────────────
     match /sessions/{sessionId} {
 
@@ -116,7 +127,7 @@ function isValidSessionRoot(data) {
     && data.keys().hasOnly([
       'sprint', 'team', 'currentPhase', 'retroStarted',
       'xp', 'completedPhases', 'createdAt', 'updatedAt', 'smDeviceId',
-      '_prefillMission', 'phaseDurations', 'phaseStartedAt'
+      '_prefillMission', 'phaseDurations', 'phaseStartedAt', 'smUid'
     ])
     && data.currentPhase is string
     && data.currentPhase.size() <= 32

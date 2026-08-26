@@ -26,6 +26,9 @@ import {
   deleteDoc,
   onSnapshot,
   increment,
+  query,
+  orderBy,
+  limit,
 } from 'firebase/firestore';
 
 // ── Validação das variáveis de ambiente ───────────────────────────────────────
@@ -70,13 +73,13 @@ if (USE_EMULATOR) {
   connectFirestoreEmulator(db, 'localhost', 8080);
 }
 
-// ── Session ID ────────────────────────────────────────────────────────────────
+// ── ID helpers ────────────────────────────────────────────────────────────────
 
 /**
- * Gera um ID de sessão com 128 bits de entropia usando a Web Crypto API.
+ * Gera um ID aleatório com 128 bits de entropia usando a Web Crypto API.
  * Resulta em 32 caracteres hex — impossível de enumerar por força bruta.
  */
-function generateId() {
+export function generateId() {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
@@ -202,3 +205,60 @@ export function subscribeCollection(sessionId, colName, callback) {
 
 // Reexporta increment para uso nos patchItem calls do store
 export { increment };
+
+// ── SM Profiles ───────────────────────────────────────────────────────────────
+
+/**
+ * Referência ao documento de perfil de um Scrum Master.
+ * O `uid` vem do Firebase Auth.
+ */
+function smProfileRef(uid) {
+  return doc(db, 'smProfiles', uid);
+}
+
+function smSessionsColRef(uid) {
+  return collection(db, 'smProfiles', uid, 'sessions');
+}
+
+function smSessionRef(uid, sessionId) {
+  return doc(db, 'smProfiles', uid, 'sessions', sessionId);
+}
+
+/**
+ * Carrega o perfil do SM. Retorna null se não existir.
+ */
+export async function loadSmProfile(uid) {
+  const snap = await getDoc(smProfileRef(uid));
+  return snap.exists() ? snap.data() : null;
+}
+
+/**
+ * Cria ou atualiza o perfil do SM (displayName, email, fotoURL…).
+ */
+export async function saveSmProfile(uid, data) {
+  await setDoc(smProfileRef(uid), { ...data, updatedAt: new Date().toISOString() }, { merge: true });
+}
+
+/**
+ * Retorna as últimas 50 sessões do SM, ordenadas por data de criação (mais recentes primeiro).
+ */
+export async function loadSmSessions(uid) {
+  const q = query(smSessionsColRef(uid), orderBy('createdAt', 'desc'), limit(50));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+/**
+ * Registra/atualiza o resumo de uma sessão no perfil do SM.
+ * Chamado sempre que o SM cria ou finaliza uma retrospectiva.
+ */
+export async function upsertSmSession(uid, sessionId, summary) {
+  await setDoc(smSessionRef(uid, sessionId), { ...summary, updatedAt: new Date().toISOString() }, { merge: true });
+}
+
+/**
+ * Remove o registro de uma sessão do perfil do SM.
+ */
+export async function deleteSmSession(uid, sessionId) {
+  await deleteDoc(smSessionRef(uid, sessionId));
+}
