@@ -1,12 +1,14 @@
 /**
- * Home Screen — redirects straight to role selection
+ * Home Screen — redirects to role selection or SM dashboard
  */
 
-import { setPhase, setState, hasSavedSession, resetState, getState } from '../state/store.js';
+import { setLocalPhase, setState, hasSavedSession, resetState, getState } from '../state/store.js';
+import { getCurrentUser } from '../services/auth.js';
 import { showModal } from '../components/modal.js';
 
 export function renderHome(root) {
   const hasSession = hasSavedSession();
+  const user       = getCurrentUser();
 
   root.innerHTML = `
     <div class="screen-home">
@@ -19,6 +21,9 @@ export function renderHome(root) {
           <button class="btn btn-ghost btn-lg" id="btn-continue" ${hasSession ? '' : 'disabled'}>
             ⏩ CONTINUAR JORNADA
           </button>
+          ${user ? `
+            <button class="btn btn-ghost btn-lg" id="btn-dashboard">🧙 MEU PAINEL (${user.displayName || user.email})</button>
+          ` : ''}
           ${hasSession
             ? `<button class="btn btn-danger btn-sm" id="btn-reset">🗑️ APAGAR TODOS OS DADOS</button>`
             : ''}
@@ -38,7 +43,6 @@ export function renderHome(root) {
       if (!confirmed) return;
       resetState();
     }
-    // Go to role selection instead of setup directly
     setState({ currentPhase: 'roleSelect', createdAt: new Date().toISOString() });
   });
 
@@ -47,8 +51,14 @@ export function renderHome(root) {
     continueBtn.addEventListener('click', () => {
       const s = getState();
       const phase = s.currentPhase && s.currentPhase !== 'home' ? s.currentPhase : 'roleSelect';
-      setPhase(phase);
+      // Usa setLocalPhase para não exigir que seja SM para navegar
+      setLocalPhase(phase);
     });
+  }
+
+  const dashBtn = root.querySelector('#btn-dashboard');
+  if (dashBtn) {
+    dashBtn.addEventListener('click', () => setLocalPhase('smDashboard'));
   }
 
   const resetBtn = root.querySelector('#btn-reset');

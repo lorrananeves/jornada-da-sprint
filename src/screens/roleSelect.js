@@ -3,11 +3,12 @@
  * Asks: "Are you the Scrum Master or a team member?"
  */
 
-import { setPhase, setLocalPhase, setRole } from '../state/store.js';
+import { setLocalPhase } from '../state/store.js';
 import { joinSession } from '../services/presence.js';
+import { getCurrentUser } from '../services/auth.js';
 
 export function renderRoleSelect(root) {
-  // If entering via a shared link (?s=...), highlight team member option
+  // Se entrando via link compartilhado (?s=...), destaca a opção de membro do time
   const params = new URLSearchParams(window.location.search);
   const hasSession = params.has('s');
 
@@ -35,15 +36,21 @@ export function renderRoleSelect(root) {
   `;
 
   root.querySelector('#btn-sm').addEventListener('click', () => {
-    setRole('scrum_master');
-    setPhase('setup');
+    // SM já autenticado → vai direto para o dashboard
+    // SM não autenticado → vai para a tela de login
+    const user = getCurrentUser();
+    if (user) {
+      setLocalPhase('smDashboard');
+    } else {
+      setLocalPhase('auth');
+    }
   });
 
   root.querySelector('#btn-team').addEventListener('click', async () => {
+    // Membros do time nunca precisam de login — entram direto pelo link
+    const { setRole } = await import('../state/store.js');
     setRole('team_member');
-    // Register presence then go to lobby (waiting room for the team)
     await joinSession();
-    // setLocalPhase: navegação local — não persiste no Firestore, não exige SM
     setLocalPhase('lobby');
   });
 }

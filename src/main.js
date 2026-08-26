@@ -5,6 +5,8 @@
 import { getState, subscribe, setPhase, isSM } from './state/store.js';
 import { initNavbar } from './components/navbar.js';
 import { renderHome } from './screens/home.js';
+import { renderAuth } from './screens/auth.js';
+import { renderSmDashboard } from './screens/smDashboard.js';
 import { renderRoleSelect } from './screens/roleSelect.js';
 import { renderSetup } from './screens/setup.js';
 import { renderLobby } from './screens/lobby.js';
@@ -17,23 +19,24 @@ import { renderComplete } from './screens/complete.js';
 import { renderReport } from './screens/report.js';
 
 const SCREENS = {
-  home:       renderHome,
-  roleSelect: renderRoleSelect,
-  setup:      renderSetup,
-  lobby:      renderLobby,
-  checkin:    renderCheckin,
-  treasures:  renderTreasures,
-  monsters:   renderMonsters,
-  combat:     renderCombat,
-  missions:   renderMissions,
-  complete:   renderComplete,
-  report:     renderReport,
+  home:         renderHome,
+  auth:         renderAuth,
+  smDashboard:  renderSmDashboard,
+  roleSelect:   renderRoleSelect,
+  setup:        renderSetup,
+  lobby:        renderLobby,
+  checkin:      renderCheckin,
+  treasures:    renderTreasures,
+  monsters:     renderMonsters,
+  combat:       renderCombat,
+  missions:     renderMissions,
+  complete:     renderComplete,
+  report:       renderReport,
 };
 
 // Fases que fazem parte da retrospectiva ativa — entram no histórico do browser.
-// Fases pré-retro (home, roleSelect, setup, lobby) são locais/transitórias e
-// não devem criar entradas de histórico: navegar "para trás" nelas via browser
-// tiraria o usuário do fluxo sem nenhum benefício.
+// Fases pré-retro (home, auth, smDashboard, roleSelect, setup, lobby) são
+// locais/transitórias e não devem criar entradas de histórico.
 const HISTORY_PHASES = new Set([
   'checkin', 'treasures', 'monsters', 'combat', 'missions', 'complete', 'report',
 ]);
@@ -43,9 +46,6 @@ function getScreenRoot() {
 }
 
 let _currentPhase = null;
-// Flag que distingue navegação iniciada pelo popstate de navegação normal.
-// Sem ela, popstate → setPhase → subscribe → navigate → pushState criaria
-// uma entrada duplicada no histórico a cada botão "voltar".
 let _fromPopstate = false;
 
 function navigate(phase) {
@@ -61,9 +61,6 @@ function navigate(phase) {
     return;
   }
 
-  // Gerencia o histórico do browser apenas para o SM e apenas para fases da retro.
-  // Membros do time não empurram entradas: a fase deles muda via Firestore/subscribe,
-  // não por interação direta, então pushState deles criaria entradas duplicadas.
   if (!_fromPopstate && isSM() && HISTORY_PHASES.has(phase)) {
     history.pushState({ phase }, '', window.location.href.split('?')[0] + window.location.search);
   }
@@ -77,8 +74,6 @@ function navigate(phase) {
 try {
   initNavbar();
 
-  // Garante que o estado inicial do histórico tem a fase gravada,
-  // para que o popstate do primeiro "voltar" saiba para onde ir.
   const initialState = getState();
   const initialPhase = initialState.currentPhase || 'home';
   history.replaceState({ phase: initialPhase }, '', window.location.href);
@@ -94,7 +89,7 @@ try {
     const phase = e.state?.phase;
     if (!phase || !SCREENS[phase]) return;
     _fromPopstate = true;
-    setPhase(phase); // setPhase já verifica isSM() internamente
+    setPhase(phase);
     _fromPopstate = false;
   });
 } catch (err) {
@@ -102,8 +97,6 @@ try {
 }
 
 function renderConfigError(err) {
-  // Tenta mostrar a mensagem no #screen-root; se o DOM ainda não existir,
-  // usa document.body como fallback.
   const root = document.getElementById('screen-root') ?? document.body;
 
   const isEnvError = err?.message?.includes('VITE_FIREBASE_');

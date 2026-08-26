@@ -2,7 +2,8 @@
  * Setup Screen — only accessible by Scrum Master
  */
 
-import { getState, setState, setPhase, completePhase } from '../state/store.js';
+import { getState, setState, setPhase, completePhase, setRole } from '../state/store.js';
+import { getCurrentUser } from '../services/auth.js';
 import { escapeHTML } from '../utils/dom.js';
 
 const PHASE_LABELS = [
@@ -102,9 +103,14 @@ export function renderSetup(root) {
     </div>
   `;
 
-  root.querySelector('#btn-back').addEventListener('click', () => setPhase('roleSelect'));
+  root.querySelector('#btn-back').addEventListener('click', async () => {
+    // SM autenticado volta ao dashboard; SM sem conta volta ao roleSelect
+    const user = getCurrentUser();
+    const { setLocalPhase } = await import('../state/store.js');
+    setLocalPhase(user ? 'smDashboard' : 'roleSelect');
+  });
 
-  root.querySelector('#btn-start-journey').addEventListener('click', () => {
+  root.querySelector('#btn-start-journey').addEventListener('click', async () => {
     const name = root.querySelector('#sprint-name').value.trim();
     if (!name) {
       root.querySelector('#sprint-name').focus();
@@ -116,6 +122,13 @@ export function renderSetup(root) {
     for (const { key } of PHASE_LABELS) {
       const val = parseInt(root.querySelector(`#timebox-${key}`).value, 10);
       phaseDurations[key] = isNaN(val) || val < 0 ? 0 : val;
+    }
+
+    // Garante que o role de SM está definido antes de persistir
+    // (necessário quando SM vem do dashboard sem ter passado pelo roleSelect)
+    const { getRole } = await import('../state/store.js');
+    if (!getRole() || getRole() === 'team_member') {
+      setRole('scrum_master');
     }
 
     setState({

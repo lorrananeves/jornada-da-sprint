@@ -18,7 +18,7 @@ const PHASES = [
 ];
 
 // Phases where navbar is hidden (no progress bar needed)
-const HIDDEN_PHASES = new Set(['home', 'roleSelect', 'lobby']);
+const HIDDEN_PHASES = new Set(['home', 'roleSelect', 'lobby', 'auth', 'smDashboard']);
 
 /** Unsubscribe handle para a assinatura de presença atual */
 let _unsubPresence = null;
