@@ -1,4 +1,171 @@
 /* ============================================================
+   Auth Screen (Login / Cadastro do Scrum Master)
+   ============================================================ */
+.screen-auth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 80px);
+  padding: 32px 16px;
+}
+
+.auth-card {
+  text-align: center;
+  max-width: 420px;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 48px 36px;
+  box-shadow: var(--shadow-lg);
+}
+
+.auth-card .form-group {
+  text-align: left;
+  margin-bottom: 12px;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.auth-error {
+  background: var(--danger-dim);
+  color: var(--danger);
+  border: 1px solid rgba(248, 81, 73, 0.3);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 0.875rem;
+  text-align: left;
+  margin-bottom: 4px;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--info);
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
+  text-decoration: underline;
+}
+.btn-link:hover { color: var(--accent); }
+
+@media (max-width: 480px) {
+  .auth-card { padding: 36px 20px; }
+}
+
+/* ============================================================
+   SM Dashboard
+   ============================================================ */
+.screen-sm-dashboard {
+  max-width: 760px;
+  margin: 0 auto;
+  padding-bottom: 48px;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+.dashboard-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.dashboard-subtitle {
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+.dashboard-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.dashboard-sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dashboard-session-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  transition: border-color var(--transition);
+  flex-wrap: wrap;
+}
+.dashboard-session-card:hover {
+  border-color: var(--accent);
+}
+
+.dashboard-session-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard-session-name {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dashboard-session-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.dashboard-session-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 600px) {
+  .dashboard-header { flex-direction: column; }
+  .dashboard-header-actions { width: 100%; justify-content: flex-end; }
+  .dashboard-session-card { flex-direction: column; align-items: flex-start; }
+  .dashboard-session-actions { width: 100%; }
+}
+
+
+/* ============================================================
    Role Select Screen
    ============================================================ */
 .screen-role-select {
