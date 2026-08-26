@@ -3,6 +3,7 @@
  */
 
 import { getState, subscribe, addCheckin, addXP, setPhase, completePhase, isSM } from '../state/store.js';
+import { uid } from '../utils/dom.js';
 import { xpForCheckin } from '../services/xp.js';
 import { calcCheckinStats, getMoodLabel } from '../services/stats.js';
 import { showXPToast } from '../components/xpToast.js';
@@ -182,7 +183,7 @@ export function renderCheckin(root) {
       regBtn.addEventListener('click', () => {
         if (!selectedScore) return;
         const comment = root.querySelector('#checkin-comment').value.trim() || null;
-        addCheckin({ score: selectedScore, comment });
+        addCheckin({ id: uid(), score: selectedScore, comment });
         addXP(xpForCheckin());
         showXPToast(xpForCheckin(), 'Check-in registrado');
         selectedScore = null;
