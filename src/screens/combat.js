@@ -3,7 +3,7 @@
  */
 
 import {
-  getState, setState, addSolution, voteSolution, addXP, setPhase, completePhase, isSM,
+  getState, setState, addSolution, voteSolution, addXP, setPhase, setLocalPhase, completePhase, isSM,
 } from '../state/store.js';
 import { xpForSolution } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
@@ -39,7 +39,10 @@ export function renderCombat(root) {
         </div>
       </div>
     `;
-    root.querySelector('#btn-back').addEventListener('click', () => setPhase('monsters'));
+    root.querySelector('#btn-back').addEventListener('click', () => {
+      if (isSM()) setPhase('monsters');
+      else setLocalPhase('roleSelect');
+    });
     return;
   }
 
@@ -196,7 +199,10 @@ export function renderCombat(root) {
     if (prevBtn) prevBtn.addEventListener('click', () => { currentMonsterIdx--; render(); });
     if (nextMonBtn) nextMonBtn.addEventListener('click', () => { currentMonsterIdx++; render(); });
 
-    root.querySelector('#btn-back').addEventListener('click', () => setPhase('monsters'));
+    root.querySelector('#btn-back').addEventListener('click', () => {
+      if (isSM()) setPhase('monsters');
+      else setLocalPhase('roleSelect');
+    });
     root.querySelector('#btn-next')?.addEventListener('click', () => {
       completePhase('combat');
       setPhase('missions');

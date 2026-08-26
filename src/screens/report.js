@@ -2,7 +2,7 @@
  * Report Screen
  */
 
-import { getState, setPhase } from '../state/store.js';
+import { getState, setPhase, setLocalPhase, isSM } from '../state/store.js';
 import { calcSummaryStats, getMoodLabel } from '../services/stats.js';
 import { exportAsPDF, exportAsPNG } from '../services/export.js';
 import { formatDate, formatISO, formatXP, getScoreEmoji, getPriorityLabel, getStrategyLabel } from '../utils/format.js';
@@ -184,7 +184,10 @@ export function renderReport(root) {
 
   const reportEl = root.querySelector('#report-content');
 
-  root.querySelector('#btn-back').addEventListener('click', () => setPhase('complete'));
+  root.querySelector('#btn-back').addEventListener('click', () => {
+    if (isSM()) setPhase('complete');
+    else setLocalPhase('roleSelect');
+  });
 
   root.querySelector('#btn-pdf').addEventListener('click', async () => {
     const btn = root.querySelector('#btn-pdf');

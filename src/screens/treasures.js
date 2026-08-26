@@ -3,7 +3,7 @@
  */
 
 import {
-  getState, addTreasure, reactToTreasure, addXP, setPhase, completePhase, isSM,
+  getState, addTreasure, reactToTreasure, addXP, setPhase, setLocalPhase, completePhase, isSM,
 } from '../state/store.js';
 import { xpForTreasure } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
@@ -152,7 +152,10 @@ export function renderTreasures(root) {
       });
     });
 
-    root.querySelector('#btn-back').addEventListener('click', () => setPhase('checkin'));
+    root.querySelector('#btn-back').addEventListener('click', () => {
+      if (isSM()) setPhase('checkin');
+      else setLocalPhase('roleSelect');
+    });
     root.querySelector('#btn-next')?.addEventListener('click', () => {
       completePhase('treasures');
       setPhase('monsters');

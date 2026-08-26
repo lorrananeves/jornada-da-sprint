@@ -4,7 +4,7 @@
 
 import {
   getState, addMonster, reactToMonster, selectMonster, prioritizeMonsters,
-  mergeMonsters, addXP, setPhase, completePhase, isSM,
+  mergeMonsters, addXP, setPhase, setLocalPhase, completePhase, isSM,
 } from '../state/store.js';
 import { xpForMonster } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
@@ -338,7 +338,10 @@ export function renderMonsters(root) {
       });
     }
 
-    root.querySelector('#btn-back').addEventListener('click', () => setPhase('treasures'));
+    root.querySelector('#btn-back').addEventListener('click', () => {
+      if (isSM()) setPhase('treasures');
+      else setLocalPhase('roleSelect');
+    });
     root.querySelector('#btn-next')?.addEventListener('click', () => {
       completePhase('monsters');
       setPhase('combat');

@@ -8,7 +8,7 @@
  *   - Sprint name/period, "waiting for SM" message, live participant count
  */
 
-import { getState, setState, setPhase } from '../state/store.js';
+import { getState, setState, setPhase, setLocalPhase } from '../state/store.js';
 import { getRole } from '../state/store.js';
 import { getSessionUrl, subscribeParticipants, stopHeartbeat, leaveSession } from '../services/presence.js';
 import { escapeHTML } from '../utils/dom.js';
@@ -104,9 +104,18 @@ export function renderLobby(root) {
             <div class="lobby-count" id="participant-count">0</div>
             <div class="lobby-count-label">participante(s) na sala</div>
           </div>
+
+          <div class="lobby-actions" style="justify-content:center;margin-top:16px">
+            <button class="btn btn-ghost" id="btn-leave-lobby">← Sair</button>
+          </div>
         </div>
       </div>
     `;
+
+    root.querySelector('#btn-leave-lobby').addEventListener('click', () => {
+      cleanup();
+      setLocalPhase('roleSelect');
+    });
   }
 
   // Real-time participant counter (both views)

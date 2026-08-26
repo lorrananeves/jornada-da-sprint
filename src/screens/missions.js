@@ -3,7 +3,7 @@
  */
 
 import {
-  getState, addMission, removeMission, addXP, setPhase, completePhase, setState, isSM,
+  getState, addMission, removeMission, addXP, setPhase, setLocalPhase, completePhase, setState, isSM,
 } from '../state/store.js';
 import { xpForMission } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
@@ -192,7 +192,10 @@ export function renderMissions(root) {
       });
     });
 
-    root.querySelector('#btn-back').addEventListener('click', () => setPhase('combat'));
+    root.querySelector('#btn-back').addEventListener('click', () => {
+      if (isSM()) setPhase('combat');
+      else setLocalPhase('roleSelect');
+    });
     root.querySelector('#btn-next')?.addEventListener('click', () => {
       completePhase('missions');
       setPhase('complete');

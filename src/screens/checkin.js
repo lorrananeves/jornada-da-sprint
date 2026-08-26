@@ -2,7 +2,7 @@
  * Check-in Screen
  */
 
-import { getState, subscribe, addCheckin, addXP, setPhase, completePhase, isSM } from '../state/store.js';
+import { getState, subscribe, addCheckin, addXP, setPhase, setLocalPhase, completePhase, isSM } from '../state/store.js';
 import { uid } from '../utils/dom.js';
 import { xpForCheckin } from '../services/xp.js';
 import { calcCheckinStats, getMoodLabel } from '../services/stats.js';
@@ -210,7 +210,10 @@ export function renderCheckin(root) {
       });
     }
 
-    root.querySelector('#btn-back').addEventListener('click', () => setPhase('setup'));
+    root.querySelector('#btn-back').addEventListener('click', () => {
+      if (isSM()) setPhase('setup');
+      else setLocalPhase('roleSelect');
+    });
     root.querySelector('#btn-next')?.addEventListener('click', () => {
       completePhase('checkin');
       setPhase('treasures');

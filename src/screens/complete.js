@@ -2,7 +2,7 @@
  * Complete Screen
  */
 
-import { getState, setPhase, completePhase } from '../state/store.js';
+import { getState, setPhase, setLocalPhase, completePhase, isSM } from '../state/store.js';
 import { calcSummaryStats, getMoodLabel } from '../services/stats.js';
 import { formatXP } from '../utils/format.js';
 import { escapeHTML } from '../utils/dom.js';
@@ -82,8 +82,12 @@ export function renderComplete(root) {
     </div>
   `;
 
-  root.querySelector('#btn-back').addEventListener('click', () => setPhase('missions'));
+  root.querySelector('#btn-back').addEventListener('click', () => {
+    if (isSM()) setPhase('missions');
+    else setLocalPhase('roleSelect');
+  });
   root.querySelector('#btn-report').addEventListener('click', () => {
+    if (!isSM()) { setLocalPhase('roleSelect'); return; }
     completePhase('complete');
     setPhase('report');
   });
