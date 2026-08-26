@@ -218,9 +218,11 @@ export function renderCheckin(root) {
   // (o router vai chamar outro renderer, este closure já não é relevante).
   let _lastCheckinCount = getState().checkins.length;
   let _lastParticipantCount = parseInt(getState().team?.participantCount, 10) || 0;
+  console.log('[checkin:sub] init — checkins:', _lastCheckinCount, 'participantCount:', _lastParticipantCount);
   _unsub = subscribe((state) => {
     // Sai da tela: cancela subscription para não acionar render em closure morto
     if (state.currentPhase !== 'checkin') {
+      console.log('[checkin:sub] fase mudou para', state.currentPhase, '— cancelando sub');
       _unsub?.();
       _unsub = null;
       return;
@@ -228,6 +230,7 @@ export function renderCheckin(root) {
     const currentParticipantCount = parseInt(state.team?.participantCount, 10) || 0;
     const checkinCountChanged      = state.checkins.length !== _lastCheckinCount;
     const participantCountChanged  = currentParticipantCount !== _lastParticipantCount;
+    console.log('[checkin:sub] notify — checkins:', state.checkins.length, 'pc:', currentParticipantCount, 'changed:', checkinCountChanged, participantCountChanged);
     if (checkinCountChanged || participantCountChanged) {
       _lastCheckinCount      = state.checkins.length;
       _lastParticipantCount  = currentParticipantCount;

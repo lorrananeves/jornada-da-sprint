@@ -49,6 +49,12 @@ test('SM inicia a retrospectiva e membro é redirecionado automaticamente', asyn
 test('Membro registra check-in e SM vê indicador atualizado em tempo real', async ({ twoParticipants }) => {
   const { smPage, memberPage } = twoParticipants;
 
+  // Captura todos os logs do console do SM para diagnóstico
+  const smLogs = [];
+  smPage.on('console', (msg) => smLogs.push(`[SM ${msg.type()}] ${msg.text()}`));
+  const memberLogs = [];
+  memberPage.on('console', (msg) => memberLogs.push(`[MB ${msg.type()}] ${msg.text()}`));
+
   await memberJoin(memberPage);
   await startRetro(smPage, memberPage);
 
@@ -62,12 +68,14 @@ test('Membro registra check-in e SM vê indicador atualizado em tempo real', asy
   // Aguarda o membro ver o feedback de envio (confirma que o Firestore recebeu)
   await expect(memberPage.locator('.xp-toast')).toBeVisible({ timeout: 10_000 });
 
-  // Aguarda mais um pouco para o Firestore propagar e o SM receber o snapshot
-  await smPage.waitForTimeout(3_000);
+  // Aguarda propagação Firestore → SM
+  await smPage.waitForTimeout(5_000);
 
-  // Dump diagnóstico: o que o SM vê no momento da falha?
+  // Dump diagnóstico completo
   const smHTML = await smPage.locator('#screen-root').innerHTML();
-  console.log('[DIAG] SM screen-root HTML:', smHTML.slice(0, 2000));
+  console.log('=== DIAG SM HTML ===\n', smHTML.slice(0, 3000));
+  console.log('=== DIAG SM LOGS ===\n', smLogs.join('\n'));
+  console.log('=== DIAG MEMBER LOGS ===\n', memberLogs.join('\n'));
 
   // SM vê o indicador atualizado para 1 de 2 via subscription em tempo real
   await expect(smPage.getByText(/1 de 2/i)).toBeVisible({ timeout: 20_000 });
