@@ -106,6 +106,21 @@ service cloud.firestore {
           && request.resource.data.expiresAt is number
           && request.resource.data.expiresAt > request.time.toMillis();
       }
+
+      // ── Indicador de digitação ────────────────────────────────────────────
+      match /typing/{deviceId} {
+        allow read: if validSessionId(sessionId);
+        // Escrita: somente o próprio dispositivo pode gravar/remover o seu doc
+        allow create, update: if
+          validSessionId(sessionId)
+          && deviceId.matches('^[0-9a-f]{16}$')
+          && request.resource.data.keys().hasOnly(['phase', 'expiresAt'])
+          && request.resource.data.phase is string
+          && request.resource.data.phase.size() <= 32
+          && request.resource.data.expiresAt is number
+          && request.resource.data.expiresAt > request.time.toMillis();
+        allow delete: if deviceId.matches('^[0-9a-f]{16}$');
+      }
     }
 
     // Bloqueia qualquer outra coleção não prevista

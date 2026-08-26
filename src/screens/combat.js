@@ -10,6 +10,7 @@ import { showXPToast } from '../components/xpToast.js';
 import { uid, escapeHTML, preserveInputs } from '../utils/dom.js';
 import { getStrategyLabel } from '../utils/format.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
+import { createTypingIndicator } from '../components/typingIndicator.js';
 
 const STRATEGIES = [
   { id: 'prevent', label: '🛡️ PREVENIR',        question: 'Como podemos evitar que isso aconteça?' },
@@ -22,8 +23,9 @@ export function renderCombat(root) {
   const selectedMonsters = state.monsters.filter((m) => m.selected);
   let currentMonsterIdx = 0;
   let currentStrategy = 'prevent';
-  let _timer = null;
-  let _unsub = null;
+  let _timer  = null;
+  let _unsub  = null;
+  let _typing = null;
 
   if (!selectedMonsters.length) {
     root.innerHTML = `
@@ -133,8 +135,13 @@ export function renderCombat(root) {
       </div>
     `; }); // end preserveInputs
 
-    if (_timer) _timer.destroy();
+    if (_timer)  _timer.destroy();
     _timer = createPhaseTimer(root.querySelector('.screen-combat'), 'combat');
+
+    if (_typing) _typing.destroy();
+    _typing = createTypingIndicator(root.querySelector('.screen-combat'), 'combat');
+    const solutionInput = root.querySelector('#solution-input');
+    if (solutionInput) _typing.watchField(solutionInput);
 
     attachEvents(monster);
   }
@@ -168,6 +175,7 @@ export function renderCombat(root) {
       addXP(xpForSolution());
       showXPToast(xpForSolution(), 'Solução adicionada');
       input.value = '';
+      if (_typing) _typing.destroy();
       render();
     });
 
@@ -216,6 +224,7 @@ export function renderCombat(root) {
     if (state.currentPhase !== 'combat') {
       _unsub?.();
       _unsub = null;
+      if (_typing) { _typing.destroy(); _typing = null; }
       return;
     }
     if (state.solutions.length !== _lastCount) {

@@ -9,6 +9,7 @@ import { xpForTreasure } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
 import { uid, escapeHTML, preserveInputs } from '../utils/dom.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
+import { createTypingIndicator } from '../components/typingIndicator.js';
 
 const CATEGORIES = [
   { id: 'treasure',    emoji: '💎', label: 'Tesouro',        question: 'O que funcionou bem nessa Sprint?' },
@@ -73,8 +74,9 @@ function buildColumn(cat, treasures) {
 }
 
 export function renderTreasures(root) {
-  let _timer = null;
-  let _unsub = null;
+  let _timer   = null;
+  let _unsub   = null;
+  let _typing  = null;
 
   function render() {
     const state = getState();
@@ -105,8 +107,13 @@ export function renderTreasures(root) {
       });
     });
 
-    if (_timer) _timer.destroy();
+    if (_timer)  _timer.destroy();
     _timer = createPhaseTimer(root.querySelector('.screen-treasures'), 'treasures');
+
+    // Indicador de digitação — recria após cada render (preserveInputs recria o DOM)
+    if (_typing) _typing.destroy();
+    _typing = createTypingIndicator(root.querySelector('#treasure-cols'), 'treasures');
+    root.querySelectorAll('.treasure-input').forEach((ta) => _typing.watchField(ta));
 
     attachEvents();
   }
@@ -126,17 +133,18 @@ export function renderTreasures(root) {
           return;
         }
         textarea.style.borderColor = '';
-        addTreasure({
-          id: uid(),
-          text,
-          category: cat.id,
-          reactions: { heart: 0, thumbs: 0, bulb: 0 },
-        });
-        const xp = xpForTreasure(cat.id);
-        addXP(xp);
-        showXPToast(xp, `${cat.emoji} ${cat.label} adicionado`);
-        textarea.value = '';
-        render();
+          addTreasure({
+            id: uid(),
+            text,
+            category: cat.id,
+            reactions: { heart: 0, thumbs: 0, bulb: 0 },
+          });
+          const xp = xpForTreasure(cat.id);
+          addXP(xp);
+          showXPToast(xp, `${cat.emoji} ${cat.label} adicionado`);
+          textarea.value = '';
+          if (_typing) _typing.destroy();
+          render();
       });
 
       // Reaction events — patch cirúrgico: só atualiza o contador no DOM,
@@ -169,6 +177,7 @@ export function renderTreasures(root) {
     if (state.currentPhase !== 'treasures') {
       _unsub?.();
       _unsub = null;
+      if (_typing) { _typing.destroy(); _typing = null; }
       return;
     }
     if (state.treasures.length !== _lastCount) {

@@ -10,14 +10,16 @@ import { showXPToast } from '../components/xpToast.js';
 import { getScoreEmoji, getScoreLabel } from '../utils/format.js';
 import { escapeHTML, preserveInputs } from '../utils/dom.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
+import { createTypingIndicator } from '../components/typingIndicator.js';
 
 const SCORES = [1, 2, 3, 4, 5];
 
 export function renderCheckin(root) {
   const _state = getState();
   let selectedScore = null;
-  let _timer = null;
-  let _unsub = null;
+  let _timer  = null;
+  let _unsub  = null;
+  let _typing = null;
 
   function buildCheckinForm() {
     return `
@@ -155,8 +157,13 @@ export function renderCheckin(root) {
       </div>
     `; }); // end preserveInputs
 
-    if (_timer) _timer.destroy();
+    if (_timer)  _timer.destroy();
     _timer = createPhaseTimer(root.querySelector('.screen-checkin'), 'checkin');
+
+    if (_typing) _typing.destroy();
+    _typing = createTypingIndicator(root.querySelector('.screen-checkin'), 'checkin');
+    const commentField = root.querySelector('#checkin-comment');
+    if (commentField) _typing.watchField(commentField);
 
     attachEvents();
   }
@@ -191,6 +198,7 @@ export function renderCheckin(root) {
         addXP(xpForCheckin());
         showXPToast(xpForCheckin(), 'Check-in registrado');
         selectedScore = null;
+        if (_typing) _typing.destroy();
         render();
       });
     }
@@ -230,6 +238,7 @@ export function renderCheckin(root) {
     if (state.currentPhase !== 'checkin') {
       _unsub?.();
       _unsub = null;
+      if (_typing) { _typing.destroy(); _typing = null; }
       return;
     }
     const currentParticipantCount = parseInt(state.team?.participantCount, 10) || 0;

@@ -11,6 +11,7 @@ import { showModal } from '../components/modal.js';
 import { uid, escapeHTML, preserveInputs } from '../utils/dom.js';
 import { getPriorityLabel, getStrategyLabel, formatDate } from '../utils/format.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
+import { createTypingIndicator } from '../components/typingIndicator.js';
 
 const PRIORITIES = [
   { id: 'high',   label: 'Alta',  class: 'priority-badge-high' },
@@ -19,8 +20,9 @@ const PRIORITIES = [
 ];
 
 export function renderMissions(root) {
-  let _timer = null;
-  let _unsub = null;
+  let _timer  = null;
+  let _unsub  = null;
+  let _typing = null;
 
   function render() {
     const state = getState();
@@ -142,8 +144,12 @@ export function renderMissions(root) {
       </div>
     `; }); // end preserveInputs
 
-    if (_timer) _timer.destroy();
+    if (_timer)  _timer.destroy();
     _timer = createPhaseTimer(root.querySelector('.screen-missions'), 'missions');
+
+    if (_typing) _typing.destroy();
+    _typing = createTypingIndicator(root.querySelector('.screen-missions'), 'missions');
+    root.querySelectorAll('#mission-title, #mission-desc').forEach((el) => _typing.watchField(el));
 
     attachEvents(prefill);
   }
@@ -157,6 +163,7 @@ export function renderMissions(root) {
         return;
       }
       root.querySelector('#mission-title').style.borderColor = '';
+      if (_typing) _typing.destroy();
 
       const mission = {
         id: uid(),
@@ -209,6 +216,7 @@ export function renderMissions(root) {
     if (state.currentPhase !== 'missions') {
       _unsub?.();
       _unsub = null;
+      if (_typing) { _typing.destroy(); _typing = null; }
       return;
     }
     if (state.missions.length !== _lastCount) {

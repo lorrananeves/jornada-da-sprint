@@ -10,6 +10,7 @@ import { xpForMonster } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
 import { uid, escapeHTML, preserveInputs } from '../utils/dom.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
+import { createTypingIndicator } from '../components/typingIndicator.js';
 
 const SUGGESTIONS = [
   'Dependências externas', 'Problemas técnicos', 'Comunicação',
@@ -137,8 +138,9 @@ function showMergeModal(keepMonster, dropMonster) {
 }
 
 export function renderMonsters(root) {
-  let _timer = null;
-  let _unsub = null;
+  let _timer  = null;
+  let _unsub  = null;
+  let _typing = null;
   // Id do card sendo arrastado (só relevante para o SM)
   let _dragId = null;
 
@@ -200,8 +202,13 @@ export function renderMonsters(root) {
       }
     });
 
-    if (_timer) _timer.destroy();
+    if (_timer)  _timer.destroy();
     _timer = createPhaseTimer(root.querySelector('.screen-monsters'), 'monsters');
+
+    if (_typing) _typing.destroy();
+    _typing = createTypingIndicator(root.querySelector('.screen-monsters'), 'monsters');
+    const monsterInput = root.querySelector('#monster-input');
+    if (monsterInput) _typing.watchField(monsterInput);
 
     attachEvents();
   }
@@ -232,6 +239,7 @@ export function renderMonsters(root) {
       addXP(xpForMonster());
       showXPToast(xpForMonster(), 'Monstro adicionado');
       input.value = '';
+      if (_typing) _typing.destroy();
       render();
     });
 
@@ -355,6 +363,7 @@ export function renderMonsters(root) {
     if (state.currentPhase !== 'monsters') {
       _unsub?.();
       _unsub = null;
+      if (_typing) { _typing.destroy(); _typing = null; }
       return;
     }
     if (state.monsters.length !== _lastCount) {
