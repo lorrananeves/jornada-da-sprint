@@ -16,11 +16,16 @@
 
 import { test as base, expect } from '@playwright/test';
 
-// Credenciais do SM nos testes E2E — podem ser sobrescritas por variáveis de ambiente.
-// O emulador de Auth é limpo a cada execução do CI, portanto qualquer valor serve.
-const E2E_EMAIL    = process.env.E2E_SM_EMAIL    ?? 'sm-e2e@test.local';
+// Senha fixa para todas as contas E2E — sem valor sensível real (emulador local).
 const E2E_PASSWORD = process.env.E2E_SM_PASSWORD ?? 'emulator-only-pw';
-const E2E_NAME     = process.env.E2E_SM_NAME     ?? 'SM E2E';
+
+/**
+ * Gera um e-mail único por invocação para evitar colisão entre testes paralelos
+ * ou retries (o emulador de Auth mantém usuários durante toda a execução).
+ */
+function makeUniqueEmail() {
+  return `sm-e2e-${Date.now()}@test.local`;
+}
 
 /**
  * Aguarda o app renderizar e garante que não estamos na tela de erro.
@@ -35,47 +40,33 @@ async function waitForApp(page) {
 }
 
 /**
- * Passa pela tela de auth: tenta criar a conta (signup); se o e-mail já existir
- * (segunda tentativa do retry do CI), faz login normalmente.
+ * Passa pela tela de auth: cria uma conta nova com e-mail único e aguarda
+ * o redirecionamento automático para o dashboard do SM.
  */
 async function authenticateSM(page) {
   // Aguarda a tela de auth aparecer
   await page.waitForSelector('#auth-email', { timeout: 15_000 });
 
-  // Tenta signup primeiro
+  // A tela começa no modo login; muda para signup
   const toggleBtn = page.locator('#btn-toggle-mode');
-  const isLogin = await toggleBtn.innerText().then((t) => /criar/i.test(t)).catch(() => false);
-  if (isLogin) {
-    // Já está no modo login — muda para signup
+  // O botão no modo login diz "Criar agora" — clica para ir ao signup
+  const btnText = await toggleBtn.innerText().catch(() => '');
+  if (/criar/i.test(btnText)) {
     await toggleBtn.click();
     await page.waitForSelector('#auth-name', { timeout: 5_000 });
   }
 
-  // Preenche o formulário de cadastro
+  // Preenche e envia o formulário de cadastro
   const nameField = page.locator('#auth-name');
   if (await nameField.isVisible({ timeout: 2_000 }).catch(() => false)) {
-    await nameField.fill(E2E_NAME);
+    await nameField.fill('SM E2E');
   }
-  await page.locator('#auth-email').fill(E2E_EMAIL);
+  await page.locator('#auth-email').fill(makeUniqueEmail());
   await page.locator('#auth-password').fill(E2E_PASSWORD);
   await page.locator('#btn-email-auth').click();
 
-  // Se aparecer erro de "e-mail já em uso", troca para login
-  const errorEl = page.locator('#auth-error');
-  const hasError = await errorEl.isVisible({ timeout: 3_000 }).catch(() => false);
-  if (hasError) {
-    const errorText = await errorEl.innerText().catch(() => '');
-    if (/já está em uso/i.test(errorText)) {
-      // Muda para login
-      await page.locator('#btn-toggle-mode').click();
-      await page.locator('#auth-email').fill(E2E_EMAIL);
-      await page.locator('#auth-password').fill(E2E_PASSWORD);
-      await page.locator('#btn-email-auth').click();
-    }
-  }
-
-  // Aguarda chegar ao dashboard do SM
-  await page.waitForSelector('#btn-new-retro', { timeout: 15_000 });
+  // Aguarda chegar ao dashboard (redirecionamento via onAuthStateChanged → store)
+  await page.waitForSelector('#btn-new-retro', { timeout: 20_000 });
 }
 
 /**

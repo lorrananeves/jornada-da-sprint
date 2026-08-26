@@ -532,9 +532,10 @@ loadFromStorage();
 // Inicializa o Auth ANTES do Firestore para que getCurrentUser() esteja disponível
 // quando initFirebase() gravar smUid na sessão.
 initAuth().then((user) => {
-  // Se o SM fez login (auth state mudou de null → user), e a fase atual é 'auth',
-  // redireciona para o dashboard.
-  if (user && _state.currentPhase === 'auth') {
+  // Se o usuário já estava logado ao carregar a página (ex: sessão persistida),
+  // e está numa tela pré-sessão, vai direto ao dashboard.
+  const preSessionPhases = new Set(['auth', 'home', 'roleSelect']);
+  if (user && preSessionPhases.has(_state.currentPhase)) {
     // Salva/atualiza perfil do SM
     saveSmProfile(user.uid, {
       displayName: user.displayName || '',
@@ -562,8 +563,11 @@ onAuthChange((user) => {
       photoURL:    user.photoURL    || '',
     }).catch((e) => console.warn('[store] saveSmProfile failed:', e));
 
-    // Se está na tela de auth, vai para o dashboard
-    if (phase === 'auth') {
+    // Se está em qualquer tela pré-sessão do SM, vai para o dashboard.
+    // Inclui 'roleSelect' para cobrir o caso em que o onAuthChange chega
+    // antes de o store ter mudado para 'auth'.
+    const preSessionPhases = new Set(['auth', 'home', 'roleSelect']);
+    if (preSessionPhases.has(phase)) {
       _state = { ..._state, currentPhase: 'smDashboard' };
       notify();
     }
