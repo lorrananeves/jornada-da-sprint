@@ -5,7 +5,7 @@
  *
  *   Documento raiz  sessions/{id}
  *     sprint, team, currentPhase, retroStarted, xp,
- *     smDeviceId, completedPhases, createdAt, updatedAt
+ *     smDeviceId, smUid, completedPhases, createdAt, updatedAt
  *
  *   Subcoleções (um documento por item — sem race condition)
  *     sessions/{id}/checkins/{itemId}
@@ -14,11 +14,16 @@
  *     sessions/{id}/solutions/{itemId}
  *     sessions/{id}/missions/{itemId}
  *
+ *   Perfil do SM (autenticado)
+ *     smProfiles/{uid}
+ *     smProfiles/{uid}/sessions/{sessionId}   ← resumo de cada retro
+ *
  * Fluxo:
- *   1. Carrega localStorage para evitar flash em branco.
- *   2. Conecta ao Firestore: carrega doc raiz + todas as subcoleções.
- *   3. Subscriptions em tempo real: doc raiz (fases) + cada subcoleção.
- *   4. Writes:
+ *   1. initAuth() aguarda o Firebase Auth resolver o estado de login.
+ *   2. Carrega localStorage para evitar flash em branco.
+ *   3. Conecta ao Firestore: carrega doc raiz + todas as subcoleções.
+ *   4. Subscriptions em tempo real: doc raiz (fases) + cada subcoleção.
+ *   5. Writes:
  *      - Campos escalares  → saveSession() (setDoc merge, só campos raiz)
  *      - XP               → incrementXP() (FieldValue.increment, atômico)
  *      - Adicionar item    → saveItem()    (setDoc no documento do item)
@@ -28,6 +33,7 @@
 
 import {
   getOrCreateSessionId,
+  generateId,
   loadSession,
   loadCollection,
   saveSession,
@@ -38,8 +44,11 @@ import {
   subscribeSession,
   subscribeCollection,
   increment,
+  saveSmProfile,
+  upsertSmSession,
 } from '../services/firebase.js';
 import { getDeviceId } from '../services/presence.js';
+import { initAuth, getCurrentUser, onAuthChange } from '../services/auth.js';
 import { showErrorToast } from '../components/xpToast.js';
 
 const STORAGE_KEY = 'jornada_sprint_session';
@@ -56,6 +65,7 @@ const DEFAULT_STATE = () => ({
   retroStarted:     false,
   xp:               0,
   smDeviceId:       null,
+  smUid:            null,   // uid do Firebase Auth do SM que criou a sessão
   completedPhases:  [],
   phaseDurations:   {},   // { checkin: 5, treasures: 10, ... } em minutos; 0 = sem timer
   phaseStartedAt:   {},   // { checkin: ISOString } — momento em que a fase foi iniciada
@@ -85,7 +95,11 @@ export function getRole() {
 export function setRole(role) {
   sessionStorage.setItem(ROLE_KEY, role);
   if (role === 'scrum_master') {
-    setScalarState({ smDeviceId: getDeviceId() });
+    const user = getCurrentUser();
+    setScalarState({
+      smDeviceId: getDeviceId(),
+      smUid: user ? user.uid : null,
+    });
   }
 }
 
@@ -163,9 +177,38 @@ function setScalarState(scalars) {
       console.warn('Firestore scalar write failed:', e);
       showErrorToast('Falha ao salvar — verifique sua conexão.');
     });
+
+    // Atualiza o resumo no perfil do SM (se estiver autenticado e for SM)
+    _syncSmProfile();
   }
 
   notify();
+}
+
+/**
+ * Sincroniza o resumo da sessão atual no perfil do SM autenticado.
+ * Chamado de forma assíncrona, sem bloquear o fluxo principal.
+ */
+function _syncSmProfile() {
+  if (!isSM()) return;
+  const user = getCurrentUser();
+  if (!user) return;
+  if (!_sessionId) return;
+
+  const status = _state.completedPhases.includes('complete') || _state.currentPhase === 'report'
+    ? 'completed'
+    : _state.retroStarted
+    ? 'active'
+    : 'setup';
+
+  upsertSmSession(user.uid, _sessionId, {
+    sessionId:   _sessionId,
+    sprintName:  _state.sprint?.name || '',
+    teamName:    _state.team?.name   || '',
+    createdAt:   _state.createdAt,
+    lastPhase:   _state.currentPhase,
+    status,
+  }).catch((e) => console.warn('[store] upsertSmSession failed:', e));
 }
 
 // ── Collection sort helpers ───────────────────────────────────────────────────
@@ -198,16 +241,11 @@ async function initFirebase() {
       _state = { ..._state, ...remote };
       if (!getRole()) _state.currentPhase = 'roleSelect';
     }
-    // Se não há sessão remota nem dados locais, o usuário ainda não criou a sessão —
-    // não há documento no Firestore ainda, portanto não abrimos subscriptions aqui.
-    // O subscribeSession detectará a criação e abrirá as subcoleções.
   } catch (e) {
     console.warn('Could not load session root from Firestore:', e);
   }
 
   // 2. Carrega e assina subcoleções apenas quando o documento raiz existe.
-  //    Sem isso, os onSnapshot disparariam imediatamente com permission-denied
-  //    porque as regras bloqueiam leituras em sessions/{id}/* sem doc raiz.
   if (sessionExists) {
     try {
       const [checkins, treasures, monsters, solutions, missions] = await Promise.all(
@@ -222,18 +260,11 @@ async function initFirebase() {
   saveToStorage(_state);
   notify();
 
-  // 3. Subscription ao doc raiz (fases, sprint, time…).
-  //    Sempre abrimos — permite detectar quando o SM cria a sessão e redirecionar membros.
-  //    O guard de updatedAt evita processar o próprio echo do SM, MAS não pode bloquear
-  //    a abertura das subcoleções. Por isso a abertura das subcoleções é separada e
-  //    controlada pela flag `subcollsOpen` — abre exatamente uma vez, independentemente
-  //    de quantas vezes o guard bloqueia o notify.
-  let subcollsOpen = sessionExists; // já abre se a sessão existia ao carregar
+  // 3. Subscription ao doc raiz
+  let subcollsOpen = sessionExists;
 
   _unsubs.push(
     subscribeSession(_sessionId, (remoteScalars) => {
-      // Abre subcoleções na primeira vez que o Firestore confirma a sessão existe,
-      // mesmo que o guard de updatedAt vá bloquear o notify logo abaixo.
       if (!subcollsOpen) {
         subcollsOpen = true;
         for (const col of COLLECTIONS) {
@@ -247,12 +278,8 @@ async function initFirebase() {
         }
       }
 
-      // Ignora se não há timestamp ou se o dado remoto não é mais recente que o local.
-      // Quando _state.updatedAt é null (estado padrão, sem gravação local), aceita sempre.
       if (remoteScalars.updatedAt && _state.updatedAt && remoteScalars.updatedAt <= _state.updatedAt) return;
 
-      // 'roleSelect' é uma fase de onboarding local: o membro ainda não escolheu
-      // papel e não deve ser redirecionado pelo snapshot do SM.
       const keepPhase = _state.currentPhase === 'roleSelect';
 
       _state = { ..._state, ...remoteScalars };
@@ -263,7 +290,7 @@ async function initFirebase() {
     })
   );
 
-  // Subcoleções para quem já tinha sessão ao carregar (loadSession retornou dados).
+  // Subcoleções para quem já tinha sessão ao carregar
   if (sessionExists) {
     subcollsOpen = true;
     for (const col of COLLECTIONS) {
@@ -285,7 +312,6 @@ export function setPhase(phase) {
     console.warn('[setPhase] bloqueado — somente o Scrum Master pode avançar fases.');
     return;
   }
-  // Registra o momento de início da fase para o timer
   const phaseStartedAt = { ..._state.phaseStartedAt, [phase]: new Date().toISOString() };
   setScalarState({ currentPhase: phase, phaseStartedAt });
 }
@@ -293,6 +319,7 @@ export function setPhase(phase) {
 /**
  * Navega localmente para uma fase sem persistir no Firestore e sem checar SM.
  * Usado pelo membro do time para mudar de tela localmente (ex: roleSelect → lobby).
+ * Também usado para fases pré-sessão do SM: auth, smDashboard.
  */
 export function setLocalPhase(phase) {
   _state = { ..._state, currentPhase: phase };
@@ -310,12 +337,10 @@ export function completePhase(phase) {
 // ── XP (incremento atômico) ───────────────────────────────────────────────────
 
 export function addXP(amount) {
-  // Otimismo local imediato
   _state = { ..._state, xp: _state.xp + amount };
   saveToStorage(_state);
   notify();
 
-  // Atomic increment no Firestore — sem race condition
   if (_sessionId) {
     incrementXP(_sessionId, amount).catch((e) =>
       console.warn('Firestore XP increment failed:', e)
@@ -383,7 +408,6 @@ export function mergeMonsters(keepId, dropId, newText) {
   const drop = _state.monsters.find((m) => m.id === dropId);
   if (!keep || !drop) return;
 
-  // Soma reactions e preserva selected se qualquer um estava selecionado
   const merged = {
     ...(newText && newText !== keep.text ? { text: newText } : {}),
     reactions: {
@@ -402,7 +426,6 @@ export function mergeMonsters(keepId, dropId, newText) {
     console.warn('Firestore mergeMonsters remove failed:', e)
   );
 
-  // Optimistic local update
   _state = {
     ..._state,
     monsters: _state.monsters
@@ -417,14 +440,11 @@ export function prioritizeMonsters() {
   const sorted = [..._state.monsters].sort(
     (a, b) => (b.reactions?.fire || 0) - (a.reactions?.fire || 0)
   );
-  // Persiste a ordem como priorityRank em cada documento para que todos os
-  // participantes vejam a mesma ordem.
   sorted.forEach((m, i) => {
     patchItem(_sessionId, 'monsters', m.id, { priorityRank: i }).catch((e) =>
       console.warn('Firestore prioritizeMonsters failed:', e)
     );
   });
-  // Optimistic local update — subscribeCollection vai confirmar com os dados reais
   _state = { ..._state, monsters: sorted.map((m, i) => ({ ...m, priorityRank: i })) };
   notify();
 }
@@ -464,7 +484,7 @@ export function removeMission(id) {
   });
 }
 
-// ── Reset ─────────────────────────────────────────────────────────────────────
+// ── Reset & Nova sessão ───────────────────────────────────────────────────────
 
 export function resetState() {
   _state = DEFAULT_STATE();
@@ -472,7 +492,87 @@ export function resetState() {
   notify();
 }
 
+/**
+ * Inicia uma nova sessão sem limpar o estado do usuário autenticado.
+ * Gera um novo sessionId na URL e reseta o estado da sessão.
+ * Chamado pelo dashboard do SM ao criar uma nova retrospectiva.
+ */
+export function startNewSession() {
+  // Limpa unsubs da sessão anterior
+  _unsubs.forEach((u) => u());
+  _unsubs.length = 0;
+
+  // Gera novo ID e atualiza URL
+  const newId = generateId();
+  const params = new URLSearchParams(window.location.search);
+  params.set('s', newId);
+  window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+  _sessionId = newId;
+
+  // Reseta estado da sessão mas mantém role (SM autenticado)
+  _state = DEFAULT_STATE();
+  _state.currentPhase = 'setup';
+  localStorage.removeItem(STORAGE_KEY);
+
+  // Aplica o role de SM na nova sessão
+  const user = getCurrentUser();
+  setScalarState({
+    smDeviceId: getDeviceId(),
+    smUid: user ? user.uid : null,
+    currentPhase: 'setup',
+    createdAt: new Date().toISOString(),
+  });
+  sessionStorage.setItem(ROLE_KEY, 'scrum_master');
+}
+
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 loadFromStorage();
-initFirebase();
+
+// Inicializa o Auth ANTES do Firestore para que getCurrentUser() esteja disponível
+// quando initFirebase() gravar smUid na sessão.
+initAuth().then((user) => {
+  // Se o SM fez login (auth state mudou de null → user), e a fase atual é 'auth',
+  // redireciona para o dashboard.
+  if (user && _state.currentPhase === 'auth') {
+    // Salva/atualiza perfil do SM
+    saveSmProfile(user.uid, {
+      displayName: user.displayName || '',
+      email:       user.email || '',
+      photoURL:    user.photoURL || '',
+      createdAt:   new Date().toISOString(),
+    }).catch((e) => console.warn('[store] saveSmProfile failed:', e));
+
+    _state = { ..._state, currentPhase: 'smDashboard' };
+    notify();
+  }
+
+  initFirebase();
+});
+
+// Escuta mudanças subsequentes de auth (login/logout após o bootstrap)
+onAuthChange((user) => {
+  const phase = _state.currentPhase;
+
+  if (user) {
+    // Usuário acabou de fazer login
+    saveSmProfile(user.uid, {
+      displayName: user.displayName || '',
+      email:       user.email       || '',
+      photoURL:    user.photoURL    || '',
+    }).catch((e) => console.warn('[store] saveSmProfile failed:', e));
+
+    // Se está na tela de auth, vai para o dashboard
+    if (phase === 'auth') {
+      _state = { ..._state, currentPhase: 'smDashboard' };
+      notify();
+    }
+  } else {
+    // Usuário acabou de fazer logout
+    const smPhases = new Set(['auth', 'smDashboard', 'setup', 'lobby']);
+    if (smPhases.has(phase)) {
+      _state = { ..._state, currentPhase: 'home' };
+      notify();
+    }
+  }
+});
