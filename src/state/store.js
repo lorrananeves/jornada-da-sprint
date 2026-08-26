@@ -104,6 +104,14 @@ export function setRole(role) {
 }
 
 export function isSM() {
+  // Se o role foi definido explicitamente nesta sessão de browser,
+  // ele tem prioridade sobre o smDeviceId — impede que alguém que
+  // criou uma sessão anterior (e tem o smDeviceId salvo) seja tratado
+  // como SM quando entra como membro do time pelo link.
+  const role = getRole();
+  if (role === 'team_member') return false;
+  if (role === 'scrum_master') return true;
+  // Sem role explícito: fallback pelo smDeviceId (bootstrap do SM autenticado)
   return _state.smDeviceId === getDeviceId();
 }
 
