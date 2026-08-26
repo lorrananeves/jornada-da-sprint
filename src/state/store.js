@@ -581,8 +581,6 @@ onAuthChange((user) => {
     }).catch((e) => console.warn('[store] saveSmProfile failed:', e));
 
     // Se está em qualquer tela pré-sessão do SM, vai para o dashboard.
-    // Inclui 'roleSelect' para cobrir o caso em que o onAuthChange chega
-    // antes de o store ter mudado para 'auth'.
     const preSessionPhases = new Set(['auth', 'home', 'roleSelect']);
     if (preSessionPhases.has(phase)) {
       _state = { ..._state, currentPhase: 'smDashboard' };

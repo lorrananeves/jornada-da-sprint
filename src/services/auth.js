@@ -51,13 +51,12 @@ export function getCurrentUser() {
 }
 
 /**
- * Registra um callback chamado sempre que o estado de autenticação muda.
+ * Registra um callback chamado apenas em mudanças *subsequentes* de autenticação
+ * (login ou logout após o bootstrap). O estado inicial é tratado por initAuth().
  * Retorna função de unsubscribe.
  */
 export function onAuthChange(callback) {
   _authListeners.add(callback);
-  // Dispara imediatamente com o estado atual
-  callback(_currentUser);
   return () => _authListeners.delete(callback);
 }
 
