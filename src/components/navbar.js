@@ -102,10 +102,14 @@ function renderNavbar() {
     }
 
     // SM sincroniza participantCount em tempo real para que os contadores de
-    // check-in e "Terminei" reflitam entradas tardias durante a retro
+    // check-in e "Terminei" reflitam entradas tardias durante a retro.
+    // Histerese: participantCount só sobe, nunca desce — evita que quedas de rede
+    // momentâneas (celular bloqueado, Wi-Fi instável) reduzam o denominador e
+    // revelem prematuramente o resultado do check-in.
     if (isSM() && count > 0) {
       const state = getState();
-      if (state.retroStarted && count !== parseInt(state.team?.participantCount, 10)) {
+      const current = parseInt(state.team?.participantCount, 10) || 0;
+      if (state.retroStarted && count > current) {
         setState({ team: { ...state.team, participantCount: count } });
       }
     }
