@@ -72,6 +72,8 @@ const DEFAULT_STATE = () => ({
   combatStrategy:      'prevent',
   // ── sinais "Terminei" por fase { [deviceId]: phaseId } ──
   readySignals:        {},
+  // ── parking lot (notas "para depois", acessíveis em qualquer fase) ──
+  parkingLot:          [],
   // ── subcoleções ──
   checkins:   [],
   treasures:  [],
@@ -280,6 +282,22 @@ async function initFirebase() {
       );
     }
   }
+}
+
+// ── Parking Lot ───────────────────────────────────────────────────────────────
+
+export function addParkingItem(text) {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  const id = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  const item = { id, text, createdAt: new Date().toISOString() };
+  const parkingLot = [...(_state.parkingLot || []), item];
+  setScalarState({ parkingLot });
+}
+
+export function removeParkingItem(id) {
+  const parkingLot = (_state.parkingLot || []).filter((i) => i.id !== id);
+  setScalarState({ parkingLot });
 }
 
 // ── Ready signals ("Terminei") ────────────────────────────────────────────────

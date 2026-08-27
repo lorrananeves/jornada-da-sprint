@@ -29,6 +29,9 @@ export {
   startNewSession,
   // sinalização "Terminei"
   signalReady,
+  // parking lot
+  addParkingItem,
+  removeParkingItem,
 } from './session.js';
 
 import { getState, getSessionId, setCollection } from './session.js';

@@ -4,6 +4,7 @@
 
 import { getState, subscribe, setPhase, isSM } from './state/store.js';
 import { initNavbar } from './components/navbar.js';
+import { initParkingLot } from './components/parkingLot.js';
 import { renderHome } from './screens/home.js';
 import { renderAuth } from './screens/auth.js';
 import { renderSmDashboard } from './screens/smDashboard.js';
@@ -73,6 +74,7 @@ function navigate(phase) {
 
 try {
   initNavbar();
+  initParkingLot();
 
   const initialState = getState();
   const initialPhase = initialState.currentPhase || 'home';
