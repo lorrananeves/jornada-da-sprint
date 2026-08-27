@@ -87,7 +87,10 @@ service cloud.firestore {
         allow create: if
           validSessionId(sessionId)
           && isValidMission(request.resource.data);
-        allow update: if false;
+        // Permite atualizar apenas o campo status (retomada de missões anteriores)
+        allow update: if
+          validSessionId(sessionId)
+          && isMissionStatusUpdate(request.resource.data, resource.data);
         // Remoção permitida (o SM pode remover missões)
         allow delete: if validSessionId(sessionId);
       }
@@ -276,4 +279,18 @@ function isVoteUpdate(newData, oldData) {
     && newData.get('strategy', '') == oldData.get('strategy', '')
     && newData.votes is number
     && newData.votes == oldData.votes + 1;
+}
+
+// Missão: permite apenas atualizar o campo status (retomada de missões anteriores)
+function isMissionStatusUpdate(newData, oldData) {
+  // Todos os campos imutáveis devem ser preservados
+  return newData.get('title', '')       == oldData.get('title', '')
+    && newData.get('description', '') == oldData.get('description', '')
+    && newData.get('strategy', '')    == oldData.get('strategy', '')
+    && newData.get('priority', '')    == oldData.get('priority', '')
+    && newData.get('owner', '')       == oldData.get('owner', '')
+    && newData.get('deadline', '')    == oldData.get('deadline', '')
+    // status é o único campo que pode mudar
+    && newData.get('status', '') is string
+    && newData.get('status', '') in ['done', 'partial', 'pending', ''];
 }

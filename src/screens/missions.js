@@ -16,7 +16,7 @@ import { getDeviceId } from '../services/presence.js';
 import { getPriorityLabel, getStrategyLabel, formatDate } from '../utils/format.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
 import { createTypingIndicator } from '../components/typingIndicator.js';
-import { loadSmSessions, loadCollection } from '../services/firebase.js';
+import { loadSmSessions, loadCollection, patchItem } from '../services/firebase.js';
 import { getCurrentUser } from '../services/auth.js';
 
 const PRIORITIES = [
@@ -27,7 +27,9 @@ const PRIORITIES = [
 
 const PREV_MISSION_STATUS_KEY = '_jornada_prev_mission_status';
 
-/** Carrega as missões da sessão anterior concluída do mesmo SM. */
+/** Carrega as missões da sessão anterior concluída do mesmo SM.
+ *  Cada item retornado inclui `_fromSession` (nome da sprint) e
+ *  `_prevSessionId` (ID do documento no Firestore, para persistir status). */
 async function loadPreviousMissions(currentSessionId, currentTeamName) {
   const user = getCurrentUser();
   if (!user) return [];
@@ -41,7 +43,11 @@ async function loadPreviousMissions(currentSessionId, currentTeamName) {
     if (!prev) return [];
     const prevId = prev.sessionId || prev.id;
     const missions = await loadCollection(prevId, 'missions');
-    return missions.map((m) => ({ ...m, _fromSession: prev.sprintName || prevId }));
+    return missions.map((m) => ({
+      ...m,
+      _fromSession:   prev.sprintName || prevId,
+      _prevSessionId: prevId,
+    }));
   } catch (e) {
     console.warn('[Missions] Erro ao carregar missões anteriores:', e);
     return [];
@@ -90,7 +96,9 @@ export function renderMissions(root) {
             <h4 class="prev-missions-title">📋 Missões da retro anterior — <span class="text-muted">${escapeHTML(_prevMissions[0]._fromSession || '')}</span></h4>
             <div class="prev-missions-list">
               ${_prevMissions.map((m) => {
-                const statusRaw = (JSON.parse(sessionStorage.getItem(PREV_MISSION_STATUS_KEY) || '{}'))[m.id] || 'pending';
+                // Prioridade: status persistido no Firestore > cache sessionStorage > 'pending'
+                const cached = (JSON.parse(sessionStorage.getItem(PREV_MISSION_STATUS_KEY) || '{}'))[m.id];
+                const statusRaw = m.status || cached || 'pending';
                 const statusOpts = [
                   { val: 'done',    label: '✅ Feito',       cls: 'prev-mission-status--done' },
                   { val: 'partial', label: '🔄 Em andamento', cls: 'prev-mission-status--partial' },
@@ -103,7 +111,9 @@ export function renderMissions(root) {
                       <span class="prev-mission-title">🚀 ${escapeHTML(m.title)}</span>
                       ${m.owner ? `<span class="text-xs text-muted">👤 ${escapeHTML(m.owner)}</span>` : ''}
                     </div>
-                    <select class="prev-mission-status-select ${cur.cls}" data-prev-mission-id="${escapeHTML(m.id)}">
+                    <select class="prev-mission-status-select ${cur.cls}"
+                      data-prev-mission-id="${escapeHTML(m.id)}"
+                      data-prev-session-id="${escapeHTML(m._prevSessionId || '')}">
                       ${statusOpts.map((o) => `<option value="${o.val}" ${o.val === statusRaw ? 'selected' : ''}>${o.label}</option>`).join('')}
                     </select>
                   </div>
@@ -256,14 +266,30 @@ export function renderMissions(root) {
       render();
     });
 
-    // Status das missões anteriores (salvo em sessionStorage por esta aba)
+    // Status das missões anteriores: persiste no Firestore + cache em sessionStorage
     root.querySelectorAll('.prev-mission-status-select').forEach((sel) => {
       sel.addEventListener('change', () => {
+        const missionId    = sel.dataset.prevMissionId;
+        const prevSessId   = sel.dataset.prevSessionId;
+        const newStatus    = sel.value;
+
+        // Cache local imediato (resiliente a falhas de rede)
         const stored = JSON.parse(sessionStorage.getItem(PREV_MISSION_STATUS_KEY) || '{}');
-        stored[sel.dataset.prevMissionId] = sel.value;
+        stored[missionId] = newStatus;
         sessionStorage.setItem(PREV_MISSION_STATUS_KEY, JSON.stringify(stored));
+
+        // Persiste no Firestore na sessão de origem da missão
+        if (prevSessId) {
+          patchItem(prevSessId, 'missions', missionId, { status: newStatus })
+            .catch((e) => console.warn('[Missions] Erro ao persistir status:', e));
+        }
+
         // Atualiza a classe de cor no próprio select sem re-render completo
-        sel.className = `prev-mission-status-select prev-mission-status--${sel.value}`;
+        sel.className = `prev-mission-status-select prev-mission-status--${newStatus}`;
+
+        // Atualiza o status em memória para que re-renders não revertam o valor
+        const mission = _prevMissions?.find((m) => m.id === missionId);
+        if (mission) mission.status = newStatus;
       });
     });
 
