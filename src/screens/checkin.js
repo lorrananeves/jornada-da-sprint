@@ -13,15 +13,29 @@ import { createPhaseTimer } from '../components/phaseTimer.js';
 import { createTypingIndicator } from '../components/typingIndicator.js';
 
 const SCORES = [1, 2, 3, 4, 5];
+// Chave em sessionStorage que marca "este dispositivo já fez check-in nesta sessão"
+const CHECKIN_DONE_KEY = '_jornada_checkin_done';
 
 export function renderCheckin(root) {
-  const _state = getState();
   let selectedScore = null;
   let _timer  = null;
   let _unsub  = null;
   let _typing = null;
 
+  /** Verdadeiro se o dispositivo atual já enviou um check-in nesta sessão. */
+  function alreadyAnswered() {
+    return sessionStorage.getItem(CHECKIN_DONE_KEY) === 'true';
+  }
+
   function buildCheckinForm() {
+    if (alreadyAnswered()) {
+      return `
+        <div class="checkin-already-done">
+          <span class="checkin-already-done-icon">✅</span>
+          <p>Você já registrou seu check-in nesta sessão.</p>
+        </div>
+      `;
+    }
     return `
       <div class="checkin-form">
         <h3 style="margin-bottom:18px">🌡️ Como foi essa Sprint para você?</h3>
@@ -123,6 +137,10 @@ export function renderCheckin(root) {
     const state = getState();
     const checkins = state.checkins;
     const participantCount = parseInt(state.team?.participantCount, 10) || 0;
+    // Resultado visível para o SM sempre, para membros apenas quando todos responderam
+    const allAnswered = participantCount > 0 && checkins.length >= participantCount;
+    const canSeeResults = isSM() || allAnswered;
+
     preserveInputs(root, () => { root.innerHTML = `
       <div class="screen-checkin screen-enter">
         <div class="phase-header">
@@ -141,14 +159,18 @@ export function renderCheckin(root) {
           ${buildCheckinForm()}
         </div>
 
-        ${checkins.length > 0 ? `
+        ${canSeeResults && checkins.length > 0 ? `
           <div style="margin-top:8px;display:flex;justify-content:flex-end">
             <button class="btn btn-ghost btn-sm" id="btn-show-results">
               📊 VER RESULTADO (${checkins.length} resposta${checkins.length !== 1 ? 's' : ''})
             </button>
           </div>
           <div id="results-area"></div>
-        ` : ''}
+        ` : (!canSeeResults && checkins.length > 0 ? `
+          <p class="text-muted text-sm" style="margin-top:12px;text-align:center">
+            🔒 Resultado disponível após todos responderem (${checkins.length}/${participantCount})
+          </p>
+        ` : '')}
 
         <div class="phase-nav">
           <button class="btn btn-ghost" id="btn-back">← Voltar</button>
@@ -190,13 +212,14 @@ export function renderCheckin(root) {
       regBtn.addEventListener('click', () => {
         if (!selectedScore) return;
         const commentText = root.querySelector('#checkin-comment').value.trim();
-        // Não envia o campo comment quando vazio — evita ambiguidade com null nas regras Firestore
         const checkin = commentText
           ? { id: uid(), score: selectedScore, comment: commentText }
           : { id: uid(), score: selectedScore };
         addCheckin(checkin);
         addXP(xpForCheckin());
         showXPToast(xpForCheckin(), 'Check-in registrado');
+        // Marca dispositivo como "já respondeu" — impede reenvio nesta sessão de browser
+        sessionStorage.setItem(CHECKIN_DONE_KEY, 'true');
         selectedScore = null;
         if (_typing) _typing.destroy();
         render();

@@ -455,6 +455,23 @@
   padding: 28px;
 }
 
+.checkin-already-done {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--success-dim);
+  border: 1px solid rgba(63,185,80,0.3);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  color: var(--success);
+  font-weight: 600;
+}
+
+.checkin-already-done-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
 .checkin-score-section {
   margin-bottom: 24px;
 }
