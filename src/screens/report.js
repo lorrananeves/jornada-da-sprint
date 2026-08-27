@@ -79,15 +79,15 @@ export function renderReport(root) {
           <div style="display:flex;gap:12px;flex-wrap:wrap">
             <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;text-align:center">
               <div style="font-size:2rem;font-weight:800;color:var(--accent)">${formatXP(stats.totalXP)}</div>
-              <div style="font-size:0.8125rem;color:var(--text-muted)">XP Total</div>
+              <div class="text-xs text-muted">XP Total</div>
             </div>
             <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;text-align:center">
               <div style="font-size:2rem;font-weight:800;color:${mood.color}">${stats.checkinStats.average.toFixed(1)}</div>
-              <div style="font-size:0.8125rem;color:var(--text-muted)">${mood.label}</div>
+              <div class="text-xs text-muted">${mood.label}</div>
             </div>
             <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;text-align:center">
               <div style="font-size:2rem;font-weight:800;color:var(--info)">${stats.checkinStats.total}</div>
-              <div style="font-size:0.8125rem;color:var(--text-muted)">Check-ins</div>
+              <div class="text-xs text-muted">Check-ins</div>
             </div>
           </div>
         </div>
@@ -146,7 +146,7 @@ export function renderReport(root) {
                 <div class="report-item" style="background:var(--danger-dim);border:1px solid rgba(248,81,73,0.2)">
                   👹 <strong>${escapeHTML(m.text)}</strong>
                   ${m.selected ? ' <span style="color:var(--accent)">🎯</span>' : ''}
-                  <span style="float:right;font-size:0.8125rem;color:var(--text-muted)">
+                  <span style="float:right" class="text-xs text-muted">
                     🔥${m.reactions.fire||0} 👀${m.reactions.eyes||0} 💡${m.reactions.bulb||0}
                   </span>
                 </div>

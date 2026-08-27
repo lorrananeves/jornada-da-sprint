@@ -18,7 +18,7 @@ export function renderComplete(root) {
       <div class="complete-hero">
         <div style="font-size:4rem;margin-bottom:12px">🏆</div>
         <h2 style="color:var(--accent);margin-bottom:6px">Jornada Concluída!</h2>
-        <p class="text-muted" style="margin-bottom:20px">
+        <p class="text-muted mb-5">
           ${state.sprint.name ? `Sprint: <strong style="color:var(--text)">${escapeHTML(state.sprint.name)}</strong>` : 'Retrospectiva finalizada'}
           ${state.team.name ? ` · Time: <strong style="color:var(--text)">${escapeHTML(state.team.name)}</strong>` : ''}
         </p>
@@ -69,7 +69,7 @@ export function renderComplete(root) {
               <span style="font-size:1.25rem">🚀</span>
               <div>
                 <div style="font-weight:600">${escapeHTML(m.title)}</div>
-                ${m.owner ? `<div style="font-size:0.8125rem;color:var(--text-muted)">👤 ${escapeHTML(m.owner)}</div>` : ''}
+                ${m.owner ? `<div class="text-xs text-muted">👤 ${escapeHTML(m.owner)}</div>` : ''}
               </div>
             </div>
           `).join('')}

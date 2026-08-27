@@ -89,7 +89,7 @@ export function renderCombat(root) {
         </div>
 
         <!-- Strategy Tabs -->
-        <div class="tabs" style="margin-bottom:20px">
+        <div class="tabs mb-5">
           ${STRATEGIES.map((s) => `
             <button class="tab-btn ${currentStrategy === s.id ? 'active' : ''}" data-strategy="${s.id}">
               ${s.label}
@@ -130,7 +130,7 @@ export function renderCombat(root) {
 
         <div class="phase-nav">
           <button class="btn btn-ghost" id="btn-back">← Voltar</button>
-          ${isSM() ? `<button class="btn btn-primary" id="btn-next">🚀 PRÓXIMA FASE →</button>` : `<span class="text-muted" style="font-size:0.875rem">Aguardando o Scrum Master avançar…</span>`}
+          ${isSM() ? `<button class="btn btn-primary" id="btn-next">🚀 PRÓXIMA FASE →</button>` : `<span class="text-muted text-sm">Aguardando o Scrum Master avançar…</span>`}
         </div>
       </div>
     `; }); // end preserveInputs

@@ -39,8 +39,8 @@ function buildMonsterCard(m, draggable) {
       <span class="card-emoji">${m.mergedFrom?.length ? '🔗' : '👹'}</span>
       <div style="flex:1">
         <span class="card-text">${escapeHTML(m.text)}</span>
-        ${m.mergedFrom?.length ? `<span class="badge monster-badge-merged" style="margin-top:4px;display:inline-flex" title="Agrupa ${m.mergedFrom.length} monstros">🔗 Mesclado (${m.mergedFrom.length + 1})</span>` : ''}
-        ${m.selected ? '<span class="badge badge-accent" style="margin-top:4px;display:inline-flex">🎯 Selecionado</span>' : ''}
+        ${m.mergedFrom?.length ? `<span class="badge monster-badge-merged mt-1 flex" title="Agrupa ${m.mergedFrom.length} monstros">🔗 Mesclado (${m.mergedFrom.length + 1})</span>` : ''}
+        ${m.selected ? '<span class="badge badge-accent mt-1 flex">🎯 Selecionado</span>' : ''}
       </div>
       ${draggable ? '<span class="monster-drag-handle" title="Arraste sobre outro card para mesclar">⠿</span>' : ''}
     </div>
@@ -163,7 +163,7 @@ export function renderMonsters(root) {
           </p>
         </div>
 
-        <div class="card" style="margin-bottom:20px">
+        <div class="card mb-5">
           <h4 style="margin-bottom:12px">Adicionar um Monstro</h4>
           <div style="display:flex;gap:8px">
             <textarea class="form-textarea" id="monster-input" placeholder="Descreva um problema que a equipe enfrentou..." style="flex:1;min-height:64px"></textarea>
@@ -193,7 +193,7 @@ export function renderMonsters(root) {
           <button class="btn btn-ghost" id="btn-back">← Voltar</button>
           ${sm
             ? `<button class="btn btn-primary" id="btn-next" ${selectedCount > 0 ? '' : 'disabled'}>🛡️ IR PARA COMBATE →</button>`
-            : `<span class="text-muted" style="font-size:0.875rem">Aguardando o Scrum Master avançar…</span>`}
+            : `<span class="text-muted text-sm">Aguardando o Scrum Master avançar…</span>`}
         </div>
       </div>
     `; // end preserveInputs
@@ -288,8 +288,7 @@ export function renderMonsters(root) {
           if (isNowSelected && !badge) {
             const textDiv = card.querySelector('.card-text').parentElement;
             const newBadge = document.createElement('span');
-            newBadge.className = 'badge badge-accent';
-            newBadge.style.cssText = 'margin-top:4px;display:inline-flex';
+            newBadge.className = 'badge badge-accent mt-1 flex';
             newBadge.textContent = '🎯 Selecionado';
             textDiv.appendChild(newBadge);
           } else if (!isNowSelected && badge) {

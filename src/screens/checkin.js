@@ -26,7 +26,7 @@ export function renderCheckin(root) {
       <div class="checkin-form">
         <h3 style="margin-bottom:18px">🌡️ Como foi essa Sprint para você?</h3>
         <div class="checkin-score-section">
-          <p class="text-muted mb-2" style="font-size:0.875rem">Selecione uma nota:</p>
+          <p class="text-muted mb-2 text-sm">Selecione uma nota:</p>
           <div class="score-buttons">
             ${SCORES.map((s) => `
               <button class="score-btn ${selectedScore === s ? 'selected' : ''}" data-score="${s}" title="${getScoreLabel(s)}" aria-label="${getScoreLabel(s)} (${getScoreEmoji(s)})" aria-pressed="${selectedScore === s}">
@@ -86,11 +86,11 @@ export function renderCheckin(root) {
           <div style="display:flex;flex-direction:column;gap:12px;min-width:140px">
             <div style="text-align:center;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px">
               <div style="font-size:2rem;font-weight:800;color:${mood.color}">${average.toFixed(1)}</div>
-              <div style="font-size:0.8125rem;color:var(--text-muted)">Média</div>
+              <div class="text-xs text-muted">Média</div>
             </div>
             <div style="text-align:center;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px">
               <div style="font-size:2rem;font-weight:800;color:var(--info)">${total}</div>
-              <div style="font-size:0.8125rem;color:var(--text-muted)">Respostas</div>
+              <div class="text-xs text-muted">Respostas</div>
             </div>
             <div style="text-align:center;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px">
               <div style="font-size:1rem;font-weight:700;color:${mood.color}">${mood.label}</div>
@@ -152,7 +152,7 @@ export function renderCheckin(root) {
 
         <div class="phase-nav">
           <button class="btn btn-ghost" id="btn-back">← Voltar</button>
-          ${isSM() ? `<button class="btn btn-primary" id="btn-next">💎 PRÓXIMA FASE →</button>` : `<span class="text-muted" style="font-size:0.875rem">Aguardando o Scrum Master avançar…</span>`}
+          ${isSM() ? `<button class="btn btn-primary" id="btn-next">💎 PRÓXIMA FASE →</button>` : `<span class="text-muted text-sm">Aguardando o Scrum Master avançar…</span>`}
         </div>
       </div>
     `; }); // end preserveInputs

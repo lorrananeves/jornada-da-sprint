@@ -55,7 +55,7 @@ export function renderMissions(root) {
         ` : ''}
 
         <!-- Add Mission Form -->
-        <div class="card" style="margin-bottom:20px">
+        <div class="card mb-5">
           <h4 style="margin-bottom:16px">+ Nova Missão</h4>
           <div style="display:flex;flex-direction:column;gap:12px">
             <div class="form-group">
@@ -139,7 +139,7 @@ export function renderMissions(root) {
 
         <div class="phase-nav">
           <button class="btn btn-ghost" id="btn-back">← Voltar</button>
-          ${isSM() ? `<button class="btn btn-primary" id="btn-next">🏆 CONCLUIR JORNADA →</button>` : `<span class="text-muted" style="font-size:0.875rem">Aguardando o Scrum Master avançar…</span>`}
+          ${isSM() ? `<button class="btn btn-primary" id="btn-next">🏆 CONCLUIR JORNADA →</button>` : `<span class="text-muted text-sm">Aguardando o Scrum Master avançar…</span>`}
         </div>
       </div>
     `; }); // end preserveInputs

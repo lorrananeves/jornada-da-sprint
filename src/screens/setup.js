@@ -22,7 +22,7 @@ export function renderSetup(root) {
       </div>
 
       <div class="card">
-        <h3 style="margin-bottom:20px">📋 Dados da Sprint</h3>
+        <h3 class="mb-5">📋 Dados da Sprint</h3>
         <div style="display:flex;flex-direction:column;gap:16px">
           <div class="form-group">
             <label class="form-label" for="sprint-name">Nome da Sprint *</label>
@@ -43,7 +43,7 @@ export function renderSetup(root) {
       </div>
 
       <div class="card" style="margin-top:16px">
-        <h3 style="margin-bottom:20px">👥 Dados do Time</h3>
+        <h3 class="mb-5">👥 Dados do Time</h3>
         <div class="form-group">
           <label class="form-label" for="team-name">Nome do Time</label>
           <input class="form-input" type="text" id="team-name" placeholder="Ex: Time Fênix"
