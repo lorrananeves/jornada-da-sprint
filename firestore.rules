@@ -142,7 +142,10 @@ function isValidSessionRoot(data) {
     && data.keys().hasOnly([
       'sprint', 'team', 'currentPhase', 'retroStarted',
       'xp', 'completedPhases', 'createdAt', 'updatedAt', 'smDeviceId',
-      '_prefillMission', 'phaseDurations', 'phaseStartedAt', 'smUid'
+      '_prefillMission', 'phaseDurations', 'phaseStartedAt', 'smUid',
+      // campos sincronizados entre participantes
+      'combatMonsterIdx', 'combatStrategy',
+      'readySignals', 'parkingLot'
     ])
     && data.currentPhase is string
     && data.currentPhase.size() <= 32
@@ -153,6 +156,10 @@ function isValidSessionRoot(data) {
     && data.get('xp', 0) >= 0
     && data.get('retroStarted', false) is bool
     && data.get('completedPhases', []).size() <= 20
+    && data.get('combatMonsterIdx', 0) is number
+    && data.get('combatStrategy', '') is string
+    && data.get('readySignals', {}) is map
+    && data.get('parkingLot', []) is list
     && isValidSprint(data.get('sprint', {}))
     && isValidTeam(data.get('team', {}));
 }
