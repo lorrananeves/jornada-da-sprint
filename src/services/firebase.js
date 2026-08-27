@@ -206,6 +206,29 @@ export function subscribeCollection(sessionId, colName, callback) {
 // Reexporta increment para uso nos patchItem calls do store
 export { increment };
 
+// ── Indicador de conectividade ────────────────────────────────────────────────
+
+/**
+ * Assina o estado de conectividade de rede do browser.
+ * Chama `callback(true)` quando online e `callback(false)` quando offline.
+ * Retorna função de cancelamento.
+ *
+ * Usa os eventos nativos `online`/`offline` do window — suficientes para
+ * indicar se o Firestore consegue alcançar os servidores do Google.
+ */
+export function subscribeConnectivity(callback) {
+  const onOnline  = () => callback(true);
+  const onOffline = () => callback(false);
+  window.addEventListener('online',  onOnline);
+  window.addEventListener('offline', onOffline);
+  // Dispara imediatamente com o estado atual
+  callback(navigator.onLine);
+  return () => {
+    window.removeEventListener('online',  onOnline);
+    window.removeEventListener('offline', onOffline);
+  };
+}
+
 // ── SM Profiles ───────────────────────────────────────────────────────────────
 
 /**

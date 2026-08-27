@@ -4,6 +4,7 @@
 
 import { getState, subscribe, setPhase } from '../state/store.js';
 import { subscribeParticipants } from '../services/presence.js';
+import { subscribeConnectivity } from '../services/firebase.js';
 import { qs } from '../utils/dom.js';
 
 const PHASES = [
@@ -22,6 +23,10 @@ const HIDDEN_PHASES = new Set(['home', 'roleSelect', 'lobby', 'auth', 'smDashboa
 
 /** Unsubscribe handle para a assinatura de presença atual */
 let _unsubPresence = null;
+/** Unsubscribe handle para o indicador de conectividade */
+let _unsubConnectivity = null;
+/** Estado atual de conectividade (true = online) */
+let _isOnline = true;
 
 function renderNavbar() {
   const root = qs('#navbar-root');
@@ -33,6 +38,7 @@ function renderNavbar() {
   // hide navbar on pre-retro screens
   if (HIDDEN_PHASES.has(currentPhase)) {
     _stopPresence();
+    _stopConnectivity();
     root.innerHTML = '';
     return;
   }
@@ -43,6 +49,10 @@ function renderNavbar() {
         <div class="navbar-top">
           <span class="navbar-brand">⚔️ Jornada da Sprint</span>
           <div class="navbar-top-right">
+            <span class="connectivity-badge connectivity-badge--${_isOnline ? 'online' : 'offline'}" id="connectivity-badge" title="${_isOnline ? 'Conectado ao Firestore' : 'Sem conexão — alterações podem não ser salvas'}">
+              <span class="connectivity-dot"></span>
+              <span class="connectivity-label">${_isOnline ? 'conectado' : 'offline'}</span>
+            </span>
             <span class="online-pill" id="online-pill" title="Participantes online">
               <span class="online-dot"></span>
               <span class="online-count">–</span>
@@ -68,6 +78,18 @@ function renderNavbar() {
       </div>
     </nav>
   `;
+
+  // Assina conectividade — cancela assinatura anterior se houver
+  _stopConnectivity();
+  _unsubConnectivity = subscribeConnectivity((online) => {
+    _isOnline = online;
+    const badge = qs('#connectivity-badge');
+    if (!badge) return;
+    badge.className = `connectivity-badge connectivity-badge--${online ? 'online' : 'offline'}`;
+    badge.title = online ? 'Conectado ao Firestore' : 'Sem conexão — alterações podem não ser salvas';
+    badge.querySelector('.connectivity-dot').className = 'connectivity-dot';
+    badge.querySelector('.connectivity-label').textContent = online ? 'conectado' : 'offline';
+  });
 
   // Assina contagem de presença — cancela assinatura anterior se houver
   _stopPresence();
@@ -97,6 +119,13 @@ function _stopPresence() {
   if (_unsubPresence) {
     _unsubPresence();
     _unsubPresence = null;
+  }
+}
+
+function _stopConnectivity() {
+  if (_unsubConnectivity) {
+    _unsubConnectivity();
+    _unsubConnectivity = null;
   }
 }
 
