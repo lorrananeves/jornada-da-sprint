@@ -777,6 +777,66 @@
   margin: 0 auto;
 }
 
+/* Painel de missões da retro anterior */
+.prev-missions-section {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.prev-missions-title {
+  margin-bottom: 12px;
+  font-size: 0.9375rem;
+}
+
+.prev-missions-list { display: flex; flex-direction: column; gap: 8px; }
+
+.prev-mission-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  flex-wrap: wrap;
+}
+
+.prev-mission-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.prev-mission-title {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prev-mission-status-select {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.prev-mission-status--done    { color: var(--success); border-color: rgba(63,185,80,0.4); }
+.prev-mission-status--partial { color: var(--accent);  border-color: rgba(240,180,41,0.4); }
+.prev-mission-status--pending { color: var(--text-muted); }
+
 .missions-list {
   display: flex;
   flex-direction: column;

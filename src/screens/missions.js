@@ -13,6 +13,8 @@ import { getDeviceId } from '../services/presence.js';
 import { getPriorityLabel, getStrategyLabel, formatDate } from '../utils/format.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
 import { createTypingIndicator } from '../components/typingIndicator.js';
+import { loadSmSessions, loadCollection } from '../services/firebase.js';
+import { getCurrentUser } from '../services/auth.js';
 
 const PRIORITIES = [
   { id: 'high',   label: 'Alta',  class: 'priority-badge-high' },
@@ -20,10 +22,35 @@ const PRIORITIES = [
   { id: 'low',    label: 'Baixa', class: 'priority-badge-low' },
 ];
 
+const PREV_MISSION_STATUS_KEY = '_jornada_prev_mission_status';
+
+/** Carrega as missões da sessão anterior concluída do mesmo SM. */
+async function loadPreviousMissions(currentSessionId, currentTeamName) {
+  const user = getCurrentUser();
+  if (!user) return [];
+  try {
+    const sessions = await loadSmSessions(user.uid);
+    // Pega a sessão concluída mais recente que não seja a atual
+    const prev = sessions.find(
+      (s) => (s.sessionId || s.id) !== currentSessionId && s.status === 'completed'
+        && (!currentTeamName || !s.teamName || s.teamName === currentTeamName)
+    );
+    if (!prev) return [];
+    const prevId = prev.sessionId || prev.id;
+    const missions = await loadCollection(prevId, 'missions');
+    return missions.map((m) => ({ ...m, _fromSession: prev.sprintName || prevId }));
+  } catch (e) {
+    console.warn('[Missions] Erro ao carregar missões anteriores:', e);
+    return [];
+  }
+}
+
 export function renderMissions(root) {
   let _timer  = null;
   let _unsub  = null;
   let _typing = null;
+  /** Missões da retro anterior (carregadas uma vez, apenas para SM). */
+  let _prevMissions = null;
 
   function render() {
     const state = getState();
@@ -54,6 +81,34 @@ export function renderMissions(root) {
             <span><strong>Temos muitas missões!</strong> Quais realmente merecem entrar na próxima Sprint? Considere remover algumas.</span>
           </div>
         ` : ''}
+
+        ${_prevMissions && _prevMissions.length > 0 ? `
+          <div class="prev-missions-section">
+            <h4 class="prev-missions-title">📋 Missões da retro anterior — <span class="text-muted">${escapeHTML(_prevMissions[0]._fromSession || '')}</span></h4>
+            <div class="prev-missions-list">
+              ${_prevMissions.map((m) => {
+                const statusRaw = (JSON.parse(sessionStorage.getItem(PREV_MISSION_STATUS_KEY) || '{}'))[m.id] || 'pending';
+                const statusOpts = [
+                  { val: 'done',    label: '✅ Feito',       cls: 'prev-mission-status--done' },
+                  { val: 'partial', label: '🔄 Em andamento', cls: 'prev-mission-status--partial' },
+                  { val: 'pending', label: '⏳ Não feito',   cls: 'prev-mission-status--pending' },
+                ];
+                const cur = statusOpts.find((o) => o.val === statusRaw) || statusOpts[2];
+                return `
+                  <div class="prev-mission-card">
+                    <div class="prev-mission-info">
+                      <span class="prev-mission-title">🚀 ${escapeHTML(m.title)}</span>
+                      ${m.owner ? `<span class="text-xs text-muted">👤 ${escapeHTML(m.owner)}</span>` : ''}
+                    </div>
+                    <select class="prev-mission-status-select ${cur.cls}" data-prev-mission-id="${escapeHTML(m.id)}">
+                      ${statusOpts.map((o) => `<option value="${o.val}" ${o.val === statusRaw ? 'selected' : ''}>${o.label}</option>`).join('')}
+                    </select>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        ` : (_prevMissions === null && isSM() ? '<div id="prev-missions-loading" style="display:none"></div>' : '')}
 
         <!-- Add Mission Form -->
         <div class="card mb-5">
@@ -154,6 +209,17 @@ export function renderMissions(root) {
     root.querySelectorAll('#mission-title, #mission-desc').forEach((el) => _typing.watchField(el));
 
     attachEvents(prefill);
+
+    // Carrega missões anteriores na primeira vez (somente SM)
+    if (_prevMissions === null && isSM()) {
+      loadPreviousMissions(
+        new URLSearchParams(window.location.search).get('s') || '',
+        getState().team?.name || ''
+      ).then((prev) => {
+        _prevMissions = prev;
+        if (prev.length > 0) render(); // re-renderiza para exibir o painel
+      });
+    }
   }
 
   function attachEvents(prefill) {
@@ -185,6 +251,17 @@ export function renderMissions(root) {
       addXP(xpForMission());
       showXPToast(xpForMission(), 'Missão adicionada');
       render();
+    });
+
+    // Status das missões anteriores (salvo em sessionStorage por esta aba)
+    root.querySelectorAll('.prev-mission-status-select').forEach((sel) => {
+      sel.addEventListener('change', () => {
+        const stored = JSON.parse(sessionStorage.getItem(PREV_MISSION_STATUS_KEY) || '{}');
+        stored[sel.dataset.prevMissionId] = sel.value;
+        sessionStorage.setItem(PREV_MISSION_STATUS_KEY, JSON.stringify(stored));
+        // Atualiza a classe de cor no próprio select sem re-render completo
+        sel.className = `prev-mission-status-select prev-mission-status--${sel.value}`;
+      });
     });
 
     // Remove missions
