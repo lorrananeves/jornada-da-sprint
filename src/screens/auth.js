@@ -1,4 +1,7 @@
 /**
+ * @security Toda interpolação em innerHTML DEVE usar escapeHTML(). Nunca
+ *   interpole valores vindos do usuário ou do Firestore sem escapar.
+ *
  * Auth Screen — Login / Cadastro do Scrum Master
  *
  * Membros do time nunca chegam aqui — eles entram pelo link (?s=...) direto no lobby.

@@ -1,4 +1,7 @@
 /**
+ * @security Toda interpolação em innerHTML DEVE usar escapeHTML(). Nunca
+ *   interpole valores vindos do usuário ou do Firestore sem escapar.
+ *
  * Role Select Screen — first screen shown to everyone
  * Asks: "Are you the Scrum Master or a team member?"
  *

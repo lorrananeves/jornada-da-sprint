@@ -1,4 +1,7 @@
 /**
+ * @security Toda interpolação em innerHTML DEVE usar escapeHTML(). Nunca
+ *   interpole valores vindos do usuário ou do Firestore sem escapar.
+ *
  * Combat Screen
  */
 
