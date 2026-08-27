@@ -164,6 +164,60 @@
   .dashboard-session-actions { width: 100%; }
 }
 
+.dashboard-trends-section {
+  margin-top: 32px;
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+
+.dashboard-trends-title {
+  margin-bottom: 16px;
+}
+
+.trend-panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.trend-section-title {
+  font-size: 0.9375rem;
+  margin-bottom: 12px;
+}
+
+.trend-chart {
+  display: block;
+  width: 100%;
+  max-width: 480px;
+  height: auto;
+  margin-bottom: 16px;
+  overflow: visible;
+}
+
+.trend-recurring-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.trend-recurring-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border-light);
+}
+
+.trend-recurring-text {
+  font-size: 0.875rem;
+  flex: 1;
+}
+
 
 /* ============================================================
    Role Select Screen
