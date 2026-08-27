@@ -38,25 +38,25 @@ export function renderReport(root) {
   }
 
   root.innerHTML = `
-    <div class="screen-report screen-enter">
+    <main class="screen-report screen-enter" role="main" aria-label="Relatório da jornada">
       <div class="phase-header">
         <div class="phase-header-top">
-          <span class="phase-icon">📋</span>
+          <span class="phase-icon" aria-hidden="true">📋</span>
           <h2 class="phase-title">Relatório da Jornada</h2>
         </div>
         <p class="phase-description">Visão completa da retrospectiva para compartilhar com o time.</p>
       </div>
 
       <div class="report-actions">
-        <button class="btn btn-back" id="btn-back">← Voltar</button>
-        <button class="btn btn-info" id="btn-pdf">📄 BAIXAR PDF</button>
-        <button class="btn btn-success" id="btn-png">🖼️ BAIXAR IMAGEM</button>
+        <button class="btn btn-back" id="btn-back" aria-label="Voltar à tela de conclusão">← Voltar</button>
+        <button class="btn btn-info" id="btn-pdf" aria-label="Baixar relatório em PDF">📄 BAIXAR PDF</button>
+        <button class="btn btn-success" id="btn-png" aria-label="Baixar relatório como imagem">🖼️ BAIXAR IMAGEM</button>
       </div>
 
       <!-- Report Content (captured for export) -->
-      <div id="report-content">
+      <div id="report-content" role="article" aria-label="Conteúdo do relatório">
         <div class="report-header">
-          <div style="font-size:3rem;margin-bottom:8px">⚔️</div>
+          <div style="font-size:3rem;margin-bottom:8px" aria-hidden="true">⚔️</div>
           <h1 class="report-title">JORNADA DA SPRINT</h1>
           <h2 style="color:var(--text);margin-bottom:8px">${escapeHTML(sprint.name || 'Retrospectiva')}</h2>
           <p class="text-muted">
@@ -179,7 +179,7 @@ export function renderReport(root) {
           }
         </div>
       </div>
-    </div>
+    </main>
   `;
 
   const reportEl = root.querySelector('#report-content');

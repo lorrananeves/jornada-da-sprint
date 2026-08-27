@@ -11,25 +11,25 @@ export function renderHome(root) {
   const user       = getCurrentUser();
 
   root.innerHTML = `
-    <div class="screen-home">
+    <main class="screen-home" role="main" aria-label="Tela inicial — Jornada da Sprint">
       <div class="home-card screen-enter">
-        <div class="home-logo">⚔️</div>
+        <div class="home-logo" aria-hidden="true">⚔️</div>
         <h1 class="home-title">JORNADA DA SPRINT</h1>
         <p class="home-subtitle">Uma retrospectiva diferente começa aqui.</p>
         <div class="home-actions">
-          <button class="btn btn-primary btn-lg" id="btn-start">🚀 COMEÇAR JORNADA</button>
-          <button class="btn btn-ghost btn-lg" id="btn-continue" ${hasSession ? '' : 'disabled'}>
+          <button class="btn btn-primary btn-lg" id="btn-start" aria-label="Começar nova jornada">🚀 COMEÇAR JORNADA</button>
+          <button class="btn btn-ghost btn-lg" id="btn-continue" ${hasSession ? '' : 'disabled'} aria-label="Continuar jornada em andamento" ${!hasSession ? 'aria-disabled="true"' : ''}>
             ⏩ CONTINUAR JORNADA
           </button>
           ${user ? `
-            <button class="btn btn-ghost btn-lg" id="btn-dashboard">🧙 MEU PAINEL (${user.displayName || user.email})</button>
+            <button class="btn btn-ghost btn-lg" id="btn-dashboard" aria-label="Acessar meu painel de retrospectivas (${user.displayName || user.email})">🧙 MEU PAINEL (${user.displayName || user.email})</button>
           ` : ''}
           ${hasSession
-            ? `<button class="btn btn-danger btn-sm" id="btn-reset">🗑️ APAGAR TODOS OS DADOS</button>`
+            ? `<button class="btn btn-danger btn-sm" id="btn-reset" aria-label="Apagar todos os dados salvos">🗑️ APAGAR TODOS OS DADOS</button>`
             : ''}
         </div>
       </div>
-    </div>
+    </main>
   `;
 
   root.querySelector('#btn-start').addEventListener('click', async () => {

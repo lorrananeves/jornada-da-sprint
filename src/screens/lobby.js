@@ -31,34 +31,34 @@ export function renderLobby(root) {
 
   if (isSM) {
     root.innerHTML = `
-      <div class="screen-lobby screen-enter">
+      <main class="screen-lobby screen-enter" role="main" aria-label="Sala de espera — Scrum Master">
         <div class="lobby-card">
           <div class="lobby-header">
-            <div class="lobby-icon">🏰</div>
+            <div class="lobby-icon" aria-hidden="true">🏰</div>
             <h2 class="lobby-title">Sala de Espera</h2>
             <p class="lobby-sprint-name">${sprintLabel}</p>
           </div>
 
-          <div class="lobby-participants">
+          <div class="lobby-participants" role="status" aria-live="polite" aria-label="Contagem de participantes">
             <div class="lobby-count" id="participant-count">0</div>
             <div class="lobby-count-label">participante(s) na sala</div>
           </div>
 
           <div class="lobby-share">
-            <p class="lobby-share-label">🔗 Compartilhe este link com o time:</p>
+            <p class="lobby-share-label" id="link-share-label">🔗 Compartilhe este link com o time:</p>
             <div class="lobby-link-row">
-              <input class="form-input lobby-link-input" id="session-link" readonly value="${escapeHTML(sessionUrl)}" />
-              <button class="btn btn-ghost btn-sm" id="btn-copy">📋 Copiar</button>
+              <input class="form-input lobby-link-input" id="session-link" readonly value="${escapeHTML(sessionUrl)}" aria-labelledby="link-share-label" aria-describedby="copy-feedback" />
+              <button class="btn btn-ghost btn-sm" id="btn-copy" aria-label="Copiar link da sessão">📋 Copiar</button>
             </div>
-            <p class="lobby-share-hint text-muted" id="copy-feedback"></p>
+            <p class="lobby-share-hint text-muted" id="copy-feedback" role="status" aria-live="polite"></p>
           </div>
 
           <div class="lobby-actions">
             <button class="btn btn-ghost" id="btn-back-setup">← Voltar ao Setup</button>
-            <button class="btn btn-primary btn-lg" id="btn-start-retro">⚔️ INICIAR RETROSPECTIVA</button>
+            <button class="btn btn-primary btn-lg" id="btn-start-retro" aria-label="Iniciar a retrospectiva para todos os participantes">⚔️ INICIAR RETROSPECTIVA</button>
           </div>
         </div>
-      </div>
+      </main>
     `;
 
     // Copy link
@@ -95,29 +95,29 @@ export function renderLobby(root) {
   } else {
     // ── Team member view ─────────────────────────────────────────────────────
     root.innerHTML = `
-      <div class="screen-lobby screen-enter">
+      <main class="screen-lobby screen-enter" role="main" aria-label="Sala de espera — aguardando início">
         <div class="lobby-card">
           <div class="lobby-header">
-            <div class="lobby-icon">⏳</div>
+            <div class="lobby-icon" aria-hidden="true">⏳</div>
             <h2 class="lobby-title lobby-title-wait">Aguardando início…</h2>
             <p class="lobby-sprint-name">${sprintLabel}</p>
           </div>
 
-          <div class="lobby-waiting-msg">
+          <div class="lobby-waiting-msg" role="status" aria-live="polite">
             <p>O Scrum Master ainda não iniciou a retrospectiva.</p>
             <p class="lobby-waiting-hint">Você será redirecionado automaticamente quando ela começar.</p>
           </div>
 
-          <div class="lobby-participants lobby-participants-team">
+          <div class="lobby-participants lobby-participants-team" aria-label="Participantes na sala" aria-live="polite">
             <div class="lobby-count" id="participant-count">0</div>
             <div class="lobby-count-label">participante(s) na sala</div>
           </div>
 
           <div class="lobby-actions" style="justify-content:center;margin-top:16px">
-            <button class="btn btn-ghost" id="btn-leave-lobby">← Sair</button>
+            <button class="btn btn-ghost" id="btn-leave-lobby" aria-label="Sair da sala de espera">← Sair</button>
           </div>
         </div>
-      </div>
+      </main>
     `;
 
     root.querySelector('#btn-leave-lobby').addEventListener('click', () => {

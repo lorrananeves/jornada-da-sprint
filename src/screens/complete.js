@@ -14,9 +14,9 @@ export function renderComplete(root) {
   const mood = getMoodLabel(stats.checkinStats.average);
 
   root.innerHTML = `
-    <div class="screen-complete screen-enter">
+    <main class="screen-complete screen-enter" role="main" aria-label="Conclusão da retrospectiva">
       <div class="complete-hero">
-        <div style="font-size:4rem;margin-bottom:12px">🏆</div>
+        <div style="font-size:4rem;margin-bottom:12px" aria-hidden="true">🏆</div>
         <h2 style="color:var(--accent);margin-bottom:6px">Jornada Concluída!</h2>
         <p class="text-muted mb-5">
           ${state.sprint.name ? `Sprint: <strong style="color:var(--text)">${escapeHTML(state.sprint.name)}</strong>` : 'Retrospectiva finalizada'}
@@ -26,36 +26,36 @@ export function renderComplete(root) {
         <p class="text-muted" style="margin-top:4px">XP total conquistado pela equipe</p>
       </div>
 
-      <div class="stats-grid">
-        <div class="stat-card">
+      <div class="stats-grid" role="region" aria-label="Estatísticas da retrospectiva">
+        <div class="stat-card" aria-label="Check-ins: ${stats.checkinStats.total}">
           <div class="stat-card-value" style="color:var(--info)">${stats.checkinStats.total}</div>
           <div class="stat-card-label">Check-ins</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" aria-label="Média do humor: ${stats.checkinStats.average.toFixed(1)}">
           <div class="stat-card-value" style="color:${mood.color}">${stats.checkinStats.average.toFixed(1)}</div>
           <div class="stat-card-label">Média do humor</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" aria-label="Tesouros: ${stats.treasureCount}">
           <div class="stat-card-value" style="color:var(--accent)">${stats.treasureCount}</div>
           <div class="stat-card-label">💎 Tesouros</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" aria-label="Reconhecimentos: ${stats.recognitionCount}">
           <div class="stat-card-value" style="color:var(--purple)">${stats.recognitionCount}</div>
           <div class="stat-card-label">❤️ Reconhecimentos</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" aria-label="Descobertas: ${stats.learningCount}">
           <div class="stat-card-value" style="color:var(--info)">${stats.learningCount}</div>
           <div class="stat-card-label">🧠 Descobertas</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" aria-label="Monstros: ${stats.monsterCount}">
           <div class="stat-card-value" style="color:var(--danger)">${stats.monsterCount}</div>
           <div class="stat-card-label">👹 Monstros</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" aria-label="Soluções: ${stats.solutionCount}">
           <div class="stat-card-value" style="color:var(--info)">${stats.solutionCount}</div>
           <div class="stat-card-label">💡 Soluções</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" aria-label="Missões: ${stats.missionCount}">
           <div class="stat-card-value" style="color:var(--success)">${stats.missionCount}</div>
           <div class="stat-card-label">🚀 Missões</div>
         </div>
@@ -77,11 +77,11 @@ export function renderComplete(root) {
       ` : ''}
 
       <div class="phase-nav" style="justify-content:center;margin-top:32px">
-        <button class="btn btn-ghost" id="btn-back">← Voltar</button>
-        <button class="btn btn-primary btn-lg" id="btn-report">📋 VER RELATÓRIO COMPLETO</button>
-        ${isSM() && getCurrentUser() ? `<button class="btn btn-ghost" id="btn-dashboard">🏠 Minhas Retrospectivas</button>` : ''}
+        <button class="btn btn-ghost" id="btn-back" aria-label="Voltar à fase de missões">← Voltar</button>
+        <button class="btn btn-primary btn-lg" id="btn-report" aria-label="Ver relatório completo da retrospectiva">📋 VER RELATÓRIO COMPLETO</button>
+        ${isSM() && getCurrentUser() ? `<button class="btn btn-ghost" id="btn-dashboard" aria-label="Ir para minhas retrospectivas">🏠 Minhas Retrospectivas</button>` : ''}
       </div>
-    </div>
+    </main>
   `;
 
   root.querySelector('#btn-back').addEventListener('click', () => {

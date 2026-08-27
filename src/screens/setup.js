@@ -12,10 +12,10 @@ export function renderSetup(root) {
   const t = state.team;
 
   root.innerHTML = `
-    <div class="screen-setup screen-enter">
+    <main class="screen-setup screen-enter" role="main" aria-label="Configurar a jornada">
       <div class="phase-header">
         <div class="phase-header-top">
-          <span class="phase-icon">⚙️</span>
+          <span class="phase-icon" aria-hidden="true">⚙️</span>
           <h2 class="phase-title">Configurar a Jornada</h2>
         </div>
         <p class="phase-description">Defina as informações básicas antes de começar a retrospectiva.</p>
@@ -27,7 +27,7 @@ export function renderSetup(root) {
           <div class="form-group">
             <label class="form-label" for="sprint-name">Nome da Sprint *</label>
             <input class="form-input" type="text" id="sprint-name" placeholder="Ex: Sprint 42"
-              value="${escapeHTML(s.name || '')}" required />
+              value="${escapeHTML(s.name || '')}" required aria-required="true" aria-describedby="setup-required-note" />
           </div>
           <div class="form-row">
             <div class="form-group">
@@ -52,12 +52,12 @@ export function renderSetup(root) {
       </div>
 
       <div class="phase-nav">
-        <button class="btn btn-ghost" id="btn-back">← Voltar</button>
-        <button class="btn btn-primary" id="btn-start-journey">⚔️ INICIAR JORNADA</button>
+        <button class="btn btn-ghost" id="btn-back" aria-label="Voltar à tela anterior">← Voltar</button>
+        <button class="btn btn-primary" id="btn-start-journey" aria-label="Confirmar configurações e iniciar a jornada">⚔️ INICIAR JORNADA</button>
       </div>
 
-      <p class="text-muted" style="margin-top:10px;font-size:0.8125rem;text-align:right">* Campo obrigatório</p>
-    </div>
+      <p class="text-muted" id="setup-required-note" style="margin-top:10px;font-size:0.8125rem;text-align:right">* Campo obrigatório</p>
+    </main>
   `;
 
   root.querySelector('#btn-back').addEventListener('click', async () => {

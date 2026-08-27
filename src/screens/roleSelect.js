@@ -30,26 +30,26 @@ export function renderRoleSelect(root) {
 
 function _renderSelectionScreen(root) {
   root.innerHTML = `
-    <div class="screen-role-select">
+    <main class="screen-role-select" role="main" aria-label="Seleção de papel">
       <div class="role-select-card screen-enter">
-        <div class="home-logo">⚔️</div>
+        <div class="home-logo" aria-hidden="true">⚔️</div>
         <h1 class="home-title">JORNADA DA SPRINT</h1>
-        <p class="home-subtitle">Como você está participando desta retrospectiva?</p>
+        <p class="home-subtitle" id="role-select-desc">Como você está participando desta retrospectiva?</p>
 
-        <div class="role-options">
-          <button class="role-option-btn role-option-featured" id="btn-sm">
-            <span class="role-option-icon">🧙</span>
+        <div class="role-options" role="group" aria-labelledby="role-select-desc">
+          <button class="role-option-btn role-option-featured" id="btn-sm" aria-describedby="desc-sm">
+            <span class="role-option-icon" aria-hidden="true">🧙</span>
             <span class="role-option-title">Scrum Master</span>
-            <span class="role-option-desc">Configuro e facilito a retrospectiva</span>
+            <span class="role-option-desc" id="desc-sm">Configuro e facilito a retrospectiva</span>
           </button>
-          <button class="role-option-btn" id="btn-team">
-            <span class="role-option-icon">🗡️</span>
+          <button class="role-option-btn" id="btn-team" aria-describedby="desc-team">
+            <span class="role-option-icon" aria-hidden="true">🗡️</span>
             <span class="role-option-title">Sou do Time</span>
-            <span class="role-option-desc">Tenho o link ou ID da retrospectiva</span>
+            <span class="role-option-desc" id="desc-team">Tenho o link ou ID da retrospectiva</span>
           </button>
         </div>
       </div>
-    </div>
+    </main>
   `;
 
   root.querySelector('#btn-sm').addEventListener('click', () => {
@@ -70,9 +70,9 @@ function _renderSelectionScreen(root) {
 
 function _showJoinForm(root) {
   root.innerHTML = `
-    <div class="screen-role-select">
+    <main class="screen-role-select" role="main" aria-label="Entrar na retrospectiva">
       <div class="role-select-card screen-enter">
-        <div class="home-logo">🗡️</div>
+        <div class="home-logo" aria-hidden="true">🗡️</div>
         <h1 class="home-title" style="font-size:1.5rem">Entrar na Retrospectiva</h1>
         <p class="home-subtitle">Cole o link ou o ID compartilhado pelo Scrum Master.</p>
 
@@ -84,17 +84,18 @@ function _showJoinForm(root) {
             type="text"
             placeholder="https://... ou cole somente o ID"
             autocomplete="off"
+            aria-describedby="join-error"
             style="margin-top:6px"
           />
-          <p class="text-muted" id="join-error" style="font-size:0.8125rem;margin-top:8px;color:var(--danger);min-height:1.2em"></p>
+          <p class="text-muted" id="join-error" role="alert" aria-live="assertive" style="font-size:0.8125rem;margin-top:8px;color:var(--danger);min-height:1.2em"></p>
         </div>
 
         <div style="display:flex;gap:12px;margin-top:8px">
-          <button class="btn btn-ghost" id="btn-back">← Voltar</button>
-          <button class="btn btn-primary" style="flex:1" id="btn-join">Entrar ⚔️</button>
+          <button class="btn btn-ghost" id="btn-back" aria-label="Voltar para seleção de papel">← Voltar</button>
+          <button class="btn btn-primary" style="flex:1" id="btn-join" aria-label="Entrar na retrospectiva">Entrar ⚔️</button>
         </div>
       </div>
-    </div>
+    </main>
   `;
 
   const input   = root.querySelector('#session-input');

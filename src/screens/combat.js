@@ -98,19 +98,21 @@ export function renderCombat(root) {
         </div>
 
         <!-- Strategy Tabs -->
-        <div class="tabs mb-5">
+        <div class="tabs mb-5" role="tablist" aria-label="Estratégias de combate">
           ${STRATEGIES.map((s) => `
-            <button class="tab-btn ${currentStrategy === s.id ? 'active' : ''}" data-strategy="${s.id}">
+            <button class="tab-btn ${currentStrategy === s.id ? 'active' : ''}" data-strategy="${s.id}"
+              role="tab" aria-selected="${currentStrategy === s.id}" aria-controls="strategy-content">
               ${s.label}
             </button>
           `).join('')}
         </div>
 
         <!-- Strategy Content -->
-        <div class="card">
+        <div class="card" id="strategy-content" role="tabpanel">
           <p class="text-muted" style="margin-bottom:14px;font-size:0.9375rem">${strategy.question}</p>
           <div style="display:flex;gap:8px">
-            <textarea class="form-textarea" id="solution-input" placeholder="Escreva uma ideia de solução..." style="flex:1;min-height:64px"></textarea>
+            <textarea class="form-textarea" id="solution-input" placeholder="Escreva uma ideia de solução..."
+              aria-label="Escreva uma solução para: ${strategy.question}" style="flex:1;min-height:64px"></textarea>
           </div>
           <button class="btn btn-info btn-sm" id="btn-add-solution" style="margin-top:10px">
             + ADICIONAR SOLUÇÃO
@@ -125,10 +127,10 @@ export function renderCombat(root) {
               ${solutions.map((sol) => `
                 <div class="solution-card">
                   <span class="solution-text">${escapeHTML(sol.text)}</span>
-                  <button class="vote-btn" data-vote="${escapeHTML(sol.id)}">
+                  <button class="vote-btn" data-vote="${escapeHTML(sol.id)}" aria-label="Votar nesta solução (${sol.votes || 0} votos)">
                     👍 ${sol.votes || 0}
                   </button>
-                  <button class="btn btn-ghost btn-sm" data-to-mission="${escapeHTML(sol.id)}" title="Transformar em Missão">
+                  <button class="btn btn-ghost btn-sm" data-to-mission="${escapeHTML(sol.id)}" title="Transformar em Missão" aria-label="Transformar solução em missão">
                     🚀
                   </button>
                 </div>
