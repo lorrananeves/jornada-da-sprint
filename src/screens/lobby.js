@@ -78,16 +78,17 @@ export function renderLobby(root) {
       }
     });
 
-    // Back to setup
+    // Back to setup — saída voluntária: para heartbeat e remove presença
     root.querySelector('#btn-back-setup').addEventListener('click', () => {
-      cleanup();
+      cleanupFull();
       setPhase('setup');
     });
 
-    // Start retrospective — salva a contagem real e avança todos para checkin
+    // Start retrospective — mantém heartbeat ativo para rastrear entradas tardias
     root.querySelector('#btn-start-retro').addEventListener('click', () => {
       const state = getState();
-      cleanup();
+      // Cancela apenas o listener da UI do lobby, sem parar o heartbeat
+      cleanupView();
       setState({
         retroStarted: true,
         currentPhase: 'checkin',
@@ -124,7 +125,7 @@ export function renderLobby(root) {
     `;
 
     root.querySelector('#btn-leave-lobby').addEventListener('click', () => {
-      cleanup();
+      cleanupFull();
       setLocalPhase('roleSelect');
     });
   }
@@ -137,12 +138,18 @@ export function renderLobby(root) {
   });
 }
 
-function cleanup() {
+/** Cancela o listener de presença da UI do lobby sem tocar no heartbeat.
+ *  Chamado ao iniciar a retro — o heartbeat deve continuar durante toda a retro. */
+function cleanupView() {
   if (_unsubscribe) {
     _unsubscribe();
     _unsubscribe = null;
   }
-  // Para o heartbeat e remove presença ao sair voluntariamente do lobby
+}
+
+/** Para o heartbeat e remove a presença. Chamado apenas ao sair voluntariamente. */
+function cleanupFull() {
+  cleanupView();
   stopHeartbeat();
   leaveSession();
 }

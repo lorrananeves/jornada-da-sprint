@@ -2,7 +2,7 @@
  * Navbar + Phase Progress Bar Component
  */
 
-import { getState, subscribe, setPhase } from '../state/store.js';
+import { getState, subscribe, setPhase, setState, isSM } from '../state/store.js';
 import { subscribeParticipants } from '../services/presence.js';
 import { subscribeConnectivity } from '../services/firebase.js';
 import { qs } from '../utils/dom.js';
@@ -94,10 +94,21 @@ function renderNavbar() {
   // Assina contagem de presença — cancela assinatura anterior se houver
   _stopPresence();
   _unsubPresence = subscribeParticipants((count) => {
+    // Atualiza o pill de presença na navbar
     const pill = qs('#online-pill');
-    if (!pill) return;
-    pill.querySelector('.online-count').textContent = count;
-    pill.title = `${count} participante${count !== 1 ? 's' : ''} online`;
+    if (pill) {
+      pill.querySelector('.online-count').textContent = count;
+      pill.title = `${count} participante${count !== 1 ? 's' : ''} online`;
+    }
+
+    // SM sincroniza participantCount em tempo real para que os contadores de
+    // check-in e "Terminei" reflitam entradas tardias durante a retro
+    if (isSM() && count > 0) {
+      const state = getState();
+      if (state.retroStarted && count !== parseInt(state.team?.participantCount, 10)) {
+        setState({ team: { ...state.team, participantCount: count } });
+      }
+    }
   });
 
   // Phase step click — allow navigating to completed phases
