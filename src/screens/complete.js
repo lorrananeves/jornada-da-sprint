@@ -6,6 +6,7 @@ import { getState, setPhase, setLocalPhase, completePhase, isSM } from '../state
 import { calcSummaryStats, getMoodLabel } from '../services/stats.js';
 import { formatXP } from '../utils/format.js';
 import { escapeHTML } from '../utils/dom.js';
+import { getCurrentUser } from '../services/auth.js';
 
 export function renderComplete(root) {
   const state = getState();
@@ -78,6 +79,7 @@ export function renderComplete(root) {
       <div class="phase-nav" style="justify-content:center;margin-top:32px">
         <button class="btn btn-ghost" id="btn-back">← Voltar</button>
         <button class="btn btn-primary btn-lg" id="btn-report">📋 VER RELATÓRIO COMPLETO</button>
+        ${isSM() && getCurrentUser() ? `<button class="btn btn-ghost" id="btn-dashboard">🏠 Minhas Retrospectivas</button>` : ''}
       </div>
     </div>
   `;
@@ -90,5 +92,8 @@ export function renderComplete(root) {
     if (!isSM()) { setLocalPhase('roleSelect'); return; }
     completePhase('complete');
     setPhase('report');
+  });
+  root.querySelector('#btn-dashboard')?.addEventListener('click', () => {
+    setLocalPhase('smDashboard');
   });
 }
