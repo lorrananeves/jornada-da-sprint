@@ -809,6 +809,35 @@
   color: var(--text);
 }
 
+/* Container wrapper do timer (envolve tanto o modo setup quanto o modo running) */
+.phase-timer-wrap {
+  margin: 12px 0 4px;
+}
+
+/* Modo configuração — controles inline para o SM */
+.phase-timer-setup {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 8px 14px;
+}
+
+.phase-timer-input {
+  width: 72px;
+  text-align: center;
+  padding: 6px 8px;
+  font-size: 0.875rem;
+}
+
+.phase-timer-unit {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 /* Últimos 20% do tempo */
 .phase-timer--warning {
   background: rgba(240, 180, 41, 0.12);

@@ -259,7 +259,7 @@ export async function exportAsPDF(state, filename = 'jornada-sprint-relatorio.pd
     pdf.setTextColor(...C.muted);
     const teamInfo = [
       team.name ? `Time: ${team.name}` : '',
-      team.participantCount ? `${team.participantCount} participantes` : '',
+      team.participantCount ? `${team.participantCount} participante${team.participantCount !== 1 ? 's' : ''}` : '',
     ].filter(Boolean).join('  ·  ');
     pdf.text(stripEmoji(teamInfo), PAGE_W / 2, cur.y, { align: 'center' });
     cur.advance(13);

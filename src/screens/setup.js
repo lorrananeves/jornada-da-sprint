@@ -6,19 +6,10 @@ import { getState, setState, setPhase, completePhase, setRole } from '../state/s
 import { getCurrentUser } from '../services/auth.js';
 import { escapeHTML } from '../utils/dom.js';
 
-const PHASE_LABELS = [
-  { key: 'checkin',   label: 'Check-in',         icon: '🌡️' },
-  { key: 'treasures', label: 'Tesouros',          icon: '💎' },
-  { key: 'monsters',  label: 'Monstros',          icon: '👾' },
-  { key: 'combat',    label: 'Combate',           icon: '⚔️' },
-  { key: 'missions',  label: 'Missões',           icon: '🎯' },
-];
-
 export function renderSetup(root) {
   const state = getState();
   const s = state.sprint;
   const t = state.team;
-  const durations = state.phaseDurations || {};
 
   root.innerHTML = `
     <div class="screen-setup screen-enter">
@@ -53,44 +44,10 @@ export function renderSetup(root) {
 
       <div class="card" style="margin-top:16px">
         <h3 style="margin-bottom:20px">👥 Dados do Time</h3>
-        <div style="display:flex;flex-direction:column;gap:16px">
-          <div class="form-group">
-            <label class="form-label" for="team-name">Nome do Time</label>
-            <input class="form-input" type="text" id="team-name" placeholder="Ex: Time Fênix"
-              value="${escapeHTML(t.name || '')}" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="participant-count">Número de Participantes</label>
-            <input class="form-input" type="number" id="participant-count" placeholder="Ex: 8" min="1"
-              value="${t.participantCount || ''}" />
-          </div>
-        </div>
-      </div>
-
-      <div class="card" style="margin-top:16px">
-        <h3 style="margin-bottom:4px">⏱️ Timebox por Fase</h3>
-        <p class="text-muted" style="font-size:0.8125rem;margin-bottom:20px">
-          Defina quantos minutos cada fase deve durar. O timer ficará visível para todo o time.
-          Deixe em 0 para não usar timer nessa fase.
-        </p>
-        <div class="timebox-grid">
-          ${PHASE_LABELS.map(({ key, label, icon }) => `
-            <div class="timebox-row">
-              <span class="timebox-phase-label">${icon} ${label}</span>
-              <div class="timebox-input-wrap">
-                <input
-                  class="form-input timebox-input"
-                  type="number"
-                  id="timebox-${key}"
-                  min="0"
-                  max="60"
-                  placeholder="0"
-                  value="${durations[key] || ''}"
-                />
-                <span class="timebox-unit">min</span>
-              </div>
-            </div>
-          `).join('')}
+        <div class="form-group">
+          <label class="form-label" for="team-name">Nome do Time</label>
+          <input class="form-input" type="text" id="team-name" placeholder="Ex: Time Fênix"
+            value="${escapeHTML(t.name || '')}" />
         </div>
       </div>
 
@@ -118,12 +75,6 @@ export function renderSetup(root) {
       return;
     }
 
-    const phaseDurations = {};
-    for (const { key } of PHASE_LABELS) {
-      const val = parseInt(root.querySelector(`#timebox-${key}`).value, 10);
-      phaseDurations[key] = isNaN(val) || val < 0 ? 0 : val;
-    }
-
     // Garante que o role de SM está definido antes de persistir
     // (necessário quando SM vem do dashboard sem ter passado pelo roleSelect)
     const { getRole } = await import('../state/store.js');
@@ -139,9 +90,8 @@ export function renderSetup(root) {
       },
       team: {
         name: root.querySelector('#team-name').value.trim(),
-        participantCount: root.querySelector('#participant-count').value,
+        participantCount: '',
       },
-      phaseDurations,
     });
 
     completePhase('setup');

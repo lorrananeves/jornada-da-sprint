@@ -61,7 +61,7 @@ export function renderReport(root) {
           <h2 style="color:var(--text);margin-bottom:8px">${escapeHTML(sprint.name || 'Retrospectiva')}</h2>
           <p class="text-muted">
             ${team.name ? `Time: ${escapeHTML(team.name)}` : ''}
-            ${team.participantCount ? ` · ${team.participantCount} participantes` : ''}
+            ${team.participantCount ? ` · ${team.participantCount} participante${team.participantCount !== 1 ? 's' : ''}` : ''}
           </p>
           ${sprint.startDate || sprint.endDate ? `
             <p class="text-muted" style="margin-top:4px;font-size:0.875rem">

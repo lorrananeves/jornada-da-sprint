@@ -229,24 +229,16 @@ export function renderCheckin(root) {
   }
 
   // Re-renderiza quando checkins mudam remotamente (ex: membro faz checkin no dispositivo dele).
-  // Usa o próprio subscribe para detectar mudanças, e cancela quando a fase muda
-  // (o router vai chamar outro renderer, este closure já não é relevante).
   let _lastCheckinCount = getState().checkins.length;
-  let _lastParticipantCount = parseInt(getState().team?.participantCount, 10) || 0;
   _unsub = subscribe((state) => {
-    // Sai da tela: cancela subscription para não acionar render em closure morto
     if (state.currentPhase !== 'checkin') {
       _unsub?.();
       _unsub = null;
       if (_typing) { _typing.destroy(); _typing = null; }
       return;
     }
-    const currentParticipantCount = parseInt(state.team?.participantCount, 10) || 0;
-    const checkinCountChanged      = state.checkins.length !== _lastCheckinCount;
-    const participantCountChanged  = currentParticipantCount !== _lastParticipantCount;
-    if (checkinCountChanged || participantCountChanged) {
-      _lastCheckinCount      = state.checkins.length;
-      _lastParticipantCount  = currentParticipantCount;
+    if (state.checkins.length !== _lastCheckinCount) {
+      _lastCheckinCount = state.checkins.length;
       render();
     }
   });

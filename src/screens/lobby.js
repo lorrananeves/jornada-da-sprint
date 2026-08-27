@@ -13,6 +13,9 @@ import { getRole } from '../state/store.js';
 import { getSessionUrl, subscribeParticipants, stopHeartbeat, leaveSession } from '../services/presence.js';
 import { escapeHTML } from '../utils/dom.js';
 
+// Contagem atual de participantes vivos no lobby (atualizada pelo subscribe)
+let _liveParticipantCount = 0;
+
 let _unsubscribe = null;
 
 export function renderLobby(root) {
@@ -78,10 +81,15 @@ export function renderLobby(root) {
       setPhase('setup');
     });
 
-    // Start retrospective — moves all participants to checkin via shared state
+    // Start retrospective — salva a contagem real e avança todos para checkin
     root.querySelector('#btn-start-retro').addEventListener('click', () => {
+      const state = getState();
       cleanup();
-      setState({ retroStarted: true, currentPhase: 'checkin' });
+      setState({
+        retroStarted: true,
+        currentPhase: 'checkin',
+        team: { ...state.team, participantCount: _liveParticipantCount },
+      });
     });
 
   } else {
@@ -120,6 +128,7 @@ export function renderLobby(root) {
 
   // Real-time participant counter (both views)
   _unsubscribe = subscribeParticipants((count) => {
+    _liveParticipantCount = count;
     const el = root.querySelector('#participant-count');
     if (el) el.textContent = count;
   });
