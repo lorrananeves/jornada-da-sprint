@@ -12,6 +12,11 @@ import { getStrategyLabel } from '../utils/format.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
 import { createTypingIndicator } from '../components/typingIndicator.js';
 
+/** Persiste o foco do SM no store (sincroniza para todos via Firestore). */
+function setCombatFocus(monsterIdx, strategy) {
+  setState({ combatMonsterIdx: monsterIdx, combatStrategy: strategy });
+}
+
 const STRATEGIES = [
   { id: 'prevent', label: '🛡️ PREVENIR',        question: 'Como podemos evitar que isso aconteça?' },
   { id: 'reduce',  label: '🧪 REDUZIR IMPACTO',  question: 'Se isso acontecer novamente, como podemos diminuir o impacto?' },
@@ -21,11 +26,13 @@ const STRATEGIES = [
 export function renderCombat(root) {
   const state = getState();
   const selectedMonsters = state.monsters.filter((m) => m.selected);
-  let currentMonsterIdx = 0;
-  let currentStrategy = 'prevent';
   let _timer  = null;
   let _unsub  = null;
   let _typing = null;
+
+  // Lê o foco inicial do store (pode ter sido sincronizado pelo SM)
+  let currentMonsterIdx = Math.min(state.combatMonsterIdx ?? 0, Math.max(0, selectedMonsters.length - 1));
+  let currentStrategy   = state.combatStrategy   ?? 'prevent';
 
   if (!selectedMonsters.length) {
     root.innerHTML = `
@@ -81,11 +88,12 @@ export function renderCombat(root) {
             </div>
           </div>
           ${selectedMonsters.length > 1 ? `
-            <div style="margin-left:auto;display:flex;gap:8px">
+            <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+              ${!isSM() ? '<span class="combat-focus-badge">📡 foco do SM</span>' : ''}
               <button class="btn btn-ghost btn-sm" id="btn-prev-monster" ${currentMonsterIdx === 0 ? 'disabled' : ''}>← Anterior</button>
               <button class="btn btn-ghost btn-sm" id="btn-next-monster" ${currentMonsterIdx === selectedMonsters.length - 1 ? 'disabled' : ''}>Próximo →</button>
             </div>
-          ` : ''}
+          ` : (!isSM() && selectedMonsters.length === 1 ? '<span class="combat-focus-badge" style="margin-left:auto">📡 foco do SM</span>' : '')}
         </div>
 
         <!-- Strategy Tabs -->
@@ -147,10 +155,12 @@ export function renderCombat(root) {
   }
 
   function attachEvents(monster) {
-    // Strategy tabs
+    // Strategy tabs — só o SM muda a estratégia ativa (sincroniza para todos)
     root.querySelectorAll('[data-strategy]').forEach((btn) => {
       btn.addEventListener('click', () => {
+        if (!isSM()) return;
         currentStrategy = btn.dataset.strategy;
+        setCombatFocus(currentMonsterIdx, currentStrategy);
         render();
       });
     });
@@ -202,11 +212,21 @@ export function renderCombat(root) {
       });
     });
 
-    // Monster navigation
+    // Monster navigation — só o SM navega (sincroniza para todos)
     const prevBtn = root.querySelector('#btn-prev-monster');
     const nextMonBtn = root.querySelector('#btn-next-monster');
-    if (prevBtn) prevBtn.addEventListener('click', () => { currentMonsterIdx--; render(); });
-    if (nextMonBtn) nextMonBtn.addEventListener('click', () => { currentMonsterIdx++; render(); });
+    if (prevBtn) prevBtn.addEventListener('click', () => {
+      if (!isSM()) return;
+      currentMonsterIdx--;
+      setCombatFocus(currentMonsterIdx, currentStrategy);
+      render();
+    });
+    if (nextMonBtn) nextMonBtn.addEventListener('click', () => {
+      if (!isSM()) return;
+      currentMonsterIdx++;
+      setCombatFocus(currentMonsterIdx, currentStrategy);
+      render();
+    });
 
     root.querySelector('#btn-back').addEventListener('click', () => {
       if (isSM()) setPhase('monsters');
@@ -218,8 +238,11 @@ export function renderCombat(root) {
     });
   }
 
-  // Subscription em tempo real: re-renderiza quando soluções mudam remotamente
-  let _lastCount = getState().solutions.length;
+  // Subscription em tempo real: re-renderiza quando soluções ou foco mudam remotamente
+  let _lastCount   = getState().solutions.length;
+  let _lastIdx     = currentMonsterIdx;
+  let _lastStrategy = currentStrategy;
+
   _unsub = subscribe((state) => {
     if (state.currentPhase !== 'combat') {
       _unsub?.();
@@ -227,8 +250,20 @@ export function renderCombat(root) {
       if (_typing) { _typing.destroy(); _typing = null; }
       return;
     }
-    if (state.solutions.length !== _lastCount) {
-      _lastCount = state.solutions.length;
+    const newIdx      = Math.min(state.combatMonsterIdx ?? 0, Math.max(0, selectedMonsters.length - 1));
+    const newStrategy = state.combatStrategy ?? 'prevent';
+    const focusChanged = newIdx !== _lastIdx || newStrategy !== _lastStrategy;
+    const countChanged = state.solutions.length !== _lastCount;
+
+    if (focusChanged || countChanged) {
+      // Membros do time seguem o foco do SM automaticamente
+      if (!isSM() && focusChanged) {
+        currentMonsterIdx = newIdx;
+        currentStrategy   = newStrategy;
+      }
+      _lastCount    = state.solutions.length;
+      _lastIdx      = newIdx;
+      _lastStrategy = newStrategy;
       render();
     }
   });

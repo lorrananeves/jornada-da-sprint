@@ -679,6 +679,18 @@
   margin: 0 auto;
 }
 
+/* Badge indicando que membros estão no foco sincronizado do SM */
+.combat-focus-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--info);
+  background: var(--info-dim);
+  border: 1px solid rgba(88,166,255,0.25);
+  border-radius: 100px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
 .combat-monster-banner {
   background: linear-gradient(135deg, var(--surface-2), var(--surface));
   border: 1px solid var(--border);

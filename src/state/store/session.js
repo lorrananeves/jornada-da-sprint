@@ -55,18 +55,21 @@ const COLLECTIONS = ['checkins', 'treasures', 'monsters', 'solutions', 'missions
 
 const DEFAULT_STATE = () => ({
   // ── doc raiz ──
-  sprint:           { name: '', startDate: '', endDate: '' },
-  team:             { name: '', participantCount: '' },
-  currentPhase:     'home',
-  retroStarted:     false,
-  xp:               0,
-  smDeviceId:       null,
-  smUid:            null,
-  completedPhases:  [],
-  phaseDurations:   {},
-  phaseStartedAt:   {},
-  createdAt:        null,
-  updatedAt:        null,
+  sprint:              { name: '', startDate: '', endDate: '' },
+  team:                { name: '', participantCount: '' },
+  currentPhase:        'home',
+  retroStarted:        false,
+  xp:                  0,
+  smDeviceId:          null,
+  smUid:               null,
+  completedPhases:     [],
+  phaseDurations:      {},
+  phaseStartedAt:      {},
+  createdAt:           null,
+  updatedAt:           null,
+  // ── foco do Combate (sincronizado entre participantes) ──
+  combatMonsterIdx:    0,    // índice do monstro atual na fase Combate
+  combatStrategy:      'prevent', // aba de estratégia atual
   // ── subcoleções ──
   checkins:   [],
   treasures:  [],
