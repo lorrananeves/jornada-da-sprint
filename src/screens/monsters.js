@@ -159,7 +159,7 @@ export function renderMonsters(root) {
           </div>
           <p class="phase-description">
             O que atrapalhou a equipe? Identifique os problemas e priorize os mais críticos.
-            ${sm ? '<span class="merge-hint">Arraste um card sobre outro para mesclar duplicados.</span>' : ''}
+            ${sm ? '<span class="merge-hint">Arraste um card sobre outro para mesclar, ou selecione 2 e clique em <strong>Mesclar</strong>.</span>' : ''}
           </p>
         </div>
 
@@ -176,10 +176,11 @@ export function renderMonsters(root) {
           </button>
         </div>
 
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div class="monsters-toolbar">
           <h4>Monstros identificados <span class="badge badge-info">${monsters.length}</span></h4>
-          <div style="display:flex;gap:8px;align-items:center">
+          <div class="monsters-toolbar-actions">
             ${selectedCount > 0 ? `<span class="badge badge-accent" data-selected-count>🎯 ${selectedCount} selecionado${selectedCount !== 1 ? 's' : ''}</span>` : ''}
+            ${sm && selectedCount === 2 ? '<button class="btn btn-info btn-sm" id="btn-merge-selected">🔗 MESCLAR SELECIONADOS</button>' : ''}
             <button class="btn btn-ghost btn-sm" id="btn-prioritize">🔥 PRIORIZAR AUTOMATICAMENTE</button>
           </div>
         </div>
@@ -241,6 +242,17 @@ export function renderMonsters(root) {
       input.value = '';
       if (_typing) _typing.destroy();
       render();
+    });
+
+    // Mesclar selecionados (fallback mobile — disponível quando exatamente 2 cards estão selecionados)
+    root.querySelector('#btn-merge-selected')?.addEventListener('click', async () => {
+      const state = getState();
+      const selected = state.monsters.filter((m) => m.selected);
+      if (selected.length !== 2) return;
+      const [keepMon, dropMon] = selected;
+      const { confirmed, keepText } = await showMergeModal(keepMon, dropMon);
+      if (!confirmed) return;
+      mergeMonsters(keepMon.id, dropMon.id, keepText);
     });
 
     // Prioritize
