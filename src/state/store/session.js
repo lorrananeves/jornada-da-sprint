@@ -220,8 +220,15 @@ async function initFirebase() {
       sessionExists = true;
       _state = { ..._state, ...remote };
       if (!getRole()) {
-        _state.currentPhase = 'roleSelect';
-        _state._guestAutoJoin = true;
+        // Se o smDeviceId do documento bate com este dispositivo, é o SM
+        // retornando (ex: nova aba, browser reiniciado) — restaura o role
+        // sem passar pelo roleSelect novamente.
+        if (remote.smDeviceId && remote.smDeviceId === getDeviceId()) {
+          sessionStorage.setItem('_jornada_role', 'scrum_master');
+        } else {
+          _state.currentPhase = 'roleSelect';
+          _state._guestAutoJoin = true;
+        }
       }
     }
   } catch (e) {
