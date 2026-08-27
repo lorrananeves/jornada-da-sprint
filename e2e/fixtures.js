@@ -114,7 +114,6 @@ export const test = base.extend({
 
     // Preenche o mínimo e cria a sessão no Firestore
     await smPage.locator('#sprint-name').fill('Sprint E2E');
-    await smPage.locator('#participant-count').fill('2');
     await smPage.locator('#btn-start-journey').click();
 
     // Aguarda o Lobby — neste ponto a sessão já existe no Firestore
