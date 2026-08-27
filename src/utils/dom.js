@@ -115,3 +115,50 @@ export function animateClass(el, cls, duration = 400) {
   el.classList.add(cls);
   setTimeout(() => el.classList.remove(cls), duration);
 }
+
+/**
+ * Sinal "Terminei essa parte" — HTML + event wiring reutilizáveis em todas as telas.
+ *
+ * buildReadySignalHTML(phase, state, isSM) → string HTML a inserir na phase-nav
+ * attachReadySignal(root, phase, signalReadyFn) → conecta o evento do botão
+ */
+
+/**
+ * Gera o HTML do sinal "Terminei" para a fase indicada.
+ * @param {string}  phase          — id da fase (ex: 'checkin')
+ * @param {object}  state          — snapshot do store
+ * @param {boolean} isUserSM       — se o usuário atual é SM
+ * @param {string}  currentDeviceId — getDeviceId()
+ */
+export function buildReadySignalHTML(phase, state, isUserSM, currentDeviceId) {
+  const signals     = state.readySignals || {};
+  const readyCount  = Object.values(signals).filter((p) => p === phase).length;
+  const totalCount  = parseInt(state.team?.participantCount, 10) || 0;
+  const alreadyDone = signals[currentDeviceId] === phase;
+
+  if (isUserSM) {
+    // SM vê o contador (sem o botão — ele avança a fase pelo btn-next)
+    if (readyCount === 0 || totalCount === 0) return '';
+    return `<span class="ready-signal-count" title="Participantes que terminaram esta parte">${readyCount}${totalCount > 0 ? `/${totalCount}` : ''} pronto${readyCount !== 1 ? 's' : ''} ✅</span>`;
+  }
+
+  // Membro do time
+  if (alreadyDone) {
+    return `<span class="ready-signal-done">✅ Pronto</span>`;
+  }
+  return `<button class="btn btn-ghost btn-sm ready-signal-btn" data-ready-phase="${phase}">✅ Terminei essa parte</button>`;
+}
+
+/**
+ * Conecta o clique do botão "Terminei" gerado por buildReadySignalHTML.
+ * @param {HTMLElement} root
+ * @param {Function}    signalReadyFn — store.signalReady
+ */
+export function attachReadySignal(root, signalReadyFn) {
+  root.querySelectorAll('.ready-signal-btn[data-ready-phase]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      signalReadyFn(btn.dataset.readyPhase);
+      btn.outerHTML = `<span class="ready-signal-done">✅ Pronto</span>`;
+    });
+  });
+}

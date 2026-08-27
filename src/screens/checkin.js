@@ -2,13 +2,13 @@
  * Check-in Screen
  */
 
-import { getState, subscribe, addCheckin, addXP, setPhase, setLocalPhase, completePhase, isSM } from '../state/store.js';
-import { uid } from '../utils/dom.js';
+import { getState, subscribe, addCheckin, addXP, setPhase, setLocalPhase, completePhase, isSM, signalReady } from '../state/store.js';
+import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
 import { xpForCheckin } from '../services/xp.js';
 import { calcCheckinStats, getMoodLabel } from '../services/stats.js';
 import { showXPToast } from '../components/xpToast.js';
 import { getScoreEmoji, getScoreLabel } from '../utils/format.js';
-import { escapeHTML, preserveInputs } from '../utils/dom.js';
+import { getDeviceId } from '../services/presence.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
 import { createTypingIndicator } from '../components/typingIndicator.js';
 
@@ -174,6 +174,7 @@ export function renderCheckin(root) {
 
         <div class="phase-nav">
           <button class="btn btn-ghost" id="btn-back">← Voltar</button>
+          ${buildReadySignalHTML('checkin', state, isSM(), getDeviceId())}
           ${isSM() ? `<button class="btn btn-primary" id="btn-next">💎 PRÓXIMA FASE →</button>` : `<span class="text-muted text-sm">Aguardando o Scrum Master avançar…</span>`}
         </div>
       </div>
@@ -191,6 +192,7 @@ export function renderCheckin(root) {
   }
 
   function attachEvents() {
+    attachReadySignal(root, signalReady);
     // Score selection
     root.querySelectorAll('.score-btn').forEach((btn) => {
       btn.addEventListener('click', () => {

@@ -3,11 +3,12 @@
  */
 
 import {
-  getState, subscribe, addTreasure, reactToTreasure, addXP, setPhase, setLocalPhase, completePhase, isSM,
+  getState, subscribe, addTreasure, reactToTreasure, addXP, setPhase, setLocalPhase, completePhase, isSM, signalReady,
 } from '../state/store.js';
 import { xpForTreasure } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
-import { uid, escapeHTML, preserveInputs } from '../utils/dom.js';
+import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
+import { getDeviceId } from '../services/presence.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
 import { createTypingIndicator } from '../components/typingIndicator.js';
 
@@ -96,6 +97,7 @@ export function renderTreasures(root) {
           <div class="treasure-columns" id="treasure-cols"></div>
           <div class="phase-nav">
             <button class="btn btn-ghost" id="btn-back">← Voltar</button>
+            ${buildReadySignalHTML('treasures', state, isSM(), getDeviceId())}
             ${isSM() ? `<button class="btn btn-primary" id="btn-next">👹 PRÓXIMA FASE →</button>` : `<span class="text-muted text-sm">Aguardando o Scrum Master avançar…</span>`}
           </div>
         </div>
@@ -119,6 +121,7 @@ export function renderTreasures(root) {
   }
 
   function attachEvents() {
+    attachReadySignal(root, signalReady);
     CATEGORIES.forEach((cat) => {
       const col = root.querySelector(`[data-category="${cat.id}"]`);
       if (!col) return;

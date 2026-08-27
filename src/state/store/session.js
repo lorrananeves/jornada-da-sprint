@@ -68,8 +68,10 @@ const DEFAULT_STATE = () => ({
   createdAt:           null,
   updatedAt:           null,
   // ── foco do Combate (sincronizado entre participantes) ──
-  combatMonsterIdx:    0,    // índice do monstro atual na fase Combate
-  combatStrategy:      'prevent', // aba de estratégia atual
+  combatMonsterIdx:    0,
+  combatStrategy:      'prevent',
+  // ── sinais "Terminei" por fase { [deviceId]: phaseId } ──
+  readySignals:        {},
   // ── subcoleções ──
   checkins:   [],
   treasures:  [],
@@ -278,6 +280,19 @@ async function initFirebase() {
       );
     }
   }
+}
+
+// ── Ready signals ("Terminei") ────────────────────────────────────────────────
+
+/**
+ * Registra que o dispositivo atual terminou a fase indicada.
+ * Qualquer participante pode chamar (não requer isSM).
+ * Persiste em readySignals[deviceId] = phaseId no doc raiz.
+ */
+export function signalReady(phase) {
+  const deviceId = getDeviceId();
+  const readySignals = { ..._state.readySignals, [deviceId]: phase };
+  setScalarState({ readySignals });
 }
 
 // ── Phase helpers ─────────────────────────────────────────────────────────────

@@ -27,6 +27,8 @@ export {
   // sessão
   resetState,
   startNewSession,
+  // sinalização "Terminei"
+  signalReady,
 } from './session.js';
 
 import { getState, getSessionId, setCollection } from './session.js';

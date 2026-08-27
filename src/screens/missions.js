@@ -3,12 +3,13 @@
  */
 
 import {
-  getState, subscribe, addMission, removeMission, addXP, setPhase, setLocalPhase, completePhase, setState, isSM,
+  getState, subscribe, addMission, removeMission, addXP, setPhase, setLocalPhase, completePhase, setState, isSM, signalReady,
 } from '../state/store.js';
 import { xpForMission } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
 import { showModal } from '../components/modal.js';
-import { uid, escapeHTML, preserveInputs } from '../utils/dom.js';
+import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
+import { getDeviceId } from '../services/presence.js';
 import { getPriorityLabel, getStrategyLabel, formatDate } from '../utils/format.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
 import { createTypingIndicator } from '../components/typingIndicator.js';
@@ -139,6 +140,7 @@ export function renderMissions(root) {
 
         <div class="phase-nav">
           <button class="btn btn-ghost" id="btn-back">← Voltar</button>
+          ${buildReadySignalHTML('missions', state, isSM(), getDeviceId())}
           ${isSM() ? `<button class="btn btn-primary" id="btn-next">🏆 CONCLUIR JORNADA →</button>` : `<span class="text-muted text-sm">Aguardando o Scrum Master avançar…</span>`}
         </div>
       </div>
@@ -155,6 +157,7 @@ export function renderMissions(root) {
   }
 
   function attachEvents(prefill) {
+    attachReadySignal(root, signalReady);
     root.querySelector('#btn-add-mission').addEventListener('click', () => {
       const title = root.querySelector('#mission-title').value.trim();
       if (!title) {

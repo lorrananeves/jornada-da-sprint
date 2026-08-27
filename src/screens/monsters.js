@@ -4,11 +4,12 @@
 
 import {
   getState, subscribe, addMonster, reactToMonster, selectMonster, prioritizeMonsters,
-  mergeMonsters, addXP, setPhase, setLocalPhase, completePhase, isSM,
+  mergeMonsters, addXP, setPhase, setLocalPhase, completePhase, isSM, signalReady,
 } from '../state/store.js';
 import { xpForMonster } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
-import { uid, escapeHTML, preserveInputs } from '../utils/dom.js';
+import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
+import { getDeviceId } from '../services/presence.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
 import { createTypingIndicator } from '../components/typingIndicator.js';
 
@@ -191,6 +192,7 @@ export function renderMonsters(root) {
 
         <div class="phase-nav">
           <button class="btn btn-ghost" id="btn-back">← Voltar</button>
+          ${buildReadySignalHTML('monsters', state, sm, getDeviceId())}
           ${sm
             ? `<button class="btn btn-primary" id="btn-next" ${selectedCount > 0 ? '' : 'disabled'}>🛡️ IR PARA COMBATE →</button>`
             : `<span class="text-muted text-sm">Aguardando o Scrum Master avançar…</span>`}
@@ -215,6 +217,7 @@ export function renderMonsters(root) {
   }
 
   function attachEvents() {
+    attachReadySignal(root, signalReady);
     const sm = isSM();
 
     // Suggestion chips

@@ -945,6 +945,29 @@
   font-size: 0.9375rem;
 }
 
+/* Sinal "Terminei" e contador de prontos */
+.ready-signal-btn {
+  color: var(--success);
+  border-color: rgba(63,185,80,0.3);
+}
+
+.ready-signal-done {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--success);
+}
+
+.ready-signal-count {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--success);
+  background: var(--success-dim);
+  border: 1px solid rgba(63,185,80,0.3);
+  border-radius: 100px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
 .phase-nav {
   display: flex;
   gap: 10px;

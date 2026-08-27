@@ -3,11 +3,12 @@
  */
 
 import {
-  getState, subscribe, setState, addSolution, voteSolution, addXP, setPhase, setLocalPhase, completePhase, isSM,
+  getState, subscribe, setState, addSolution, voteSolution, addXP, setPhase, setLocalPhase, completePhase, isSM, signalReady,
 } from '../state/store.js';
 import { xpForSolution } from '../services/xp.js';
 import { showXPToast } from '../components/xpToast.js';
-import { uid, escapeHTML, preserveInputs } from '../utils/dom.js';
+import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
+import { getDeviceId } from '../services/presence.js';
 import { getStrategyLabel } from '../utils/format.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
 import { createTypingIndicator } from '../components/typingIndicator.js';
@@ -138,6 +139,7 @@ export function renderCombat(root) {
 
         <div class="phase-nav">
           <button class="btn btn-ghost" id="btn-back">← Voltar</button>
+          ${buildReadySignalHTML('combat', getState(), isSM(), getDeviceId())}
           ${isSM() ? `<button class="btn btn-primary" id="btn-next">🚀 PRÓXIMA FASE →</button>` : `<span class="text-muted text-sm">Aguardando o Scrum Master avançar…</span>`}
         </div>
       </div>
@@ -155,6 +157,7 @@ export function renderCombat(root) {
   }
 
   function attachEvents(monster) {
+    attachReadySignal(root, signalReady);
     // Strategy tabs — só o SM muda a estratégia ativa (sincroniza para todos)
     root.querySelectorAll('[data-strategy]').forEach((btn) => {
       btn.addEventListener('click', () => {
