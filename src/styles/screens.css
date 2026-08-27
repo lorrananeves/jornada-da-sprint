@@ -1088,3 +1088,73 @@
   justify-content: flex-end;
   margin-top: 32px;
 }
+
+/* ── Responsividade mobile — breakpoints adicionais ────────────────────────── */
+
+@media (max-width: 480px) {
+  /* Monsters: cartões em coluna única para facilitar toque */
+  .monsters-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  /* Combat: banner do monstro em stack vertical */
+  .combat-monster-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .combat-monster-banner > div:last-child {
+    margin-left: 0 !important;
+    flex-wrap: wrap;
+  }
+
+  /* Complete: padding reduzido no hero */
+  .complete-hero {
+    padding: 24px 16px;
+  }
+
+  .complete-xp-total {
+    font-size: 2.5rem;
+  }
+
+  /* Stats: garante no mínimo 2 colunas bem espaçadas */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .stat-card {
+    padding: 14px 10px;
+  }
+
+  .stat-card-value {
+    font-size: 1.5rem;
+  }
+
+  /* Report: padding reduzido no conteúdo */
+  #report-content {
+    padding: 20px 14px;
+  }
+
+  /* Phase nav: empilha botões em mobile */
+  .phase-nav {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* Solution card: stack vertical */
+  .solution-card {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Warning banner: fonte menor */
+  .warning-banner {
+    font-size: 0.8125rem;
+    padding: 8px 10px;
+  }
+}

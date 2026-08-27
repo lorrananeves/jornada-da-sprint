@@ -1134,3 +1134,29 @@
   #parking-lot-root { bottom: 16px; left: 16px; }
   .parking-lot-panel { width: calc(100vw - 32px); }
 }
+
+/* ── Responsividade mobile — navbar ─────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  /* Oculta o label textual do badge de conectividade; mantém só o dot */
+  .connectivity-label {
+    display: none;
+  }
+
+  /* Reduz padding do badge de conectividade */
+  .connectivity-badge {
+    padding: 3px 6px;
+    gap: 4px;
+  }
+
+  /* XP badge mais compacto */
+  .xp-badge {
+    padding: 3px 8px;
+    font-size: 0.8125rem;
+  }
+
+  /* Navbar brand menor para caber em telas < 480px */
+  .navbar-brand {
+    font-size: 0.75rem;
+  }
+}
