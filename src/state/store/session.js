@@ -261,9 +261,16 @@ async function initFirebase() {
 
       if (remoteScalars.updatedAt && _state.updatedAt && remoteScalars.updatedAt <= _state.updatedAt) return;
 
-      const keepPhase = _state.currentPhase === 'roleSelect';
+      // Fases locais do membro que não devem ser sobrescritas por snapshots remotos:
+      //   - 'roleSelect': membro ainda está escolhendo o papel
+      //   - 'lobby': membro está na sala de espera; só segue o SM quando retroStarted=true
+      const localPhase = _state.currentPhase;
+      const keepPhase =
+        localPhase === 'roleSelect' ||
+        (localPhase === 'lobby' && !remoteScalars.retroStarted);
+
       _state = { ..._state, ...remoteScalars };
-      if (keepPhase) _state.currentPhase = 'roleSelect';
+      if (keepPhase) _state.currentPhase = localPhase;
       delete _state.role;
       saveToStorage(_state);
       notify();

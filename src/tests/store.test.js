@@ -209,7 +209,7 @@ describe('setState', () => {
 });
 
 
-// ── subscribeSession guard (roleSelect) ───────────────────────────────────────
+// ── subscribeSession guard (roleSelect + lobby) ───────────────────────────────
 
 describe('subscribeSession — guard de fase local', () => {
   it('não sobrescreve currentPhase quando membro está em roleSelect', () => {
@@ -228,18 +228,51 @@ describe('subscribeSession — guard de fase local', () => {
     expect(getState().currentPhase).toBe('roleSelect');
   });
 
-  it('aceita mudança de fase quando membro NÃO está em roleSelect', () => {
-    // Membro já escolheu papel e está no lobby
+  it('não sobrescreve currentPhase quando membro está em lobby e retro ainda não começou', () => {
+    // Membro escolheu papel e está no lobby aguardando o SM iniciar
     setLocalPhase('lobby');
 
+    // SM ainda está no setup (retroStarted ausente/false no snapshot)
+    _mocks.sessionCallback?.({
+      currentPhase: 'setup',
+      retroStarted: false,
+      updatedAt: new Date().toISOString(),
+      smDeviceId: DEVICE_SM,
+    });
+
+    // Membro deve permanecer no lobby de espera
+    expect(getState().currentPhase).toBe('lobby');
+  });
+
+  it('aceita mudança de fase quando SM inicia a retro (retroStarted=true)', () => {
+    // Membro está no lobby
+    setLocalPhase('lobby');
+
+    // SM inicia a retro — snapshot chega com retroStarted=true e currentPhase=checkin
     _mocks.sessionCallback?.({
       currentPhase: 'checkin',
+      retroStarted: true,
       updatedAt: new Date().toISOString(),
       smDeviceId: DEVICE_SM,
     });
 
     // Agora deve seguir o SM para checkin
     expect(getState().currentPhase).toBe('checkin');
+  });
+
+  it('aceita mudança de fase quando membro NÃO está em roleSelect nem lobby', () => {
+    // Membro já está na retro em andamento
+    setLocalPhase('checkin');
+
+    _mocks.sessionCallback?.({
+      currentPhase: 'treasures',
+      retroStarted: true,
+      updatedAt: new Date().toISOString(),
+      smDeviceId: DEVICE_SM,
+    });
+
+    // Segue o SM para tesouros
+    expect(getState().currentPhase).toBe('treasures');
   });
 });
 
