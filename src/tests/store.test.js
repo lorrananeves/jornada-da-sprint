@@ -274,6 +274,35 @@ describe('subscribeSession — guard de fase local', () => {
     // Segue o SM para tesouros
     expect(getState().currentPhase).toBe('treasures');
   });
+
+  it('aceita mudança de fase mesmo quando dois snapshots têm o mesmo updatedAt', () => {
+    // Simula o bug: completePhase + setPhase chamados no mesmo milissegundo
+    // geram o mesmo updatedAt no segundo snapshot
+    const sameTimestamp = '2025-01-01T12:00:00.000Z';
+
+    // Membro recebe primeiro snapshot (completedPhases atualizado, currentPhase=checkin)
+    setLocalPhase('checkin');
+    _mocks.sessionCallback?.({
+      currentPhase: 'checkin',
+      completedPhases: ['checkin'],
+      retroStarted: true,
+      updatedAt: sameTimestamp,
+      smDeviceId: DEVICE_SM,
+    });
+    expect(getState().currentPhase).toBe('checkin');
+
+    // Segundo snapshot chega com mesmo updatedAt mas com currentPhase mudado
+    _mocks.sessionCallback?.({
+      currentPhase: 'treasures',
+      completedPhases: ['checkin'],
+      retroStarted: true,
+      updatedAt: sameTimestamp,
+      smDeviceId: DEVICE_SM,
+    });
+
+    // Deve aceitar porque a fase mudou, mesmo com updatedAt igual
+    expect(getState().currentPhase).toBe('treasures');
+  });
 });
 
 

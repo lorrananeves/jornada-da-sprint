@@ -259,7 +259,17 @@ async function initFirebase() {
         }
       }
 
-      if (remoteScalars.updatedAt && _state.updatedAt && remoteScalars.updatedAt <= _state.updatedAt) return;
+      // Guarda de deduplicação: ignora snapshots que não trazem nada novo.
+      // Exceção: se a fase mudou, sempre aceitar — evita o bug onde dois
+      // setScalarState chamados no mesmo milissegundo (completePhase + setPhase)
+      // geram o mesmo updatedAt e o segundo snapshot seria descartado.
+      const phaseChanged = remoteScalars.currentPhase && remoteScalars.currentPhase !== _state.currentPhase;
+      if (
+        !phaseChanged &&
+        remoteScalars.updatedAt &&
+        _state.updatedAt &&
+        remoteScalars.updatedAt <= _state.updatedAt
+      ) return;
 
       // Fases locais do membro que não devem ser sobrescritas por snapshots remotos:
       //   - 'roleSelect': membro ainda está escolhendo o papel
