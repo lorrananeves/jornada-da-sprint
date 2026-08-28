@@ -488,8 +488,10 @@ onAuthChange((user) => {
       notify();
     }
   } else {
+    // Só redireciona para home se o dispositivo atual é o SM (ou quer ser SM).
+    // Membros do time nunca fazem login e não devem ser afetados pelo logout.
     const smPhases = new Set(['auth', 'smDashboard', 'setup', 'lobby']);
-    if (smPhases.has(phase)) {
+    if (smPhases.has(phase) && isSM()) {
       _state = { ..._state, currentPhase: 'home' };
       notify();
     }
