@@ -92,7 +92,7 @@ export function renderComplete(root) {
     else setLocalPhase('roleSelect');
   });
   root.querySelector('#btn-report').addEventListener('click', () => {
-    if (!isSM()) { setLocalPhase('roleSelect'); return; }
+    if (!isSM()) { setLocalPhase('report'); return; }
     completePhase('complete');
     setPhase('report');
   });
