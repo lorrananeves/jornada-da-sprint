@@ -268,14 +268,16 @@ export function renderMonsters(root) {
     });
 
     // Reactions — patch cirúrgico.
-    // reactToMonster retorna false se o dispositivo já reagiu (proteção duplicata).
+    // reactToMonster retorna Promise<false> se o dispositivo já reagiu.
     root.querySelectorAll('.reaction-btn[data-reaction]').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        const accepted = reactToMonster(btn.dataset.id, btn.dataset.reaction);
-        if (!accepted) return;
+        // Otimismo local: atualiza imediatamente para feedback rápido
         const span = btn.querySelector('.reaction-count');
         if (span) span.textContent = Number(span.textContent) + 1;
+        const accepted = await reactToMonster(btn.dataset.id, btn.dataset.reaction);
+        // Reverte se rejeitado (já reagiu ou erro)
+        if (!accepted && span) span.textContent = Number(span.textContent) - 1;
       });
     });
 

@@ -12,6 +12,7 @@ import {
   increment,
   batchWrite,
   castVote,
+  castReaction,
 } from '../../services/firebase.js';
 import { showErrorToast } from '../../components/xpToast.js';
 
@@ -35,11 +36,9 @@ export function addTreasure(sessionId, treasure) {
   });
 }
 
-export function reactToTreasure(sessionId, id, reaction) {
+export function reactToTreasure(sessionId, id, reaction, deviceId) {
   if (!sessionId) return;
-  patchItem(sessionId, 'treasures', id, {
-    [`reactions.${reaction}`]: increment(1),
-  }).catch((e) => console.warn('Firestore reactToTreasure failed:', e));
+  return castReaction(sessionId, 'treasures', id, deviceId, reaction);
 }
 
 // ── Monsters ──────────────────────────────────────────────────────────────────
@@ -52,11 +51,9 @@ export function addMonster(sessionId, monster) {
   });
 }
 
-export function reactToMonster(sessionId, id, reaction) {
+export function reactToMonster(sessionId, id, reaction, deviceId) {
   if (!sessionId) return;
-  patchItem(sessionId, 'monsters', id, {
-    [`reactions.${reaction}`]: increment(1),
-  }).catch((e) => console.warn('Firestore reactToMonster failed:', e));
+  return castReaction(sessionId, 'monsters', id, deviceId, reaction);
 }
 
 export function selectMonster(sessionId, monsters, id) {

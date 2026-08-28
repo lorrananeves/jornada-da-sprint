@@ -60,6 +60,17 @@ service cloud.firestore {
           validSessionId(sessionId)
           && isReactionUpdate(request.resource.data, resource.data);
         allow delete: if false;
+
+        // Token de reação: {deviceId}_{reaction} como ID — create falha se já existir
+        match /reactions/{tokenId} {
+          allow read: if validSessionId(sessionId);
+          allow create: if
+            validSessionId(sessionId)
+            && tokenId.matches('^[0-9a-f]{16}_[a-z]+$')
+            && request.resource.data.keys().hasOnly(['reactedAt'])
+            && request.resource.data.reactedAt is string;
+          allow update, delete: if false;
+        }
       }
 
       // ── Monstros ─────────────────────────────────────────────────────────
@@ -73,6 +84,17 @@ service cloud.firestore {
           validSessionId(sessionId)
           && isMonsterUpdate(request.resource.data, resource.data);
         allow delete: if false;
+
+        // Token de reação: {deviceId}_{reaction} como ID — create falha se já existir
+        match /reactions/{tokenId} {
+          allow read: if validSessionId(sessionId);
+          allow create: if
+            validSessionId(sessionId)
+            && tokenId.matches('^[0-9a-f]{16}_[a-z]+$')
+            && request.resource.data.keys().hasOnly(['reactedAt'])
+            && request.resource.data.reactedAt is string;
+          allow update, delete: if false;
+        }
       }
 
       // ── Soluções ─────────────────────────────────────────────────────────

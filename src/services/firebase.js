@@ -225,7 +225,7 @@ export async function batchWrite(sessionId, ops) {
   await batch.commit();
 }
 
-// ── Voto único por dispositivo ────────────────────────────────────────────────
+// ── Voto/reação únicos por dispositivo ───────────────────────────────────────
 
 /**
  * Registra um voto de forma atômica usando transação:
@@ -246,6 +246,30 @@ export async function castVote(sessionId, colName, itemId, deviceId) {
     }
     tx.set(voteRef, { votedAt: new Date().toISOString() });
     tx.update(parentRef, { votes: increment(1) });
+  });
+}
+
+/**
+ * Registra uma reação de forma atômica usando transação:
+ *   1. Cria sessions/{sessionId}/{colName}/{itemId}/reactions/{deviceId}_{reaction}
+ *      (falha se já existe — um dispositivo só reage uma vez por tipo de reação).
+ *   2. Incrementa reactions.{reaction} no documento pai.
+ *
+ * Lança erro se o token já existir — o chamador deve capturar e tratar
+ * como "já reagiu".
+ */
+export async function castReaction(sessionId, colName, itemId, deviceId, reaction) {
+  const tokenId    = `${deviceId}_${reaction}`;
+  const tokenRef   = doc(db, 'sessions', sessionId, colName, itemId, 'reactions', tokenId);
+  const parentRef  = itemRef(sessionId, colName, itemId);
+
+  await runTransaction(db, async (tx) => {
+    const tokenSnap = await tx.get(tokenRef);
+    if (tokenSnap.exists()) {
+      throw new Error('already-reacted');
+    }
+    tx.set(tokenRef, { reactedAt: new Date().toISOString() });
+    tx.update(parentRef, { [`reactions.${reaction}`]: increment(1) });
   });
 }
 

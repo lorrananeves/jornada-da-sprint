@@ -63,24 +63,36 @@ const patchMonsters = (items) => setCollection('monsters', items);
 export const addCheckin       = (c)          => _addCheckin(sid(), c);
 export const addTreasure      = (t)          => _addTreasure(sid(), t);
 
-export function reactToTreasure(id, reaction) {
+export async function reactToTreasure(id, reaction) {
   const sessionId = sid();
   const deviceId  = getDeviceId();
   if (hasReacted(sessionId, 'treasures', id, deviceId, reaction)) return false;
   markReacted(sessionId, 'treasures', id, deviceId, reaction);
-  _reactToTreasure(sessionId, id, reaction);
-  return true;
+  try {
+    await _reactToTreasure(sessionId, id, reaction, deviceId);
+    return true;
+  } catch (e) {
+    if (e?.message === 'already-reacted') return false;
+    console.warn('Firestore reactToTreasure failed:', e);
+    return false;
+  }
 }
 
 export const addMonster       = (m)          => _addMonster(sid(), m);
 
-export function reactToMonster(id, reaction) {
+export async function reactToMonster(id, reaction) {
   const sessionId = sid();
   const deviceId  = getDeviceId();
   if (hasReacted(sessionId, 'monsters', id, deviceId, reaction)) return false;
   markReacted(sessionId, 'monsters', id, deviceId, reaction);
-  _reactToMonster(sessionId, id, reaction);
-  return true;
+  try {
+    await _reactToMonster(sessionId, id, reaction, deviceId);
+    return true;
+  } catch (e) {
+    if (e?.message === 'already-reacted') return false;
+    console.warn('Firestore reactToMonster failed:', e);
+    return false;
+  }
 }
 
 export const selectMonster    = (id)         => _selectMonster(sid(), monsters(), id);

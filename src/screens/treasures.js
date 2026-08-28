@@ -155,16 +155,16 @@ export function renderTreasures(root) {
 
       // Reaction events — patch cirúrgico: só atualiza o contador no DOM,
       // sem recriar a tela e sem destruir os <textarea> com texto digitado.
-      // reactToTreasure retorna false se o dispositivo já reagiu (proteção duplicata).
+      // reactToTreasure retorna Promise<false> se o dispositivo já reagiu.
       col.querySelectorAll('.reaction-btn[data-reaction]').forEach((btn) => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
           const { id: itemId, reaction } = btn.dataset;
-          const accepted = reactToTreasure(itemId, reaction);
-          if (!accepted) return;
-          // Atualiza otimisticamente o contador no DOM enquanto o Firestore
-          // processa (o patchItem remoto chegará em breve via subscription)
+          // Otimismo local: atualiza imediatamente para feedback rápido
           const span = btn.querySelector('.reaction-count');
           if (span) span.textContent = Number(span.textContent) + 1;
+          const accepted = await reactToTreasure(itemId, reaction);
+          // Reverte se rejeitado (já reagiu ou erro)
+          if (!accepted && span) span.textContent = Number(span.textContent) - 1;
         });
       });
     });
