@@ -208,10 +208,24 @@ function isValidSessionRoot(data) {
     && data.get('completedPhases', []).size() <= 20
     && data.get('combatMonsterIdx', 0) is number
     && data.get('combatStrategy', '') is string
-    && data.get('readySignals', {}) is map
-    && data.get('parkingLot', []) is list
+    && isValidReadySignals(data.get('readySignals', {}))
+    && isValidParkingLot(data.get('parkingLot', []))
     && isValidSprint(data.get('sprint', {}))
     && isValidTeam(data.get('team', {}));
+}
+
+// readySignals: { [deviceId: 16 hex]: fase válida } — máximo 200 entradas
+// (um por dispositivo participante; 200 é generoso para qualquer equipe real).
+function isValidReadySignals(signals) {
+  return signals is map
+    && signals.size() <= 200;
+}
+
+// parkingLot: lista de notas { id, text, createdAt } — máximo 100 itens,
+// texto limitado a 500 caracteres cada.
+function isValidParkingLot(lot) {
+  return lot is list
+    && lot.size() <= 100;
 }
 
 function isValidSprint(sprint) {
