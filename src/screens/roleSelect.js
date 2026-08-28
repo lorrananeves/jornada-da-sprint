@@ -165,7 +165,12 @@ function _showJoinForm(root) {
 
 async function _enterAsTeamMember() {
   setRole('team_member');
-  await joinSession();
+  // joinSession tem timeout implícito do SDK, mas adicionamos um guard
+  // para garantir que o lobby aparece mesmo se a presença demorar muito.
+  await Promise.race([
+    joinSession(),
+    new Promise((resolve) => setTimeout(resolve, 8_000)),
+  ]);
   setLocalPhase('lobby');
 }
 

@@ -28,9 +28,11 @@ export default defineConfig({
     },
   ],
 
-  // Sobe o Vite preview em modo emulador antes de rodar os testes
+  // Sobe o Vite preview em modo emulador antes de rodar os testes.
+  // No CI o bundle já foi compilado pelo step anterior (Build app) com
+  // VITE_FIREBASE_USE_EMULATOR=true — apenas iniciamos o preview aqui.
   webServer: {
-    command: 'npm run build && npm run preview',
+    command: process.env.CI ? 'npm run preview' : 'npm run build && npm run preview',
     url: 'http://localhost:4173',
     reuseExistingServer: !process.env.CI,
     env: {
