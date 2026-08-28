@@ -9,7 +9,6 @@ import {
   saveItem,
   patchItem,
   removeItem,
-  increment,
   batchWrite,
   castVote,
   castReaction,
