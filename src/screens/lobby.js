@@ -13,7 +13,7 @@
 
 import { getState, setState, setPhase, setLocalPhase } from '../state/store.js';
 import { getRole } from '../state/store.js';
-import { getSessionUrl, subscribeParticipants, stopHeartbeat, leaveSession } from '../services/presence.js';
+import { joinSession, getSessionUrl, subscribeParticipants, stopHeartbeat, leaveSession } from '../services/presence.js';
 import { escapeHTML } from '../utils/dom.js';
 
 // Contagem atual de participantes vivos no lobby (atualizada pelo subscribe)
@@ -33,6 +33,9 @@ export function renderLobby(root) {
     : 'Sprint';
 
   if (isSM) {
+    // Registra o SM como presente para que subscribeParticipants o contabilize
+    joinSession();
+
     root.innerHTML = `
       <main class="screen-lobby screen-enter" role="main" aria-label="Sala de espera — Scrum Master">
         <div class="lobby-card">
