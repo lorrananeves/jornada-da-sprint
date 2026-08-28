@@ -163,13 +163,13 @@ export function createPhaseTimer(containerEl, phase) {
       const input    = _wrapEl.querySelector('.phase-timer-input');
       const startBtn = _wrapEl.querySelector('.phase-timer-start-btn');
 
+      // Atualiza apenas o estado do botão ao digitar — sem escrever no Firestore
       input.addEventListener('input', () => {
         const val = parseInt(input.value, 10);
-        const valid = !isNaN(val) && val >= 1;
-        startBtn.disabled = !valid;
-        if (valid) saveDuration(val);
+        startBtn.disabled = isNaN(val) || val < 1;
       });
 
+      // Persiste a duração e inicia o timer apenas ao clicar em "Iniciar"
       startBtn.addEventListener('click', () => {
         const val = parseInt(input.value, 10);
         if (isNaN(val) || val < 1) return;
