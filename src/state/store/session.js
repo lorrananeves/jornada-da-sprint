@@ -90,6 +90,8 @@ const _unsubs = [];
 // ── Getters internos (para modules irmãos) ────────────────────────────────────
 
 export function getSessionId() { return _sessionId; }
+/** Usado apenas em testes para restaurar o sessionId após resetState(). */
+export function _setSessionId(id) { _sessionId = id; }
 
 // ── localStorage ─────────────────────────────────────────────────────────────
 
@@ -379,8 +381,19 @@ export function addXP(amount) {
 // ── Reset & Nova sessão ───────────────────────────────────────────────────────
 
 export function resetState() {
+  // Cancela todas as subscriptions do Firestore antes de limpar o estado
+  _unsubs.forEach((u) => u());
+  _unsubs.length = 0;
+
+  _sessionId = null;
   _state = DEFAULT_STATE();
+
   localStorage.removeItem(STORAGE_KEY);
+  // Limpa flags de sessão do sessionStorage (check-in, missões anteriores, role)
+  sessionStorage.removeItem('_jornada_checkin_done');
+  sessionStorage.removeItem('_jornada_prev_mission_status');
+  sessionStorage.removeItem('_jornada_role');
+
   notify();
 }
 
@@ -396,6 +409,9 @@ export function startNewSession() {
 
   _state = DEFAULT_STATE();
   localStorage.removeItem(STORAGE_KEY);
+  // Limpa flags de sessão anteriores para garantir estado limpo
+  sessionStorage.removeItem('_jornada_checkin_done');
+  sessionStorage.removeItem('_jornada_prev_mission_status');
 
   const user = getCurrentUser();
   setScalarState({

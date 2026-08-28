@@ -5,7 +5,7 @@
  * Home Screen — redirects to role selection or SM dashboard
  */
 
-import { setLocalPhase, setState, hasSavedSession, resetState, getState } from '../state/store.js';
+import { setLocalPhase, hasSavedSession, resetState, getState, startNewSession } from '../state/store.js';
 import { getCurrentUser } from '../services/auth.js';
 import { showModal } from '../components/modal.js';
 
@@ -44,9 +44,11 @@ export function renderHome(root) {
         confirmClass: 'btn btn-danger',
       });
       if (!confirmed) return;
+      // resetState() garante que não haverá escrita na sessão antiga depois
       resetState();
     }
-    setState({ currentPhase: 'roleSelect', createdAt: new Date().toISOString() });
+    // startNewSession() gera um novo ID, inicializa o Firestore e vai para setup
+    startNewSession();
   });
 
   const continueBtn = root.querySelector('#btn-continue');

@@ -75,6 +75,7 @@ import {
   subscribe,
   resetState,
 } from '../state/store.js';
+import { _setSessionId } from '../state/store/session.js';
 
 import { patchItem } from '../services/firebase.js';
 
@@ -82,6 +83,9 @@ import { patchItem } from '../services/firebase.js';
 
 beforeEach(() => {
   resetState();
+  // Restaura o sessionId após resetState() zerá-lo, para que testes que
+  // dependem de writes no Firestore continuem funcionando
+  _setSessionId('test-session-id');
   _mocks.currentDeviceId = DEVICE_SM;
 });
 
