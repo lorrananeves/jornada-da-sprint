@@ -70,7 +70,8 @@ export function mergeMonsters(sessionId, monsters, keepId, dropId, newText, noti
   const drop = monsters.find((m) => m.id === dropId);
   if (!keep || !drop) return;
 
-  const merged = {
+  const mergedFrom = [...(keep.mergedFrom || [keep.id]), drop.id];
+  const keepUpdate = {
     ...(newText && newText !== keep.text ? { text: newText } : {}),
     reactions: {
       fire: (keep.reactions?.fire || 0) + (drop.reactions?.fire || 0),
@@ -78,19 +79,27 @@ export function mergeMonsters(sessionId, monsters, keepId, dropId, newText, noti
       bulb: (keep.reactions?.bulb || 0) + (drop.reactions?.bulb || 0),
     },
     selected: keep.selected || drop.selected,
-    mergedFrom: [...(keep.mergedFrom || [keep.id]), drop.id],
+    mergedFrom,
   };
 
-  // Batch write atômico: update do keep + delete do drop numa única operação
+  // Batch write atômico: update do keep + marcação de inativo no drop.
+  // Não usamos delete porque as Rules bloqueiam delete em /monsters.
+  // Marcar merged=true + mergedInto preserva histórico e é auditável.
+  const dropUpdate = {
+    merged: true,
+    mergedInto: keepId,
+  };
+
   batchWrite(sessionId, [
-    { type: 'update', colName: 'monsters', itemId: keepId, data: merged },
-    { type: 'delete', colName: 'monsters', itemId: dropId },
+    { type: 'update', colName: 'monsters', itemId: keepId, data: keepUpdate },
+    { type: 'update', colName: 'monsters', itemId: dropId, data: dropUpdate },
   ]).catch((e) => console.warn('Firestore mergeMonsters batch failed:', e));
 
+  // Optimistic local: remove o drop da lista (ele ficará inativo no Firestore)
   notifyFn(
     monsters
       .filter((m) => m.id !== dropId)
-      .map((m) => (m.id === keepId ? { ...m, ...merged } : m))
+      .map((m) => (m.id === keepId ? { ...m, ...keepUpdate } : m))
   );
 }
 

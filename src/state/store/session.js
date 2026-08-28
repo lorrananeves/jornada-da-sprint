@@ -203,9 +203,11 @@ function _syncSmProfile() {
 
 function sortCollection(col, items) {
   if (col !== 'monsters') return items;
-  const ranked = items.filter((m) => m.priorityRank != null);
-  if (ranked.length === 0) return items;
-  return [...items].sort(
+  // Exclui monstros marcados como merged (foram absorvidos por outro card).
+  const active = items.filter((m) => !m.merged);
+  const ranked = active.filter((m) => m.priorityRank != null);
+  if (ranked.length === 0) return active;
+  return [...active].sort(
     (a, b) => (a.priorityRank ?? Infinity) - (b.priorityRank ?? Infinity)
   );
 }
