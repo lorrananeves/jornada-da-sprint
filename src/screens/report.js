@@ -21,21 +21,20 @@ export function renderReport(root) {
   const treasureItems = treasures.filter((t) => t.category === 'treasure');
   const recognitionItems = treasures.filter((t) => t.category === 'recognition');
   const learningItems = treasures.filter((t) => t.category === 'learning');
-  const _selectedMonsters = monsters.filter((m) => m.selected);
 
   function renderItemList(items, emoji) {
-    if (!items.length) return '<p style="color:var(--text-muted);font-size:0.875rem">Nenhum item registrado.</p>';
+    if (!items.length) return '<p class="text-muted text-sm">Nenhum item registrado.</p>';
     return items.map((item) => `<div class="report-item">${emoji} ${escapeHTML(item.text || item.title)}</div>`).join('');
   }
 
   function renderSolutionsForMonster(monsterId) {
     const sols = solutions.filter((s) => s.monsterId === monsterId);
-    if (!sols.length) return '<p style="color:var(--text-muted);font-size:0.875rem;margin-left:16px">Sem soluções registradas.</p>';
+    if (!sols.length) return '<p class="text-muted text-sm" style="margin-left:16px">Sem soluções registradas.</p>';
     return sols.map((s) => `
-      <div class="report-item" style="margin-left:16px;display:flex;gap:10px;align-items:center">
+      <div class="report-item report-solution-row">
         <span>${getStrategyLabel(s.strategy)}</span>
-        <span style="flex:1">${escapeHTML(s.text)}</span>
-        <span style="color:var(--success);font-size:0.8125rem;white-space:nowrap">👍 ${s.votes}</span>
+        <span class="report-solution-text">${escapeHTML(s.text)}</span>
+        <span class="report-solution-votes">👍 ${s.votes}</span>
       </div>
     `).join('');
   }
@@ -59,19 +58,19 @@ export function renderReport(root) {
       <!-- Report Content (captured for export) -->
       <div id="report-content" role="article" aria-label="Conteúdo do relatório">
         <div class="report-header">
-          <div style="font-size:3rem;margin-bottom:8px" aria-hidden="true">⚔️</div>
+          <div class="report-header-icon" aria-hidden="true">⚔️</div>
           <h1 class="report-title">JORNADA DA SPRINT</h1>
-          <h2 style="color:var(--text);margin-bottom:8px">${escapeHTML(sprint.name || 'Retrospectiva')}</h2>
+          <h2 class="report-header-subtitle">${escapeHTML(sprint.name || 'Retrospectiva')}</h2>
           <p class="text-muted">
             ${team.name ? `Time: ${escapeHTML(team.name)}` : ''}
             ${team.participantCount ? ` · ${team.participantCount} participante${team.participantCount !== 1 ? 's' : ''}` : ''}
           </p>
           ${sprint.startDate || sprint.endDate ? `
-            <p class="text-muted" style="margin-top:4px;font-size:0.875rem">
+            <p class="text-muted text-sm mt-1">
               📅 ${formatDate(sprint.startDate)} → ${formatDate(sprint.endDate)}
             </p>
           ` : ''}
-          <p class="text-muted" style="margin-top:4px;font-size:0.8125rem">
+          <p class="text-muted text-xs mt-1">
             Gerado em ${formatISO(new Date().toISOString())}
           </p>
         </div>
@@ -79,17 +78,17 @@ export function renderReport(root) {
         <!-- XP Summary -->
         <div class="report-section">
           <div class="report-section-title">⭐ Resultado Geral</div>
-          <div style="display:flex;gap:12px;flex-wrap:wrap">
-            <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;text-align:center">
-              <div style="font-size:2rem;font-weight:800;color:var(--accent)">${formatXP(stats.totalXP)}</div>
+          <div class="report-kpis">
+            <div class="report-kpi">
+              <div class="report-kpi-value text-accent">${formatXP(stats.totalXP)}</div>
               <div class="text-xs text-muted">XP Total</div>
             </div>
-            <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;text-align:center">
-              <div style="font-size:2rem;font-weight:800;color:${mood.color}">${stats.checkinStats.average.toFixed(1)}</div>
+            <div class="report-kpi">
+              <div class="report-kpi-value" style="color:${mood.color}">${stats.checkinStats.average.toFixed(1)}</div>
               <div class="text-xs text-muted">${mood.label}</div>
             </div>
-            <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;text-align:center">
-              <div style="font-size:2rem;font-weight:800;color:var(--info)">${stats.checkinStats.total}</div>
+            <div class="report-kpi">
+              <div class="report-kpi-value text-info">${stats.checkinStats.total}</div>
               <div class="text-xs text-muted">Check-ins</div>
             </div>
           </div>
@@ -105,16 +104,16 @@ export function renderReport(root) {
               return `
                 <div class="stat-bar-row">
                   <span class="stat-bar-label">${getScoreEmoji(s)}</span>
-                  <div class="stat-bar-track" style="height:10px;flex:1">
-                    <div class="stat-bar-fill" style="width:${pct}%;height:10px"></div>
+                  <div class="stat-bar-track">
+                    <div class="stat-bar-fill" style="width:${pct}%"></div>
                   </div>
-                  <span class="stat-bar-count" style="width:30px">${count}</span>
+                  <span class="stat-bar-count">${count}</span>
                 </div>
               `;
             }).join('')}
             ${checkins.filter((c) => c.comment).length > 0 ? `
-              <div style="margin-top:12px">
-                <p style="font-size:0.875rem;font-weight:600;color:var(--text-muted);margin-bottom:8px">💬 Comentários anônimos:</p>
+              <div class="report-comments">
+                <p class="report-comments-label">💬 Comentários anônimos:</p>
                 ${checkins.filter((c) => c.comment).map((c) => `<div class="report-item">"${escapeHTML(c.comment)}"</div>`).join('')}
               </div>
             ` : ''}
@@ -125,31 +124,31 @@ export function renderReport(root) {
         <div class="report-section">
           <div class="report-section-title">💎 Tesouros da Sprint</div>
           ${treasureItems.length > 0 ? `
-            <p style="font-size:0.8125rem;font-weight:600;color:var(--text-muted);margin-bottom:6px">💎 O que funcionou bem:</p>
+            <p class="report-category-label">💎 O que funcionou bem:</p>
             ${renderItemList(treasureItems, '💎')}
           ` : ''}
           ${recognitionItems.length > 0 ? `
-            <p style="font-size:0.8125rem;font-weight:600;color:var(--text-muted);margin:12px 0 6px">❤️ Reconhecimentos:</p>
+            <p class="report-category-label">❤️ Reconhecimentos:</p>
             ${renderItemList(recognitionItems, '❤️')}
           ` : ''}
           ${learningItems.length > 0 ? `
-            <p style="font-size:0.8125rem;font-weight:600;color:var(--text-muted);margin:12px 0 6px">🧠 Descobertas:</p>
+            <p class="report-category-label">🧠 Descobertas:</p>
             ${renderItemList(learningItems, '🧠')}
           ` : ''}
-          ${treasures.length === 0 ? '<p style="color:var(--text-muted);font-size:0.875rem">Nenhum tesouro registrado.</p>' : ''}
+          ${treasures.length === 0 ? '<p class="text-muted text-sm">Nenhum tesouro registrado.</p>' : ''}
         </div>
 
         <!-- Monsters & Solutions -->
         <div class="report-section">
           <div class="report-section-title">👹 Monstros & Soluções</div>
           ${monsters.length === 0
-            ? '<p style="color:var(--text-muted);font-size:0.875rem">Nenhum monstro identificado.</p>'
+            ? '<p class="text-muted text-sm">Nenhum monstro identificado.</p>'
             : monsters.map((m) => `
-              <div style="margin-bottom:14px">
-                <div class="report-item" style="background:var(--danger-dim);border:1px solid rgba(248,81,73,0.2)">
+              <div class="report-monster-block">
+                <div class="report-item report-item--monster">
                   👹 <strong>${escapeHTML(m.text)}</strong>
-                  ${m.selected ? ' <span style="color:var(--accent)">🎯</span>' : ''}
-                  <span style="float:right" class="text-xs text-muted">
+                  ${m.selected ? ' <span class="text-accent">🎯</span>' : ''}
+                  <span class="report-monster-reactions text-xs text-muted">
                     🔥${m.reactions.fire||0} 👀${m.reactions.eyes||0} 💡${m.reactions.bulb||0}
                   </span>
                 </div>
@@ -163,18 +162,18 @@ export function renderReport(root) {
         <div class="report-section">
           <div class="report-section-title">🚀 Missões para a Próxima Sprint</div>
           ${missions.length === 0
-            ? '<p style="color:var(--text-muted);font-size:0.875rem">Nenhuma missão definida.</p>'
+            ? '<p class="text-muted text-sm">Nenhuma missão definida.</p>'
             : missions.map((m) => `
-              <div class="report-item" style="margin-bottom:8px">
-                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+              <div class="report-item mb-2">
+                <div class="report-mission-row">
                   <div>
                     <strong>🚀 ${escapeHTML(m.title)}</strong>
-                    ${m.description ? `<div style="font-size:0.875rem;color:var(--text-muted);margin-top:2px">${escapeHTML(m.description)}</div>` : ''}
+                    ${m.description ? `<div class="report-mission-desc">${escapeHTML(m.description)}</div>` : ''}
                   </div>
-                  <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0">
-                    <span style="font-size:0.75rem;font-weight:600">${getPriorityLabel(m.priority)}</span>
-                    ${m.owner ? `<span style="font-size:0.75rem;color:var(--purple)">👤 ${escapeHTML(m.owner)}</span>` : ''}
-                    ${m.deadline ? `<span style="font-size:0.75rem;color:var(--accent)">📅 ${formatDate(m.deadline)}</span>` : ''}
+                  <div class="report-mission-meta">
+                    <span class="meta-priority">${getPriorityLabel(m.priority)}</span>
+                    ${m.owner ? `<span class="meta-owner">👤 ${escapeHTML(m.owner)}</span>` : ''}
+                    ${m.deadline ? `<span class="meta-deadline">📅 ${formatDate(m.deadline)}</span>` : ''}
                   </div>
                 </div>
               </div>

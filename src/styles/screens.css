@@ -1054,6 +1054,135 @@
   color: var(--text);
 }
 
+/* Ícone grande no cabeçalho do relatório */
+.report-header-icon {
+  font-size: 3rem;
+  margin-bottom: 8px;
+}
+
+/* Subtítulo de sprint no cabeçalho */
+.report-header-subtitle {
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+/* KPIs — faixa de cards de resultado geral */
+.report-kpis {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.report-kpi {
+  flex: 1;
+  min-width: 120px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  text-align: center;
+}
+
+.report-kpi-value {
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+/* Seção de comentários do check-in */
+.report-comments {
+  margin-top: 12px;
+}
+
+.report-comments-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+/* Sub-rótulo de categoria (O que funcionou / Reconhecimentos / Descobertas) */
+.report-category-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.report-category-label + .report-category-label,
+.report-item + .report-category-label {
+  margin-top: 12px;
+}
+
+/* Bloco de monstro + soluções aninhadas */
+.report-monster-block {
+  margin-bottom: 14px;
+}
+
+.report-item--monster {
+  background: var(--danger-dim);
+  border: 1px solid rgba(248, 81, 73, 0.2);
+}
+
+.report-monster-reactions {
+  float: right;
+}
+
+/* Solução aninhada sob o monstro */
+.report-solution-row {
+  margin-left: 16px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.report-solution-text {
+  flex: 1;
+}
+
+.report-solution-votes {
+  color: var(--success);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+/* Card de missão */
+.report-mission-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.report-mission-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.report-mission-meta span {
+  font-size: 0.75rem;
+}
+
+.report-mission-meta .meta-priority {
+  font-weight: 600;
+}
+
+.report-mission-meta .meta-owner {
+  color: var(--purple);
+}
+
+.report-mission-meta .meta-deadline {
+  color: var(--accent);
+}
+
+.report-mission-desc {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
 /* ============================================================
    Phase Header (common)
    ============================================================ */
