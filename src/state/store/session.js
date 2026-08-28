@@ -338,7 +338,10 @@ export function removeParkingItem(id) {
  * Qualquer participante pode chamar (não requer isSM).
  * Persiste em readySignals[deviceId] = phaseId no doc raiz.
  */
+const VALID_READY_PHASES = new Set(['checkin', 'treasures', 'monsters', 'combat', 'missions']);
+
 export function signalReady(phase) {
+  if (!VALID_READY_PHASES.has(phase)) return;
   const deviceId = getDeviceId();
   const readySignals = { ..._state.readySignals, [deviceId]: phase };
   setScalarState({ readySignals });
