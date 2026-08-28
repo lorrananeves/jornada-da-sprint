@@ -36,10 +36,14 @@ service cloud.firestore {
         );
 
       // ── Checkins ─────────────────────────────────────────────────────────
+      // O ID do documento é o deviceId do participante (16 hex chars).
+      // Um dispositivo só pode criar um único check-in: se o doc já existir,
+      // um create falha automaticamente no Firestore (sem necessidade de update).
       match /checkins/{itemId} {
         allow read: if validSessionId(sessionId);
         allow create: if
           validSessionId(sessionId)
+          && itemId.matches('^[0-9a-f]{16}$')
           && isValidCheckin(request.resource.data);
         // Checkins são imutáveis após criação
         allow update, delete: if false;

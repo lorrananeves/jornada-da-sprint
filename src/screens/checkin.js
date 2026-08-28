@@ -6,7 +6,7 @@
  */
 
 import { getState, subscribe, addCheckin, addXP, setPhase, setLocalPhase, completePhase, isSM, signalReady } from '../state/store.js';
-import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
+import { escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
 import { xpForCheckin } from '../services/xp.js';
 import { calcCheckinStats, getMoodLabel } from '../services/stats.js';
 import { showXPToast } from '../components/xpToast.js';
@@ -223,9 +223,13 @@ export function renderCheckin(root) {
       regBtn.addEventListener('click', () => {
         if (!selectedScore) return;
         const commentText = root.querySelector('#checkin-comment').value.trim();
+        // Usa o deviceId como ID do documento — garante que cada dispositivo
+        // só consegue criar um único check-in (tentativa de create duplicado
+        // falha no Firestore porque o documento já existe).
+        const deviceId = getDeviceId();
         const checkin = commentText
-          ? { id: uid(), score: selectedScore, comment: commentText }
-          : { id: uid(), score: selectedScore };
+          ? { id: deviceId, score: selectedScore, comment: commentText }
+          : { id: deviceId, score: selectedScore };
         addCheckin(checkin);
         addXP(xpForCheckin());
         showXPToast(xpForCheckin(), 'Check-in registrado');
