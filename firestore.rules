@@ -254,16 +254,16 @@ function isChangingIdentityFields(newData, oldData) {
 //   1. Se smUid está definido, usa Firebase Auth (mais forte).
 //   2. Caso contrário, aceita smDeviceId como fallback (sessão anônima).
 function isScrumMaster(newData, oldData) {
-  let byAuth = oldData.get('smUid', null) != null
+  return (
+    oldData.get('smUid', null) != null
     && request.auth != null
-    && request.auth.uid == oldData.smUid;
-
-  let byDevice = oldData.get('smUid', null) == null
+    && request.auth.uid == oldData.smUid
+  ) || (
+    oldData.get('smUid', null) == null
     && newData.smDeviceId == oldData.smDeviceId
     && newData.smDeviceId != null
-    && newData.smDeviceId.size() > 0;
-
-  return byAuth || byDevice;
+    && newData.smDeviceId.size() > 0
+  );
 }
 
 // ── Validadores de subcoleção ─────────────────────────────────────────────────
@@ -350,46 +350,37 @@ function isReactionUpdate(newData, oldData) {
 function isMonsterUpdate(newData, oldData) {
   // Caso 3: marcação de monstro descartado no merge (drop)
   // Só merged e mergedInto podem mudar — todos os outros campos ficam iguais.
-  let isDropMark =
-      newData.get('merged', false) == true
+  // Casos 1 e 2: atualização normal ou merge do keep.
+  // Usamos isDropMark || (schemaOk && ...) para evitar if/let como statements.
+  return (
+    // Caso 3 — drop mark
+    newData.get('merged', false) == true
     && newData.get('mergedInto', '') is string
     && newData.get('mergedInto', '').size() > 0
-    && newData.get('text', '')       == oldData.get('text', '')
+    && newData.get('text', '')        == oldData.get('text', '')
     && newData.get('selected', false) == oldData.get('selected', false)
-    && newData.get('reactions', {})  == oldData.get('reactions', {});
-
-  if (isDropMark) {
-    return true;
-  }
-
-  // Casos 1 e 2: atualização normal ou merge do keep
-  let schemaOk = newData.keys().hasOnly(['text', 'reactions', 'selected', 'priorityRank', 'mergedFrom', 'merged', 'mergedInto'])
+    && newData.get('reactions', {})   == oldData.get('reactions', {})
+  ) || (
+    // Casos 1 e 2 — reação simples ou merge do keep
+    newData.keys().hasOnly(['text', 'reactions', 'selected', 'priorityRank', 'mergedFrom', 'merged', 'mergedInto'])
     && newData.get('text', '') is string
     && newData.get('text', '').size() >= 1
     && newData.get('text', '').size() <= 1000
     && (!('priorityRank' in newData.diff(oldData).affectedKeys())
-        || newData.get('priorityRank', null) is number);
-
-  // Reações nunca podem cair
-  let reactionsNonDecreasing =
-      newData.get('reactions', {}).get('fire', 0) >= oldData.get('reactions', {}).get('fire', 0)
+        || newData.get('priorityRank', null) is number)
+    // Reações nunca podem cair
+    && newData.get('reactions', {}).get('fire', 0) >= oldData.get('reactions', {}).get('fire', 0)
     && newData.get('reactions', {}).get('eyes', 0) >= oldData.get('reactions', {}).get('eyes', 0)
-    && newData.get('reactions', {}).get('bulb', 0) >= oldData.get('reactions', {}).get('bulb', 0);
-
-  // Reação simples: cada contador sobe no máximo +1
-  let isSimpleReaction =
-      newData.get('reactions', {}).get('fire', 0) <= oldData.get('reactions', {}).get('fire', 0) + 1
-    && newData.get('reactions', {}).get('eyes', 0) <= oldData.get('reactions', {}).get('eyes', 0) + 1
-    && newData.get('reactions', {}).get('bulb', 0) <= oldData.get('reactions', {}).get('bulb', 0) + 1;
-
-  // Merge do keep: mergedFrom cresceu — reações podem subir mais que +1,
-  // mas o teto é a soma atual + valor máximo razoável por monstro (1000 reações).
-  // A validação fina da soma exata exigiria leitura do drop no Rules, o que não
-  // é possível sem transação; a integridade real é garantida pelo batchWrite
-  // atômico no cliente e pela regra de que reactions nunca decrescem.
-  let isMergeUpdate = newData.get('mergedFrom', []).size() > oldData.get('mergedFrom', []).size();
-
-  return schemaOk && reactionsNonDecreasing && (isSimpleReaction || isMergeUpdate);
+    && newData.get('reactions', {}).get('bulb', 0) >= oldData.get('reactions', {}).get('bulb', 0)
+    // Reação simples (+1 máx) ou merge do keep (mergedFrom cresceu)
+    && (
+      (
+        newData.get('reactions', {}).get('fire', 0) <= oldData.get('reactions', {}).get('fire', 0) + 1
+        && newData.get('reactions', {}).get('eyes', 0) <= oldData.get('reactions', {}).get('eyes', 0) + 1
+        && newData.get('reactions', {}).get('bulb', 0) <= oldData.get('reactions', {}).get('bulb', 0) + 1
+      ) || newData.get('mergedFrom', []).size() > oldData.get('mergedFrom', []).size()
+    )
+  );
 }
 
 // Solução: só votes pode aumentar (nunca diminuir)
