@@ -90,9 +90,15 @@ export function generateId() {
 /**
  * Retorna o sessionId da URL ou cria um novo e atualiza a URL.
  */
+const SESSION_ID_RE = /^[0-9a-f]{32}$/;
+
 export function getOrCreateSessionId() {
   const params = new URLSearchParams(window.location.search);
-  let id = params.get('s');
+  const raw = params.get('s');
+
+  // Valida o formato antes de usar — evita erros desnecessários no Firestore
+  // caso o usuário acesse com ?s=abc ou um link malformado.
+  let id = raw && SESSION_ID_RE.test(raw) ? raw : null;
 
   if (!id) {
     id = generateId();
