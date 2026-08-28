@@ -16,8 +16,14 @@ import { createPhaseTimer } from '../components/phaseTimer.js';
 import { createTypingIndicator } from '../components/typingIndicator.js';
 
 const SCORES = [1, 2, 3, 4, 5];
-// Chave em sessionStorage que marca "este dispositivo já fez check-in nesta sessão"
-const CHECKIN_DONE_KEY = '_jornada_checkin_done';
+
+/** Chave de sessionStorage com o sessionId embutido — evita que a flag de
+ *  "já respondeu" vaze entre sessões diferentes no mesmo browser. */
+function checkinDoneKey() {
+  const params = new URLSearchParams(window.location.search);
+  const sid = params.get('s') || 'default';
+  return `_jornada_checkin_done_${sid}`;
+}
 
 export function renderCheckin(root) {
   let selectedScore = null;
@@ -27,7 +33,7 @@ export function renderCheckin(root) {
 
   /** Verdadeiro se o dispositivo atual já enviou um check-in nesta sessão. */
   function alreadyAnswered() {
-    return sessionStorage.getItem(CHECKIN_DONE_KEY) === 'true';
+    return sessionStorage.getItem(checkinDoneKey()) === 'true';
   }
 
   function buildCheckinForm() {
@@ -224,7 +230,7 @@ export function renderCheckin(root) {
         addXP(xpForCheckin());
         showXPToast(xpForCheckin(), 'Check-in registrado');
         // Marca dispositivo como "já respondeu" — impede reenvio nesta sessão de browser
-        sessionStorage.setItem(CHECKIN_DONE_KEY, 'true');
+        sessionStorage.setItem(checkinDoneKey(), 'true');
         selectedScore = null;
         if (_typing) _typing.destroy();
         render();
