@@ -267,11 +267,13 @@ export function renderMonsters(root) {
       render();
     });
 
-    // Reactions — patch cirúrgico
+    // Reactions — patch cirúrgico.
+    // reactToMonster retorna false se o dispositivo já reagiu (proteção duplicata).
     root.querySelectorAll('.reaction-btn[data-reaction]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        reactToMonster(btn.dataset.id, btn.dataset.reaction);
+        const accepted = reactToMonster(btn.dataset.id, btn.dataset.reaction);
+        if (!accepted) return;
         const span = btn.querySelector('.reaction-count');
         if (span) span.textContent = Number(span.textContent) + 1;
       });
