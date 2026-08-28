@@ -253,22 +253,31 @@ async function initFirebase() {
   saveToStorage(_state);
   notify();
 
-  let subcollsOpen = sessionExists;
+  // Abre as subscriptions de todas as subcoleções uma única vez.
+  // Chamada imediatamente se a sessão já existe, ou no primeiro snapshot
+  // do doc raiz quando a sessão é criada agora.
+  let subcollsOpen = false;
+  function openSubcollections() {
+    if (subcollsOpen) return;
+    subcollsOpen = true;
+    for (const col of COLLECTIONS) {
+      _unsubs.push(
+        subscribeCollection(_sessionId, col, (items) => {
+          _state = { ..._state, [col]: sortCollection(col, items) };
+          saveToStorage(_state);
+          notify();
+        })
+      );
+    }
+  }
+
+  if (sessionExists) openSubcollections();
 
   _unsubs.push(
     subscribeSession(_sessionId, (remoteScalars) => {
-      if (!subcollsOpen) {
-        subcollsOpen = true;
-        for (const col of COLLECTIONS) {
-          _unsubs.push(
-            subscribeCollection(_sessionId, col, (items) => {
-              _state = { ..._state, [col]: sortCollection(col, items) };
-              saveToStorage(_state);
-              notify();
-            })
-          );
-        }
-      }
+      // Abre subs das subcoleções no primeiro snapshot do doc raiz,
+      // caso a sessão tenha sido criada agora (sessionExists era false).
+      openSubcollections();
 
       // Guarda de deduplicação: ignora snapshots que não trazem nada novo.
       // Exceções — sempre aceitar quando:
@@ -302,19 +311,6 @@ async function initFirebase() {
       notify();
     })
   );
-
-  if (sessionExists) {
-    subcollsOpen = true;
-    for (const col of COLLECTIONS) {
-      _unsubs.push(
-        subscribeCollection(_sessionId, col, (items) => {
-          _state = { ..._state, [col]: sortCollection(col, items) };
-          saveToStorage(_state);
-          notify();
-        })
-      );
-    }
-  }
 }
 
 // ── Parking Lot ───────────────────────────────────────────────────────────────
@@ -407,7 +403,7 @@ export function resetState() {
   notify();
 }
 
-export function startNewSession() {
+export async function startNewSession() {
   _unsubs.forEach((u) => u());
   _unsubs.length = 0;
 
@@ -432,7 +428,7 @@ export function startNewSession() {
   });
   sessionStorage.setItem('_jornada_role', 'scrum_master');
 
-  initFirebase();
+  await initFirebase();
 }
 
 // ── isSM (wrapper local) ──────────────────────────────────────────────────────
