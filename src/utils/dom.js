@@ -105,9 +105,15 @@ export function clearEl(el) {
   while (el.firstChild) el.removeChild(el.firstChild);
 }
 
-/** Generate a simple unique ID */
+/**
+ * Gera um ID aleatório criptograficamente seguro (128 bits / 32 chars hex).
+ * Usa a mesma estratégia de generateId() em firebase.js — evita colisões
+ * que Math.random() + Date.now() poderia causar em escrita concorrente.
+ */
 export function uid() {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /** Add a CSS class temporarily then remove after animation */
