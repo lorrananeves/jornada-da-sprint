@@ -11,6 +11,7 @@ import {
   removeItem,
   increment,
   batchWrite,
+  castVote,
 } from '../../services/firebase.js';
 import { showErrorToast } from '../../components/xpToast.js';
 
@@ -127,11 +128,9 @@ export function addSolution(sessionId, solution) {
   });
 }
 
-export function voteSolution(sessionId, id) {
+export function voteSolution(sessionId, id, deviceId) {
   if (!sessionId) return;
-  patchItem(sessionId, 'solutions', id, {
-    votes: increment(1),
-  }).catch((e) => console.warn('Firestore voteSolution failed:', e));
+  return castVote(sessionId, 'solutions', id, deviceId);
 }
 
 // ── Missions ──────────────────────────────────────────────────────────────────

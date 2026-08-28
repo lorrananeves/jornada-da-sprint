@@ -88,13 +88,20 @@ export const mergeMonsters    = (k, d, t)    => _mergeMonsters(sid(), monsters()
 export const prioritizeMonsters = ()         => _prioritizeMonsters(sid(), monsters(), patchMonsters);
 export const addSolution      = (s)          => _addSolution(sid(), s);
 
-export function voteSolution(id) {
+export async function voteSolution(id) {
   const sessionId = sid();
   const deviceId  = getDeviceId();
+  // Guarda client-side para resposta imediata na UI (evita flash de botão)
   if (hasReacted(sessionId, 'solutions', id, deviceId, 'vote')) return false;
   markReacted(sessionId, 'solutions', id, deviceId, 'vote');
-  _voteSolution(sessionId, id);
-  return true;
+  try {
+    await _voteSolution(sessionId, id, deviceId);
+    return true;
+  } catch (e) {
+    if (e?.message === 'already-voted') return false;
+    console.warn('Firestore voteSolution failed:', e);
+    return false;
+  }
 }
 
 export const addMission       = (m)          => _addMission(sid(), m);

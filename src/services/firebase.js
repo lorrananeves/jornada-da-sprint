@@ -27,6 +27,7 @@ import {
   onSnapshot,
   increment,
   writeBatch,
+  runTransaction,
   query,
   orderBy,
   limit,
@@ -222,6 +223,30 @@ export async function batchWrite(sessionId, ops) {
     }
   }
   await batch.commit();
+}
+
+// ── Voto único por dispositivo ────────────────────────────────────────────────
+
+/**
+ * Registra um voto de forma atômica usando transação:
+ *   1. Cria sessions/{sessionId}/{colName}/{itemId}/votes/{deviceId} (falha se já existe).
+ *   2. Incrementa o campo `votes` no documento pai.
+ *
+ * Lança erro se o documento de voto já existir — o chamador deve capturar
+ * e tratar como "já votou".
+ */
+export async function castVote(sessionId, colName, itemId, deviceId) {
+  const voteRef   = doc(db, 'sessions', sessionId, colName, itemId, 'votes', deviceId);
+  const parentRef = itemRef(sessionId, colName, itemId);
+
+  await runTransaction(db, async (tx) => {
+    const voteSnap = await tx.get(voteRef);
+    if (voteSnap.exists()) {
+      throw new Error('already-voted');
+    }
+    tx.set(voteRef, { votedAt: new Date().toISOString() });
+    tx.update(parentRef, { votes: increment(1) });
+  });
 }
 
 // ── Indicador de conectividade ────────────────────────────────────────────────

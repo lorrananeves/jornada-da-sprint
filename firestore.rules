@@ -81,11 +81,22 @@ service cloud.firestore {
         allow create: if
           validSessionId(sessionId)
           && isValidSolution(request.resource.data);
-        // Só permite incrementar votos
+        // Só permite incrementar votos (via transação atomica do castVote)
         allow update: if
           validSessionId(sessionId)
           && isVoteUpdate(request.resource.data, resource.data);
         allow delete: if false;
+
+        // Token de voto: deviceId como ID — create falha se já existir
+        match /votes/{deviceId} {
+          allow read: if validSessionId(sessionId);
+          allow create: if
+            validSessionId(sessionId)
+            && deviceId.matches('^[0-9a-f]{16}$')
+            && request.resource.data.keys().hasOnly(['votedAt'])
+            && request.resource.data.votedAt is string;
+          allow update, delete: if false;
+        }
       }
 
       // ── Missões ──────────────────────────────────────────────────────────

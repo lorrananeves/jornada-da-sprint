@@ -198,14 +198,18 @@ export function renderCombat(root) {
     });
 
     // Vote — patch cirúrgico: incrementa o contador sem re-render completo.
-    // voteSolution retorna false se o dispositivo já votou (proteção duplicata).
+    // voteSolution retorna Promise<false> se o dispositivo já votou.
     root.querySelectorAll('[data-vote]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const accepted = voteSolution(btn.dataset.vote);
-        if (!accepted) return;
-        // Otimismo local: incrementa o número exibido no botão
+      btn.addEventListener('click', async () => {
+        // Otimismo local: incrementa imediatamente para feedback rápido
         const match = btn.textContent.match(/\d+/);
         if (match) btn.textContent = `👍 ${Number(match[0]) + 1}`;
+        const accepted = await voteSolution(btn.dataset.vote);
+        // Se rejeitado (já votou ou erro), reverte o otimismo
+        if (!accepted) {
+          const matchAfter = btn.textContent.match(/\d+/);
+          if (matchAfter) btn.textContent = `👍 ${Number(matchAfter[0]) - 1}`;
+        }
       });
     });
 
