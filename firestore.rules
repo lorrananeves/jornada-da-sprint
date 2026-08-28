@@ -199,11 +199,21 @@ function isChangingIdentityFields(newData, oldData) {
     || newData.get('smUid', null) != oldData.get('smUid', null);
 }
 
+// Verifica se o request vem do Scrum Master legítimo da sessão.
+// Prioridade:
+//   1. Se smUid está definido, usa Firebase Auth (mais forte).
+//   2. Caso contrário, aceita smDeviceId como fallback (sessão anônima).
 function isScrumMaster(newData, oldData) {
-  return
-    newData.smDeviceId == oldData.smDeviceId
+  let byAuth = oldData.get('smUid', null) != null
+    && request.auth != null
+    && request.auth.uid == oldData.smUid;
+
+  let byDevice = oldData.get('smUid', null) == null
+    && newData.smDeviceId == oldData.smDeviceId
     && newData.smDeviceId != null
     && newData.smDeviceId.size() > 0;
+
+  return byAuth || byDevice;
 }
 
 // ── Validadores de subcoleção ─────────────────────────────────────────────────
