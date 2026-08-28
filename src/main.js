@@ -2,7 +2,7 @@
  * Main Entry Point — Router
  */
 
-import { getState, subscribe, setPhase, isSM } from './state/store.js';
+import { getState, subscribe, setLocalPhase, isSM } from './state/store.js';
 import { initNavbar } from './components/navbar.js';
 import { initParkingLot } from './components/parkingLot.js';
 import { renderHome } from './screens/home.js';
@@ -86,12 +86,13 @@ try {
     navigate(state.currentPhase);
   });
 
-  // Botão "voltar/avançar" do browser
+  // Botão "voltar/avançar" do browser — navega apenas localmente,
+  // sem alterar a fase global da retro (que mudaria para todos os participantes)
   window.addEventListener('popstate', (e) => {
     const phase = e.state?.phase;
     if (!phase || !SCREENS[phase]) return;
     _fromPopstate = true;
-    setPhase(phase);
+    setLocalPhase(phase);
     _fromPopstate = false;
   });
 } catch (err) {
