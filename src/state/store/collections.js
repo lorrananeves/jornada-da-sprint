@@ -10,6 +10,7 @@ import {
   patchItem,
   removeItem,
   increment,
+  batchWrite,
 } from '../../services/firebase.js';
 import { showErrorToast } from '../../components/xpToast.js';
 
@@ -83,12 +84,11 @@ export function mergeMonsters(sessionId, monsters, keepId, dropId, newText, noti
     mergedFrom: [...(keep.mergedFrom || [keep.id]), drop.id],
   };
 
-  patchItem(sessionId, 'monsters', keepId, merged).catch((e) =>
-    console.warn('Firestore mergeMonsters patch failed:', e)
-  );
-  removeItem(sessionId, 'monsters', dropId).catch((e) =>
-    console.warn('Firestore mergeMonsters remove failed:', e)
-  );
+  // Batch write atômico: update do keep + delete do drop numa única operação
+  batchWrite(sessionId, [
+    { type: 'update', colName: 'monsters', itemId: keepId, data: merged },
+    { type: 'delete', colName: 'monsters', itemId: dropId },
+  ]).catch((e) => console.warn('Firestore mergeMonsters batch failed:', e));
 
   notifyFn(
     monsters
@@ -102,11 +102,18 @@ export function prioritizeMonsters(sessionId, monsters, notifyFn) {
   const sorted = [...monsters].sort(
     (a, b) => (b.reactions?.fire || 0) - (a.reactions?.fire || 0)
   );
-  sorted.forEach((m, i) => {
-    patchItem(sessionId, 'monsters', m.id, { priorityRank: i }).catch((e) =>
-      console.warn('Firestore prioritizeMonsters failed:', e)
+  // Batch write atômico: todos os priorityRanks numa única operação
+  const ops = sorted.map((m, i) => ({
+    type: 'update',
+    colName: 'monsters',
+    itemId: m.id,
+    data: { priorityRank: i },
+  }));
+  if (ops.length > 0) {
+    batchWrite(sessionId, ops).catch((e) =>
+      console.warn('Firestore prioritizeMonsters batch failed:', e)
     );
-  });
+  }
   notifyFn(sorted.map((m, i) => ({ ...m, priorityRank: i })));
 }
 

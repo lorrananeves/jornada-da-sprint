@@ -26,6 +26,7 @@ import {
   deleteDoc,
   onSnapshot,
   increment,
+  writeBatch,
   query,
   orderBy,
   limit,
@@ -203,8 +204,25 @@ export function subscribeCollection(sessionId, colName, callback) {
   );
 }
 
-// Reexporta increment para uso nos patchItem calls do store
-export { increment };
+// Reexporta increment e writeBatch para uso no store
+export { increment, writeBatch };
+
+/**
+ * Executa um conjunto de updates atômicos numa batch write do Firestore.
+ * `ops` é um array de { type: 'update'|'delete', sessionId, colName, itemId, data? }
+ */
+export async function batchWrite(sessionId, ops) {
+  const batch = writeBatch(db);
+  for (const op of ops) {
+    const ref = itemRef(sessionId, op.colName, op.itemId);
+    if (op.type === 'update') {
+      batch.update(ref, op.data);
+    } else if (op.type === 'delete') {
+      batch.delete(ref);
+    }
+  }
+  await batch.commit();
+}
 
 // ── Indicador de conectividade ────────────────────────────────────────────────
 

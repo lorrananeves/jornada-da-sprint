@@ -42,6 +42,7 @@ vi.mock('../services/firebase.js', () => ({
   saveItem:             vi.fn().mockResolvedValue(undefined),
   patchItem:            vi.fn().mockResolvedValue(undefined),
   removeItem:           vi.fn().mockResolvedValue(undefined),
+  batchWrite:           vi.fn().mockResolvedValue(undefined),
   subscribeSession:     vi.fn().mockImplementation((_, cb) => {
     _mocks.sessionCallback = cb;
     return () => {};
@@ -77,7 +78,7 @@ import {
 } from '../state/store.js';
 import { _setSessionId } from '../state/store/session.js';
 
-import { patchItem } from '../services/firebase.js';
+import { batchWrite } from '../services/firebase.js';
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -363,29 +364,31 @@ describe('prioritizeMonsters', () => {
   beforeEach(() => {
     setState({ smDeviceId: DEVICE_SM });
     _mocks.currentDeviceId = DEVICE_SM;
-    patchItem.mockClear();
+    batchWrite.mockClear();
   });
 
   it('não lança erro quando monsters está vazio', () => {
     expect(() => prioritizeMonsters()).not.toThrow();
-    expect(patchItem).not.toHaveBeenCalled();
+    expect(batchWrite).not.toHaveBeenCalled();
   });
 
-  it('persiste priorityRank no Firestore em ordem fire decrescente', () => {
+  it('persiste priorityRank no Firestore via batch write em ordem fire decrescente', () => {
     seedMonsters([
       { id: 'a', text: 'A', reactions: { fire: 1, eyes: 0, bulb: 0 }, selected: false },
       { id: 'b', text: 'B', reactions: { fire: 5, eyes: 0, bulb: 0 }, selected: false },
       { id: 'c', text: 'C', reactions: { fire: 3, eyes: 0, bulb: 0 }, selected: false },
     ]);
-    patchItem.mockClear(); // descarta os calls do seedMonsters se houver
+    batchWrite.mockClear();
 
     prioritizeMonsters();
 
-    // Deve ter chamado patchItem para cada monstro com o campo priorityRank
-    expect(patchItem).toHaveBeenCalledTimes(3);
-    expect(patchItem).toHaveBeenCalledWith('test-session-id', 'monsters', 'b', { priorityRank: 0 });
-    expect(patchItem).toHaveBeenCalledWith('test-session-id', 'monsters', 'c', { priorityRank: 1 });
-    expect(patchItem).toHaveBeenCalledWith('test-session-id', 'monsters', 'a', { priorityRank: 2 });
+    // Deve ter chamado batchWrite uma única vez com todos os ops
+    expect(batchWrite).toHaveBeenCalledTimes(1);
+    expect(batchWrite).toHaveBeenCalledWith('test-session-id', [
+      { type: 'update', colName: 'monsters', itemId: 'b', data: { priorityRank: 0 } },
+      { type: 'update', colName: 'monsters', itemId: 'c', data: { priorityRank: 1 } },
+      { type: 'update', colName: 'monsters', itemId: 'a', data: { priorityRank: 2 } },
+    ]);
   });
 
   it('reordena o estado local na mesma ordem', () => {
