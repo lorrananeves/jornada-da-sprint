@@ -27,6 +27,9 @@ service cloud.firestore {
       allow update: if
         sessionId.matches('^[0-9a-f]{32}$')
         && isValidSessionRoot(request.resource.data)
+        // smDeviceId e smUid são imutáveis após a criação da sessão:
+        // nenhum participante — nem mesmo o SM — pode alterá-los via update.
+        && !isChangingIdentityFields(request.resource.data, resource.data)
         && (
           !isChangingPhaseFields(request.resource.data, resource.data)
           || isScrumMaster(request.resource.data, resource.data)
@@ -188,6 +191,12 @@ function isChangingPhaseFields(newData, oldData) {
   return
     newData.get('currentPhase', null) != oldData.get('currentPhase', null)
     || newData.get('completedPhases', []) != oldData.get('completedPhases', []);
+}
+
+function isChangingIdentityFields(newData, oldData) {
+  return
+    newData.get('smDeviceId', null) != oldData.get('smDeviceId', null)
+    || newData.get('smUid', null) != oldData.get('smUid', null);
 }
 
 function isScrumMaster(newData, oldData) {
