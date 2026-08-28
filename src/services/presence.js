@@ -151,8 +151,9 @@ export function subscribeParticipants(callback) {
       // Aceita tanto número epoch quanto Timestamp do Firestore
       if (typeof expires === 'number') return expires > now;
       if (expires instanceof Timestamp) return expires.toMillis() > now;
-      // Documento antigo sem expiresAt (schema anterior) — considera vivo
-      return true;
+      // Documento sem expiresAt (schema antigo ou malformado) — não considera vivo;
+      // evita que documentos "fantasma" sejam contados para sempre
+      return false;
     });
     callback(alive.length);
   });
