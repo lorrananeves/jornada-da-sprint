@@ -78,10 +78,24 @@ export const test = base.extend({
     await memberPage.goto(`/?s=${sessionId}`);
     await waitForApp(memberPage);
 
+    // Captura logs do console do membro para diagnóstico
+    const memberConsoleLogs = [];
+    memberPage.on('console', (msg) => {
+      memberConsoleLogs.push(`[${msg.type()}] ${msg.text()}`);
+    });
+
     // Com ?s= na URL e sessão existente, o store seta _guestAutoJoin=true e vai
     // direto para o lobby de espera sem exibir roleSelect.
     // Aguarda o texto de espera aparecer — pode demorar mais no CI.
-    await memberPage.waitForSelector('.lobby-title-wait', { timeout: 40_000 });
+    try {
+      await memberPage.waitForSelector('.lobby-title-wait', { timeout: 40_000 });
+    } catch (e) {
+      // Dump diagnóstico: HTML visível + logs do console
+      const html = await memberPage.locator('#screen-root').innerHTML().catch(() => '(sem #screen-root)');
+      console.log('[DIAG] memberPage HTML no timeout:\n', html.slice(0, 2000));
+      console.log('[DIAG] memberPage console logs:\n', memberConsoleLogs.join('\n'));
+      throw e;
+    }
 
     await use({ smPage, memberPage, sessionId });
 
