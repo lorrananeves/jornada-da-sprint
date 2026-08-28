@@ -269,12 +269,17 @@ async function initFirebase() {
       }
 
       // Guarda de deduplicação: ignora snapshots que não trazem nada novo.
-      // Exceção: se a fase mudou, sempre aceitar — evita o bug onde dois
-      // setScalarState chamados no mesmo milissegundo (completePhase + setPhase)
-      // geram o mesmo updatedAt e o segundo snapshot seria descartado.
+      // Exceções — sempre aceitar quando:
+      //   1. A fase mudou (evita bug de dois writes no mesmo milissegundo)
+      //   2. O XP mudou — incrementXP() usa FieldValue.increment e não
+      //      atualiza updatedAt, então o snapshot pode chegar com updatedAt
+      //      igual mas xp diferente; descartar esse snapshot causaria
+      //      dessincronização de XP entre participantes.
       const phaseChanged = remoteScalars.currentPhase && remoteScalars.currentPhase !== _state.currentPhase;
+      const xpChanged    = remoteScalars.xp !== undefined && remoteScalars.xp !== _state.xp;
       if (
         !phaseChanged &&
+        !xpChanged &&
         remoteScalars.updatedAt &&
         _state.updatedAt &&
         remoteScalars.updatedAt <= _state.updatedAt
