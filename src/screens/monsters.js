@@ -378,8 +378,16 @@ export function renderMonsters(root) {
     });
   }
 
-  // Subscription em tempo real: re-renderiza quando monstros mudam remotamente
-  let _lastCount = getState().monsters.length;
+  // Retorna uma string que muda sempre que qualquer reação, seleção ou o
+  // conjunto de monstros muda — permite detectar atualizações remotas além de length.
+  function _fingerprint(monsters) {
+    return monsters.map((m) =>
+      `${m.id}:${m.reactions.fire|0},${m.reactions.eyes|0},${m.reactions.bulb|0},${m.selected ? 1 : 0}`
+    ).join('|');
+  }
+
+  // Subscription em tempo real: re-renderiza quando monstros ou reações mudam remotamente
+  let _lastFingerprint = _fingerprint(getState().monsters);
   _unsub = subscribe((state) => {
     if (state.currentPhase !== 'monsters') {
       _unsub?.();
@@ -387,8 +395,9 @@ export function renderMonsters(root) {
       if (_typing) { _typing.destroy(); _typing = null; }
       return;
     }
-    if (state.monsters.length !== _lastCount) {
-      _lastCount = state.monsters.length;
+    const fp = _fingerprint(state.monsters);
+    if (fp !== _lastFingerprint) {
+      _lastFingerprint = fp;
       render();
     }
   });

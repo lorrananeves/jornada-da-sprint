@@ -252,10 +252,16 @@ export function renderCombat(root) {
     });
   }
 
-  // Subscription em tempo real: re-renderiza quando soluções ou foco mudam remotamente
-  let _lastCount   = getState().solutions.length;
-  let _lastIdx     = currentMonsterIdx;
-  let _lastStrategy = currentStrategy;
+  // Retorna uma string que muda sempre que qualquer voto ou o conjunto de
+  // soluções muda — permite detectar atualizações remotas além de length.
+  function _fingerprint(solutions) {
+    return solutions.map((s) => `${s.id}:${s.votes|0}`).join('|');
+  }
+
+  // Subscription em tempo real: re-renderiza quando soluções, votos ou foco mudam remotamente
+  let _lastFingerprint = _fingerprint(getState().solutions);
+  let _lastIdx         = currentMonsterIdx;
+  let _lastStrategy    = currentStrategy;
 
   _unsub = subscribe((state) => {
     if (state.currentPhase !== 'combat') {
@@ -267,17 +273,18 @@ export function renderCombat(root) {
     const newIdx      = Math.min(state.combatMonsterIdx ?? 0, Math.max(0, selectedMonsters.length - 1));
     const newStrategy = state.combatStrategy ?? 'prevent';
     const focusChanged = newIdx !== _lastIdx || newStrategy !== _lastStrategy;
-    const countChanged = state.solutions.length !== _lastCount;
+    const fp = _fingerprint(state.solutions);
+    const solutionsChanged = fp !== _lastFingerprint;
 
-    if (focusChanged || countChanged) {
+    if (focusChanged || solutionsChanged) {
       // Membros do time seguem o foco do SM automaticamente
       if (!isSM() && focusChanged) {
         currentMonsterIdx = newIdx;
         currentStrategy   = newStrategy;
       }
-      _lastCount    = state.solutions.length;
-      _lastIdx      = newIdx;
-      _lastStrategy = newStrategy;
+      _lastFingerprint = fp;
+      _lastIdx         = newIdx;
+      _lastStrategy    = newStrategy;
       render();
     }
   });

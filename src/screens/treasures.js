@@ -179,8 +179,16 @@ export function renderTreasures(root) {
     });
   }
 
-  // Subscription em tempo real: re-renderiza quando tesouros mudam remotamente
-  let _lastCount = getState().treasures.length;
+  // Retorna uma string que muda sempre que qualquer reação ou o conjunto de
+  // itens muda — permite detectar atualizações remotas além de length.
+  function _fingerprint(treasures) {
+    return treasures.map((t) =>
+      `${t.id}:${t.reactions.heart|0},${t.reactions.thumbs|0},${t.reactions.bulb|0}`
+    ).join('|');
+  }
+
+  // Subscription em tempo real: re-renderiza quando tesouros ou reações mudam remotamente
+  let _lastFingerprint = _fingerprint(getState().treasures);
   _unsub = subscribe((state) => {
     if (state.currentPhase !== 'treasures') {
       _unsub?.();
@@ -188,8 +196,9 @@ export function renderTreasures(root) {
       if (_typing) { _typing.destroy(); _typing = null; }
       return;
     }
-    if (state.treasures.length !== _lastCount) {
-      _lastCount = state.treasures.length;
+    const fp = _fingerprint(state.treasures);
+    if (fp !== _lastFingerprint) {
+      _lastFingerprint = fp;
       render();
     }
   });
