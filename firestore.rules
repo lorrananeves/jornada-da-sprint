@@ -48,10 +48,10 @@ service cloud.firestore {
         allow create: if
           validSessionId(sessionId)
           && isValidTreasure(request.resource.data);
-        // Só permite atualizar reações (campos reactions.*)
+        // Só permite atualizar reações — incremento de +1 por escrita (nunca decrementar)
         allow update: if
           validSessionId(sessionId)
-          && isReactionUpdate(request.resource.data, resource.data, ['text', 'category', 'id']);
+          && isReactionUpdate(request.resource.data, resource.data);
         allow delete: if false;
       }
 
@@ -249,27 +249,49 @@ function isValidMission(data) {
     && data.priority in ['high', 'medium', 'low'];
 }
 
-// Reação: verifica que os campos imutáveis não foram alterados
-function isReactionUpdate(newData, oldData, immutableFields) {
-  return immutableFields.size() == 0
-    || (
-      immutableFields.toSet().difference(
-        newData.keys().toSet().intersection(immutableFields.toSet())
-      ).size() == 0
-      && immutableFields.toSet().hasAll(
-        newData.keys().toSet().intersection(immutableFields.toSet())
-      )
-    );
+// Tesouro: só reações podem mudar (campos text/category imutáveis).
+// Cada contador só pode aumentar em +1 por escrita (nunca decrementar, nunca pular).
+function isReactionUpdate(newData, oldData) {
+  return newData.get('text',     '') == oldData.get('text',     '')
+    && newData.get('category', '') == oldData.get('category', '')
+    // Cada reação só pode subir +1 ou ficar igual (nunca cair)
+    && newData.get('reactions', {}).get('heart',  0) >= oldData.get('reactions', {}).get('heart',  0)
+    && newData.get('reactions', {}).get('thumbs', 0) >= oldData.get('reactions', {}).get('thumbs', 0)
+    && newData.get('reactions', {}).get('bulb',   0) >= oldData.get('reactions', {}).get('bulb',   0)
+    && newData.get('reactions', {}).get('heart',  0) <= oldData.get('reactions', {}).get('heart',  0) + 1
+    && newData.get('reactions', {}).get('thumbs', 0) <= oldData.get('reactions', {}).get('thumbs', 0) + 1
+    && newData.get('reactions', {}).get('bulb',   0) <= oldData.get('reactions', {}).get('bulb',   0) + 1;
 }
 
-// Monstro: permite mudar reactions.*, selected, priorityRank, text (merge) e mergedFrom
+// Monstro: permite mudar reactions.*, selected, priorityRank, text (merge) e mergedFrom.
+// Há dois tipos de update válidos:
+//   1. Reação simples: apenas reactions.* sobe +1 (nunca decrementa)
+//   2. Merge: mergedFrom muda — neste caso as reações podem somar mais que +1
 function isMonsterUpdate(newData, oldData) {
-  return newData.keys().hasOnly(['text', 'reactions', 'selected', 'priorityRank', 'mergedFrom'])
+  let schemaOk = newData.keys().hasOnly(['text', 'reactions', 'selected', 'priorityRank', 'mergedFrom'])
     && newData.get('text', '') is string
     && newData.get('text', '').size() >= 1
     && newData.get('text', '').size() <= 1000
     && (!('priorityRank' in newData.diff(oldData).affectedKeys())
         || newData.get('priorityRank', null) is number);
+
+  // Se mergedFrom mudou, é um merge — reações podem subir qualquer valor (mas não cair)
+  let isMerge = newData.get('mergedFrom', []).size() > oldData.get('mergedFrom', []).size();
+  let reactionsNonNegative =
+      newData.get('reactions', {}).get('fire',  0) >= 0
+    && newData.get('reactions', {}).get('eyes',  0) >= 0
+    && newData.get('reactions', {}).get('bulb',  0) >= 0;
+
+  // Reação simples: cada contador sobe no máximo +1
+  let isSimpleReaction =
+      newData.get('reactions', {}).get('fire',  0) >= oldData.get('reactions', {}).get('fire',  0)
+    && newData.get('reactions', {}).get('eyes',  0) >= oldData.get('reactions', {}).get('eyes',  0)
+    && newData.get('reactions', {}).get('bulb',  0) >= oldData.get('reactions', {}).get('bulb',  0)
+    && newData.get('reactions', {}).get('fire',  0) <= oldData.get('reactions', {}).get('fire',  0) + 1
+    && newData.get('reactions', {}).get('eyes',  0) <= oldData.get('reactions', {}).get('eyes',  0) + 1
+    && newData.get('reactions', {}).get('bulb',  0) <= oldData.get('reactions', {}).get('bulb',  0) + 1;
+
+  return schemaOk && (isMerge ? reactionsNonNegative : isSimpleReaction);
 }
 
 // Solução: só votes pode aumentar (nunca diminuir)
