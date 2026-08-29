@@ -110,6 +110,67 @@ describe('isSM', () => {
   });
 });
 
+// ── Proteção de identidade (smDeviceId / smUid imutáveis) ─────────────────────
+//
+// Cobre o vetor de ataque: participante chama setState({ smDeviceId: 'meu-id' })
+// tentando assumir o controle da sessão.
+
+describe('proteção de identidade da sessão', () => {
+  it('não permite sobrescrever smDeviceId após a criação da sessão', () => {
+    // SM cria a sessão
+    setState({ smDeviceId: DEVICE_SM });
+    expect(getState().smDeviceId).toBe(DEVICE_SM);
+
+    // Participante tenta assumir o papel de SM
+    _mocks.currentDeviceId = DEVICE_TEAM;
+    setState({ smDeviceId: DEVICE_TEAM });
+
+    // smDeviceId deve permanecer inalterado
+    expect(getState().smDeviceId).toBe(DEVICE_SM);
+  });
+
+  it('não permite sobrescrever smUid após a criação da sessão', () => {
+    setState({ smDeviceId: DEVICE_SM, smUid: 'uid-original' });
+
+    setState({ smUid: 'uid-atacante' });
+
+    expect(getState().smUid).toBe('uid-original');
+  });
+
+  it('participante continua não sendo SM após tentativa de sobrescrita', () => {
+    setState({ smDeviceId: DEVICE_SM });
+    _mocks.currentDeviceId = DEVICE_TEAM;
+
+    // Ataque: tenta se tornar SM
+    setState({ smDeviceId: DEVICE_TEAM });
+
+    // isSM ainda deve retornar false para o participante
+    expect(isSM()).toBe(false);
+  });
+
+  it('participante não consegue avançar fase após tentativa de sobrescrita', () => {
+    setState({ smDeviceId: DEVICE_SM });
+    _mocks.currentDeviceId = DEVICE_SM;
+    setPhase('checkin');
+    expect(getState().currentPhase).toBe('checkin');
+
+    // Participante tenta assumir controle e avançar fase
+    _mocks.currentDeviceId = DEVICE_TEAM;
+    setState({ smDeviceId: DEVICE_TEAM });
+    setPhase('treasures');
+
+    // Fase deve permanecer em checkin
+    expect(getState().currentPhase).toBe('checkin');
+  });
+
+  it('aceita smDeviceId na criação inicial (quando ainda é null)', () => {
+    // Estado inicial: smDeviceId é null → criação legítima
+    expect(getState().smDeviceId).toBeNull();
+    setState({ smDeviceId: DEVICE_SM });
+    expect(getState().smDeviceId).toBe(DEVICE_SM);
+  });
+});
+
 // ── setPhase ──────────────────────────────────────────────────────────────────
 
 describe('setPhase', () => {

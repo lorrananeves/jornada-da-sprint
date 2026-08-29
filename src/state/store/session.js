@@ -156,7 +156,14 @@ export function setState(partial) {
 
 export function setScalarState(scalars) {
   const now = new Date().toISOString();
-  _state = { ..._state, ...scalars, updatedAt: now, createdAt: _state.createdAt ?? now };
+  // smDeviceId e smUid são imutáveis após a criação da sessão.
+  // Impede que qualquer chamada posterior (inclusive via console) sobrescreva
+  // a identidade do SM no estado local — e consequentemente no Firestore.
+  // Na criação (smDeviceId ainda null), os valores são aceitos normalmente.
+  // eslint-disable-next-line no-unused-vars
+  const { smDeviceId, smUid, ...rest } = scalars;
+  const safeScalars = _state.smDeviceId ? rest : scalars;
+  _state = { ..._state, ...safeScalars, updatedAt: now, createdAt: _state.createdAt ?? now };
   saveToStorage(_state);
 
   if (_sessionId) {
