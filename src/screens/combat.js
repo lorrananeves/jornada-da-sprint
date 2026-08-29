@@ -201,6 +201,9 @@ export function renderCombat(root) {
       } catch (e) {
         console.warn('Firestore addSolution failed:', e);
         showErrorToast('Solução não foi salva — verifique sua conexão.');
+        // Não credita XP: a solução não foi persistida, então o incremento
+        // não é enviado. Nenhuma reversão necessária pois addXP só é chamado
+        // no bloco de sucesso acima.
         addBtn.disabled = false;
       }
     });

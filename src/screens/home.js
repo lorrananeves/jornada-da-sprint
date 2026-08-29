@@ -47,8 +47,10 @@ export function renderHome(root) {
       // resetState() garante que não haverá escrita na sessão antiga depois
       resetState();
     }
-    // startNewSession() gera um novo ID, inicializa o Firestore e vai para setup
-    startNewSession();
+    // startNewSession() é async: gera novo ID, inicializa o Firestore e seta
+    // smDeviceId/smUid/currentPhase antes de notificar os listeners.
+    // Sem await, o setup screen pode renderizar com o estado ainda vazio.
+    await startNewSession();
   });
 
   const continueBtn = root.querySelector('#btn-continue');

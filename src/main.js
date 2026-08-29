@@ -70,6 +70,35 @@ function navigate(phase) {
   renderer(root);
 }
 
+// ── Exibição de erro de configuração ─────────────────────────────────────────
+// Declarada antes do try/catch para garantir que esteja disponível mesmo que
+// um erro de parse ou import ocorra durante o bootstrap do módulo.
+
+function renderConfigError(err) {
+  const root = document.getElementById('screen-root') ?? document.body;
+
+  const isEnvError = err?.message?.includes('VITE_FIREBASE_');
+  const title   = isEnvError ? '⚙️ Configuração incompleta' : '💥 Erro ao iniciar';
+  const detail  = isEnvError
+    ? 'As variáveis de ambiente do Firebase não foram encontradas.'
+    : 'Ocorreu um erro inesperado ao inicializar o aplicativo.';
+  const hint    = isEnvError
+    ? 'Copie <code>.env.example</code> para <code>.env</code> na raiz do projeto e preencha com os valores do seu projeto Firebase. Depois reinicie o servidor com <code>npm run dev</code>.'
+    : `<pre style="font-size:0.75rem;overflow:auto;white-space:pre-wrap;word-break:break-all">${err?.message ?? err}</pre>`;
+
+  root.innerHTML = `
+    <div style="
+      max-width:560px;margin:80px auto;padding:40px 32px;
+      background:#161b22;border:1px solid rgba(248,81,73,0.4);
+      border-radius:12px;font-family:system-ui,sans-serif;color:#e6edf3;
+    ">
+      <h1 style="font-size:1.5rem;font-weight:700;margin-bottom:12px;color:#f85149">${title}</h1>
+      <p style="color:#8b949e;margin-bottom:16px">${detail}</p>
+      <div style="font-size:0.9375rem;line-height:1.7;color:#e6edf3">${hint}</div>
+    </div>
+  `;
+}
+
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 try {
@@ -99,27 +128,3 @@ try {
   renderConfigError(err);
 }
 
-function renderConfigError(err) {
-  const root = document.getElementById('screen-root') ?? document.body;
-
-  const isEnvError = err?.message?.includes('VITE_FIREBASE_');
-  const title   = isEnvError ? '⚙️ Configuração incompleta' : '💥 Erro ao iniciar';
-  const detail  = isEnvError
-    ? 'As variáveis de ambiente do Firebase não foram encontradas.'
-    : 'Ocorreu um erro inesperado ao inicializar o aplicativo.';
-  const hint    = isEnvError
-    ? 'Copie <code>.env.example</code> para <code>.env</code> na raiz do projeto e preencha com os valores do seu projeto Firebase. Depois reinicie o servidor com <code>npm run dev</code>.'
-    : `<pre style="font-size:0.75rem;overflow:auto;white-space:pre-wrap;word-break:break-all">${err?.message ?? err}</pre>`;
-
-  root.innerHTML = `
-    <div style="
-      max-width:560px;margin:80px auto;padding:40px 32px;
-      background:#161b22;border:1px solid rgba(248,81,73,0.4);
-      border-radius:12px;font-family:system-ui,sans-serif;color:#e6edf3;
-    ">
-      <h1 style="font-size:1.5rem;font-weight:700;margin-bottom:12px;color:#f85149">${title}</h1>
-      <p style="color:#8b949e;margin-bottom:16px">${detail}</p>
-      <div style="font-size:0.9375rem;line-height:1.7;color:#e6edf3">${hint}</div>
-    </div>
-  `;
-}

@@ -286,12 +286,17 @@ export function renderMonsters(root) {
     root.querySelectorAll('.reaction-btn[data-reaction]').forEach((btn) => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
+        // Desabilita durante o await para evitar duplo-clique e race condition:
+        // dois cliques rápidos disparariam duas transações simultâneas no Firestore
+        // e duplicariam o contador local antes da resposta chegar.
+        btn.disabled = true;
         // Otimismo local: atualiza imediatamente para feedback rápido
         const span = btn.querySelector('.reaction-count');
         if (span) span.textContent = Number(span.textContent) + 1;
         const accepted = await reactToMonster(btn.dataset.id, btn.dataset.reaction);
         // Reverte se rejeitado (já reagiu ou erro)
         if (!accepted && span) span.textContent = Number(span.textContent) - 1;
+        btn.disabled = false;
       });
     });
 

@@ -167,12 +167,17 @@ export function renderTreasures(root) {
       col.querySelectorAll('.reaction-btn[data-reaction]').forEach((btn) => {
         btn.addEventListener('click', async () => {
           const { id: itemId, reaction } = btn.dataset;
+          // Desabilita durante o await para evitar duplo-clique e race condition:
+          // dois cliques rápidos disparariam duas transações simultâneas no Firestore
+          // e duplicariam o contador local antes da resposta chegar.
+          btn.disabled = true;
           // Otimismo local: atualiza imediatamente para feedback rápido
           const span = btn.querySelector('.reaction-count');
           if (span) span.textContent = Number(span.textContent) + 1;
           const accepted = await reactToTreasure(itemId, reaction);
           // Reverte se rejeitado (já reagiu ou erro)
           if (!accepted && span) span.textContent = Number(span.textContent) - 1;
+          btn.disabled = false;
         });
       });
     });

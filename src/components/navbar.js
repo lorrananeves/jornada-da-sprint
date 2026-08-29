@@ -25,6 +25,8 @@ const HIDDEN_PHASES = new Set(['home', 'roleSelect', 'lobby', 'auth', 'smDashboa
 let _isOnline = true;
 /** Contagem atual de presença — atualizada pela sub */
 let _presenceCount = 0;
+/** Unsubscribe da sub do store — guardado para evitar registro duplo em re-bootstrap */
+let _unsubStore = null;
 
 /** Renderiza (ou atualiza) o DOM da navbar sem recriar as subscriptions. */
 function renderNavbar() {
@@ -159,5 +161,10 @@ export function initNavbar() {
   });
 
   renderNavbar();
-  subscribe(renderNavbar);
+  // Registra a subscription do store apenas uma vez.
+  // Sem esse guard, chamadas repetidas a initNavbar() (ex: hot-reload) acumulariam
+  // múltiplos listeners e causariam re-renders duplicados a cada mudança de estado.
+  if (!_unsubStore) {
+    _unsubStore = subscribe(renderNavbar);
+  }
 }
