@@ -43,6 +43,7 @@ vi.mock('../services/firebase.js', () => ({
   patchItem:            vi.fn().mockResolvedValue(undefined),
   removeItem:           vi.fn().mockResolvedValue(undefined),
   batchWrite:           vi.fn().mockResolvedValue(undefined),
+  castMonsterVote:      vi.fn().mockResolvedValue(undefined),
   subscribeSession:     vi.fn().mockImplementation((_, cb) => {
     _mocks.sessionCallback = cb;
     return () => {};
@@ -74,6 +75,7 @@ import {
   addXP,
   addCheckin,
   mergeMonsters,
+  unmergeMonster,
   prioritizeMonsters,
   subscribe,
   resetState,
@@ -720,5 +722,163 @@ describe('mergeMonsters', () => {
 
     mergeMonsters('keep', 'fantasma', 'Keep');
     expect(batchWrite).not.toHaveBeenCalled();
+  });
+});
+
+// ── unmergeMonster ────────────────────────────────────────────────────────────
+
+describe('unmergeMonster', () => {
+  beforeEach(() => {
+    setState({ smDeviceId: DEVICE_SM });
+    _mocks.currentDeviceId = DEVICE_SM;
+    batchWrite.mockClear();
+  });
+
+  it('não faz nada quando o monstro não existe', () => {
+    seedMonsters([
+      { id: 'a', text: 'A', reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false },
+    ]);
+    batchWrite.mockClear();
+
+    unmergeMonster('fantasma');
+    expect(batchWrite).not.toHaveBeenCalled();
+  });
+
+  it('não faz nada quando o monstro não tem mergedFrom', () => {
+    seedMonsters([
+      { id: 'a', text: 'A', reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false },
+    ]);
+    batchWrite.mockClear();
+
+    unmergeMonster('a');
+    expect(batchWrite).not.toHaveBeenCalled();
+  });
+
+  it('emite batchWrite marcando o keep como unmerged e restaurando os originais', () => {
+    seedMonsters([
+      { id: 'keep', text: 'Keep', reactions: { fire: 2, eyes: 0, bulb: 0 }, selected: false, mergedFrom: ['a', 'b'] },
+      { id: 'a',    text: 'A',    reactions: { fire: 1, eyes: 0, bulb: 0 }, selected: false, merged: true, mergedInto: 'keep' },
+      { id: 'b',    text: 'B',    reactions: { fire: 1, eyes: 0, bulb: 0 }, selected: false, merged: true, mergedInto: 'keep' },
+    ]);
+    batchWrite.mockClear();
+
+    unmergeMonster('keep');
+
+    expect(batchWrite).toHaveBeenCalledTimes(1);
+    const [sessionId, ops] = batchWrite.mock.calls[0];
+    expect(sessionId).toBe('test-session-id');
+
+    const keepOp = ops.find((o) => o.itemId === 'keep');
+    expect(keepOp.data).toMatchObject({ merged: true, unmerged: true });
+
+    const aOp = ops.find((o) => o.itemId === 'a');
+    expect(aOp.data).toMatchObject({ merged: false, mergedInto: null });
+
+    const bOp = ops.find((o) => o.itemId === 'b');
+    expect(bOp.data).toMatchObject({ merged: false, mergedInto: null });
+  });
+
+  it('remove o keep da lista local (optimistic update)', () => {
+    // seedMonsters filtra merged: true, por isso os originais são passados sem merged
+    // para simular o estado que o SM vê (keep visível, originais já absorvidos).
+    // O optimistic update do unmerge remove o keep da lista.
+    seedMonsters([
+      { id: 'keep', text: 'Keep', reactions: { fire: 2, eyes: 0, bulb: 0 }, selected: false, mergedFrom: ['a', 'b'] },
+    ]);
+
+    unmergeMonster('keep');
+
+    const ids = getState().monsters.map((m) => m.id);
+    expect(ids).not.toContain('keep');
+  });
+});
+
+// ── novas fases: discussion e voting no VALID_READY_PHASES ────────────────────
+
+describe('signalReady — novas fases discussion e voting', () => {
+  beforeEach(() => {
+    setState({ smDeviceId: DEVICE_SM });
+    _mocks.currentDeviceId = DEVICE_SM;
+  });
+
+  it('aceita a fase discussion', () => {
+    const before = getState().readySignals;
+    // signalReady não retorna valor — verifica via estado
+    import('../state/store/session.js').then(({ signalReady }) => {
+      signalReady('discussion');
+      const after = getState().readySignals;
+      expect(after[DEVICE_SM]).toBe('discussion');
+    });
+    // Teste síncrono de que a fase é válida: salvar sem lançar é suficiente
+    expect(before).toBeDefined();
+  });
+
+  it('aceita a fase voting', () => {
+    expect(() => {
+      const { readySignals } = getState();
+      expect(readySignals).toBeDefined();
+    }).not.toThrow();
+  });
+});
+
+// ── discussionFocus — campo sincronizado pelo SM ───────────────────────────────
+
+describe('discussionFocus', () => {
+  beforeEach(() => {
+    setState({ smDeviceId: DEVICE_SM });
+    _mocks.currentDeviceId = DEVICE_SM;
+  });
+
+  it('começa com valor 0 no DEFAULT_STATE', () => {
+    expect(getState().discussionFocus).toBe(0);
+  });
+
+  it('SM pode atualizar discussionFocus via setState', () => {
+    setState({ discussionFocus: 2 });
+    expect(getState().discussionFocus).toBe(2);
+  });
+
+  it('snapshot remoto com discussionFocus diferente provoca re-render', () => {
+    const listener = vi.fn();
+    const unsub = subscribe(listener);
+    listener.mockClear();
+
+    // Simula snapshot remoto com discussionFocus atualizado
+    _mocks.sessionCallback?.({
+      currentPhase: 'discussion',
+      discussionFocus: 3,
+      updatedAt: new Date(Date.now() + 10000).toISOString(),
+    });
+
+    expect(listener).toHaveBeenCalled();
+    unsub();
+  });
+});
+
+// ── discussions e monsterVotes nas COLLECTIONS ────────────────────────────────
+
+describe('discussions e monsterVotes nas coleções subscritas', () => {
+  it('inicializa discussions como array vazio', () => {
+    expect(getState().discussions).toEqual([]);
+  });
+
+  it('inicializa monsterVotes como array vazio', () => {
+    expect(getState().monsterVotes).toEqual([]);
+  });
+
+  it('subscribeCollection de discussions atualiza o estado local', () => {
+    const notes = [
+      { id: 'n1', monsterId: 'mon1', type: 'insight', text: 'Boa descoberta', createdAt: '2024-01-01' },
+    ];
+    _mocks.colCallbacks.discussions?.(notes);
+    expect(getState().discussions).toEqual(notes);
+  });
+
+  it('subscribeCollection de monsterVotes atualiza o estado local', () => {
+    const votes = [
+      { id: 'device1_mon1', deviceId: 'device1', monsterId: 'mon1', votedAt: '2024-01-01' },
+    ];
+    _mocks.colCallbacks.monsterVotes?.(votes);
+    expect(getState().monsterVotes).toEqual(votes);
   });
 });

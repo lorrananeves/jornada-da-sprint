@@ -11,6 +11,8 @@
  *   3. Membro registra check-in; indicador atualiza para o SM (tempo real)
  *   4. SM avança para Tesouros; membro segue automaticamente (tempo real)
  *   5. Membro não vê o botão de avançar fase
+ *   6. SM avança para Monstros; membro segue automaticamente (novo fluxo)
+ *   7. SM avança para Discussão (sem exigir seleção de monstros)
  */
 
 import { test, expect } from './fixtures.js';
@@ -108,4 +110,43 @@ test('Membro do time não vê o botão de avançar fase', async ({ twoParticipan
 
   // Membro vê a mensagem de espera
   await expect(memberPage.getByText(/aguardando o scrum master/i)).toBeVisible();
+});
+
+// ── 6. SM avança para Monstros; membro segue automaticamente ─────────────────
+
+test('SM avança para Monstros e membro é redirecionado automaticamente', async ({ twoParticipants }) => {
+  const { smPage, memberPage } = twoParticipants;
+
+  await memberJoin(memberPage);
+  await startRetro(smPage, memberPage);
+
+  // SM avança: checkin → treasures → monsters
+  await smPage.locator('#btn-next').click();
+  await expect(smPage.getByText(/tesouros da sprint/i)).toBeVisible({ timeout: 10_000 });
+  await smPage.locator('#btn-next').click();
+  await expect(smPage.getByText(/monstros da sprint/i)).toBeVisible({ timeout: 10_000 });
+
+  // Membro segue para monstros em tempo real
+  await expect(memberPage.getByText(/monstros da sprint/i)).toBeVisible({ timeout: 20_000 });
+});
+
+// ── 7. SM avança para Discussão sem exigir seleção de monstros ───────────────
+
+test('SM avança para Discussão a partir de Monstros (botão sempre habilitado)', async ({ twoParticipants }) => {
+  const { smPage, memberPage } = twoParticipants;
+
+  await memberJoin(memberPage);
+  await startRetro(smPage, memberPage);
+
+  // Navega até a fase de Monstros
+  await smPage.locator('#btn-next').click(); // → tesouros
+  await smPage.locator('#btn-next').click(); // → monstros
+  await expect(smPage.getByText(/monstros da sprint/i)).toBeVisible({ timeout: 10_000 });
+
+  // Botão deve estar habilitado sem precisar selecionar monstros
+  const nextBtn = smPage.locator('#btn-next');
+  await expect(nextBtn).toBeEnabled({ timeout: 5_000 });
+
+  // Verifica que o texto do botão indica "Discussão"
+  await expect(nextBtn).toContainText(/discussão/i);
 });
