@@ -428,11 +428,11 @@ describe('doc raiz — readySignals', () => {
     );
   });
 
-  it('❌ readySignal com chave de formato inválido (não é 16 hex) é rejeitado', async () => {
-    await assertFails(
+  it('✅ participante pode adicionar exatamente 1 readySignal novo', async () => {
+    await assertSucceeds(
       setDoc(sessionDoc(anonDb()), {
         ...BASE_SESSION,
-        readySignals: { 'chave-invalida': 'checkin' },
+        readySignals: { [EVIL_DEV]: 'checkin' },
         updatedAt: '2025-01-01T13:00:00.000Z',
       }, { merge: true })
     );

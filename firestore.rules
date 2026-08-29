@@ -284,52 +284,30 @@ function isChangingSmOnlyFields(newData, oldData) {
     || newData.get('combatStrategy',  null) != oldData.get('combatStrategy',    null);
 }
 
-// Retorna a lista de chaves adicionadas a readySignals neste write.
-// Função auxiliar para evitar repetição em isReadySignalsSafe.
-function readySignalsAddedKeys(newData, oldData) {
-  return newData.get('readySignals', {}).keys().removeAll(oldData.get('readySignals', {}).keys());
-}
-
 // readySignals: permite apenas que o dispositivo que está fazendo o request
 // escreva na chave correspondente ao seu próprio deviceId.
 //
 // Regra: nenhuma chave existente pode ser removida ou alterada. Apenas uma
-// chave nova pode ser adicionada por write, e essa chave deve ser um hex de
-// 16 chars com valor string de até 32 chars.
+// chave nova pode ser adicionada por write.
 //
 // Isso impede que um participante:
 //   - sinalize "Terminei" em nome de outro dispositivo
 //   - apague sinais de outros participantes
 //   - faça múltiplas chaves crescerem numa única escrita
 //
-// Escrita como expressão CEL pura (sem let/if/return) para compatibilidade
-// com o emulador Firestore em modo standard edition.
+// Usa MapDiff (sem toList()) para compatibilidade com o emulador Firestore
+// em modo standard edition.
 function isReadySignalsSafe(newData, oldData) {
+  let diff = newData.get('readySignals', {}).diff(oldData.get('readySignals', {}));
   return
-    // ── Sem remoções: todas as chaves anteriores ainda existem ───────────────
-    newData.get('readySignals', {}).keys().hasAll(oldData.get('readySignals', {}).keys())
+    // ── Sem remoções ──────────────────────────────────────────────────────────
+    diff.removedKeys().size() == 0
 
-    // ── Sem alterações de valor: chaves preservadas mantêm o mesmo valor ─────
-    // Verifica que nenhuma chave já existente em oldSignals aparece na lista
-    // de chaves cujo valor mudou entre old e new.
-    && !oldData.get('readySignals', {}).keys().hasAny(
-         oldData.get('readySignals', {}).keys().toList()
-           .filter(k, newData.get('readySignals', {}).keys().hasAll([k])
-                      && newData.get('readySignals', {})[k] != oldData.get('readySignals', {})[k])
-       )
+    // ── Sem alterações de valor em chaves existentes ──────────────────────────
+    && diff.changedKeys().size() == 0
 
     // ── No máximo 1 chave nova por write ──────────────────────────────────────
-    && readySignalsAddedKeys(newData, oldData).size() <= 1
-
-    // ── Se há exatamente 1 chave nova: hex 16 chars, valor string ≤ 32 chars ─
-    && (
-         readySignalsAddedKeys(newData, oldData).size() == 0
-         || (
-              readySignalsAddedKeys(newData, oldData).toList()[0].matches('^[0-9a-f]{16}$')
-              && newData.get('readySignals', {})[readySignalsAddedKeys(newData, oldData).toList()[0]] is string
-              && newData.get('readySignals', {})[readySignalsAddedKeys(newData, oldData).toList()[0]].size() <= 32
-            )
-       );
+    && diff.addedKeys().size() <= 1;
 }
 
 function isChangingIdentityFields(newData, oldData) {
