@@ -72,6 +72,9 @@ function presenceColRef(sessionId) {
 /** Handle do intervalo de heartbeat — null quando inativo */
 let _heartbeatTimer = null;
 
+/** Handler do beforeunload registrado — garante que só existe um por vez */
+let _beforeUnloadHandler = null;
+
 /**
  * Registra este dispositivo como presente e inicia o heartbeat.
  * Retorna uma função de cleanup (para ao sair do lobby).
@@ -106,11 +109,17 @@ export async function joinSession() {
   }, HEARTBEAT_MS);
 
   // Melhor esforço ao fechar a aba: ainda tentamos o delete,
-  // mas agora não é crítico — o TTL cobre a falha
-  window.addEventListener('beforeunload', () => {
+  // mas agora não é crítico — o TTL cobre a falha.
+  // Remove o handler anterior antes de registrar um novo para evitar
+  // acúmulo quando joinSession() é chamado mais de uma vez na mesma aba.
+  if (_beforeUnloadHandler) {
+    window.removeEventListener('beforeunload', _beforeUnloadHandler);
+  }
+  _beforeUnloadHandler = () => {
     stopHeartbeat();
     leaveSession();
-  }, { once: true });
+  };
+  window.addEventListener('beforeunload', _beforeUnloadHandler, { once: true });
 }
 
 /**

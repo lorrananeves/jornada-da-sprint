@@ -165,17 +165,12 @@ function _showJoinForm(root) {
 
 async function _enterAsTeamMember() {
   setRole('team_member');
-  console.warn('[roleSelect] _enterAsTeamMember: iniciando joinSession');
   // joinSession tem timeout implícito do SDK, mas adicionamos um guard
   // para garantir que o lobby aparece mesmo se a presença demorar muito.
   await Promise.race([
-    joinSession().then(() => console.warn('[roleSelect] joinSession: concluído')),
-    new Promise((resolve) => setTimeout(() => {
-      console.warn('[roleSelect] joinSession: timeout 8s, avançando para lobby');
-      resolve();
-    }, 8_000)),
+    joinSession(),
+    new Promise((resolve) => setTimeout(resolve, 8_000)),
   ]);
-  console.warn('[roleSelect] _enterAsTeamMember: setLocalPhase lobby');
   setLocalPhase('lobby');
 }
 
