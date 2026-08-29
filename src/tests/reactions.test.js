@@ -4,7 +4,7 @@
  * Usa jsdom localStorage (disponível no ambiente Vitest com jsdom).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { hasReacted, markReacted } from '../services/reactions.js';
+import { hasReacted, markReacted, unmarkReacted } from '../services/reactions.js';
 
 const SID  = 'aabbcc112233445566778899aabbcc00';
 const DEV  = 'device0011aabbcc';
@@ -73,5 +73,40 @@ describe('markReacted — persiste entre chamadas', () => {
     const raw = JSON.parse(localStorage.getItem('_jornada_reactions') || '[]');
     const key = `${SID}:solutions:sol1:${DEV}:vote`;
     expect(raw.filter((k) => k === key)).toHaveLength(1);
+  });
+});
+
+describe('unmarkReacted — rollback de marcação', () => {
+  it('remove a marcação existente, fazendo hasReacted retornar false', () => {
+    markReacted(SID, 'monsters', 'item1', DEV, 'fire');
+    expect(hasReacted(SID, 'monsters', 'item1', DEV, 'fire')).toBe(true);
+
+    unmarkReacted(SID, 'monsters', 'item1', DEV, 'fire');
+    expect(hasReacted(SID, 'monsters', 'item1', DEV, 'fire')).toBe(false);
+  });
+
+  it('não afeta outras marcações ao remover uma', () => {
+    markReacted(SID, 'monsters', 'item1', DEV, 'fire');
+    markReacted(SID, 'monsters', 'item1', DEV, 'eyes');
+
+    unmarkReacted(SID, 'monsters', 'item1', DEV, 'fire');
+
+    expect(hasReacted(SID, 'monsters', 'item1', DEV, 'fire')).toBe(false);
+    expect(hasReacted(SID, 'monsters', 'item1', DEV, 'eyes')).toBe(true);
+  });
+
+  it('é seguro chamar em chave inexistente (sem erro)', () => {
+    expect(() => unmarkReacted(SID, 'monsters', 'naoexiste', DEV, 'fire')).not.toThrow();
+    expect(hasReacted(SID, 'monsters', 'naoexiste', DEV, 'fire')).toBe(false);
+  });
+
+  it('permite reagir novamente após unmark (simula retry após falha de rede)', () => {
+    markReacted(SID, 'treasures', 'item2', DEV, 'heart');
+    unmarkReacted(SID, 'treasures', 'item2', DEV, 'heart');
+    // Após rollback, hasReacted deve retornar false permitindo nova tentativa
+    expect(hasReacted(SID, 'treasures', 'item2', DEV, 'heart')).toBe(false);
+    // Pode ser marcado novamente
+    markReacted(SID, 'treasures', 'item2', DEV, 'heart');
+    expect(hasReacted(SID, 'treasures', 'item2', DEV, 'heart')).toBe(true);
   });
 });

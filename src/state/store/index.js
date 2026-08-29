@@ -67,12 +67,15 @@ export async function reactToTreasure(id, reaction) {
   const sessionId = sid();
   const deviceId  = getDeviceId();
   if (hasReacted(sessionId, 'treasures', id, deviceId, reaction)) return false;
-  markReacted(sessionId, 'treasures', id, deviceId, reaction);
   try {
     await _reactToTreasure(sessionId, id, reaction, deviceId);
+    markReacted(sessionId, 'treasures', id, deviceId, reaction);
     return true;
   } catch (e) {
-    if (e?.message === 'already-reacted') return false;
+    if (e?.message === 'already-reacted') {
+      markReacted(sessionId, 'treasures', id, deviceId, reaction);
+      return false;
+    }
     console.warn('Firestore reactToTreasure failed:', e);
     return false;
   }
@@ -84,12 +87,15 @@ export async function reactToMonster(id, reaction) {
   const sessionId = sid();
   const deviceId  = getDeviceId();
   if (hasReacted(sessionId, 'monsters', id, deviceId, reaction)) return false;
-  markReacted(sessionId, 'monsters', id, deviceId, reaction);
   try {
     await _reactToMonster(sessionId, id, reaction, deviceId);
+    markReacted(sessionId, 'monsters', id, deviceId, reaction);
     return true;
   } catch (e) {
-    if (e?.message === 'already-reacted') return false;
+    if (e?.message === 'already-reacted') {
+      markReacted(sessionId, 'monsters', id, deviceId, reaction);
+      return false;
+    }
     console.warn('Firestore reactToMonster failed:', e);
     return false;
   }
@@ -103,14 +109,16 @@ export const addSolution      = (s)          => _addSolution(sid(), s);
 export async function voteSolution(id) {
   const sessionId = sid();
   const deviceId  = getDeviceId();
-  // Guarda client-side para resposta imediata na UI (evita flash de botão)
   if (hasReacted(sessionId, 'solutions', id, deviceId, 'vote')) return false;
-  markReacted(sessionId, 'solutions', id, deviceId, 'vote');
   try {
     await _voteSolution(sessionId, id, deviceId);
+    markReacted(sessionId, 'solutions', id, deviceId, 'vote');
     return true;
   } catch (e) {
-    if (e?.message === 'already-voted') return false;
+    if (e?.message === 'already-voted') {
+      markReacted(sessionId, 'solutions', id, deviceId, 'vote');
+      return false;
+    }
     console.warn('Firestore voteSolution failed:', e);
     return false;
   }

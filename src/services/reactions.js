@@ -60,3 +60,18 @@ export function markReacted(sessionId, colName, itemId, deviceId, reactionKey) {
   set.add(key);
   _save(set);
 }
+
+/**
+ * Desfaz o registro de uma reação (rollback após falha no Firestore).
+ * @param {string} sessionId
+ * @param {string} colName
+ * @param {string} itemId
+ * @param {string} deviceId
+ * @param {string} reactionKey
+ */
+export function unmarkReacted(sessionId, colName, itemId, deviceId, reactionKey) {
+  const key = `${sessionId}:${colName}:${itemId}:${deviceId}:${reactionKey}`;
+  const set = _load();
+  set.delete(key);
+  _save(set);
+}
