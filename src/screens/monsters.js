@@ -394,8 +394,10 @@ export function renderMonsters(root) {
     ).join('|');
   }
 
-  // Subscription em tempo real: re-renderiza quando monstros ou reações mudam remotamente
-  let _lastFingerprint = _fingerprint(getState().monsters);
+  // Subscription em tempo real: re-renderiza quando monstros/reações mudam remotamente
+  // ou quando participantCount sobe (entrada tardia — atualiza contador de "Terminei").
+  let _lastFingerprint      = _fingerprint(getState().monsters);
+  let _lastParticipantCount = parseInt(getState().team?.participantCount, 10) || 0;
   _unsub = subscribe((state) => {
     if (state.currentPhase !== 'monsters') {
       _unsub?.();
@@ -403,9 +405,11 @@ export function renderMonsters(root) {
       if (_typing) { _typing.destroy(); _typing = null; }
       return;
     }
-    const fp = _fingerprint(state.monsters);
-    if (fp !== _lastFingerprint) {
-      _lastFingerprint = fp;
+    const fp       = _fingerprint(state.monsters);
+    const newCount = parseInt(state.team?.participantCount, 10) || 0;
+    if (fp !== _lastFingerprint || newCount !== _lastParticipantCount) {
+      _lastFingerprint      = fp;
+      _lastParticipantCount = newCount;
       render();
     }
   });

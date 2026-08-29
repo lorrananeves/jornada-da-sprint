@@ -195,8 +195,10 @@ export function renderTreasures(root) {
     ).join('|');
   }
 
-  // Subscription em tempo real: re-renderiza quando tesouros ou reações mudam remotamente
-  let _lastFingerprint = _fingerprint(getState().treasures);
+  // Subscription em tempo real: re-renderiza quando tesouros/reações mudam remotamente
+  // ou quando participantCount sobe (entrada tardia — atualiza contador de "Terminei").
+  let _lastFingerprint      = _fingerprint(getState().treasures);
+  let _lastParticipantCount = parseInt(getState().team?.participantCount, 10) || 0;
   _unsub = subscribe((state) => {
     if (state.currentPhase !== 'treasures') {
       _unsub?.();
@@ -204,9 +206,11 @@ export function renderTreasures(root) {
       if (_typing) { _typing.destroy(); _typing = null; }
       return;
     }
-    const fp = _fingerprint(state.treasures);
-    if (fp !== _lastFingerprint) {
-      _lastFingerprint = fp;
+    const fp       = _fingerprint(state.treasures);
+    const newCount = parseInt(state.team?.participantCount, 10) || 0;
+    if (fp !== _lastFingerprint || newCount !== _lastParticipantCount) {
+      _lastFingerprint      = fp;
+      _lastParticipantCount = newCount;
       render();
     }
   });

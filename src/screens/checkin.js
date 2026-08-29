@@ -274,8 +274,10 @@ export function renderCheckin(root) {
     });
   }
 
-  // Re-renderiza quando checkins mudam remotamente (ex: membro faz checkin no dispositivo dele).
-  let _lastCheckinCount = getState().checkins.length;
+  // Re-renderiza quando checkins mudam remotamente (ex: membro faz checkin no dispositivo dele)
+  // ou quando participantCount sobe (entrada tardia detectada pela navbar do SM).
+  let _lastCheckinCount    = getState().checkins.length;
+  let _lastParticipantCount = parseInt(getState().team?.participantCount, 10) || 0;
   _unsub = subscribe((state) => {
     if (state.currentPhase !== 'checkin') {
       _unsub?.();
@@ -283,8 +285,11 @@ export function renderCheckin(root) {
       if (_typing) { _typing.destroy(); _typing = null; }
       return;
     }
-    if (state.checkins.length !== _lastCheckinCount) {
-      _lastCheckinCount = state.checkins.length;
+    const newCount = parseInt(state.team?.participantCount, 10) || 0;
+    const countChanged = state.checkins.length !== _lastCheckinCount || newCount !== _lastParticipantCount;
+    if (countChanged) {
+      _lastCheckinCount     = state.checkins.length;
+      _lastParticipantCount = newCount;
       render();
     }
   });

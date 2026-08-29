@@ -47,7 +47,7 @@ A aplicação é **multiplayer em tempo real**: o Scrum Master controla o fluxo 
 - **Timer de fase** — cronômetro controlável por fase, visível para todos os participantes
 
 ### Qualidade dos dados
-- **`participantCount` dinâmico** — o denominador dos contadores (check-in, "Terminei") acompanha a contagem real de presença em tempo real, mas nunca diminui — evita que quedas momentâneas de rede (celular bloqueado, Wi-Fi instável) revelem prematuramente o resultado do check-in
+- **`participantCount` dinâmico** — quando a retro já está em andamento, a navbar do SM detecta entradas tardias via `subscribeParticipants` e sincroniza `team.participantCount` para todos via Firestore sempre que a contagem sobe. Todas as telas de retro re-renderizam ao receber o valor atualizado, garantindo que o denominador dos contadores (check-in, "Terminei") reflita o número real de participantes. O valor nunca diminui — evita que quedas momentâneas de rede (celular bloqueado, Wi-Fi instável) revelem prematuramente o resultado do check-in
 
 ### UX
 - **Fallback mobile para mesclagem de monstros** — botão "🔗 MESCLAR SELECIONADOS" ao selecionar 2 monstros, como alternativa ao drag-and-drop (que não funciona bem em touch)
@@ -251,6 +251,7 @@ O serviço [`presence.js`](src/services/presence.js) usa **heartbeat com TTL**:
 - O heartbeat **não para** ao iniciar a retro — persiste durante todas as fases para capturar entradas tardias
 - A contagem filtra client-side: só conta documentos com `expiresAt > Date.now()`
 - O SM sincroniza `team.participantCount` sempre que a contagem **sobe** (nunca quando cai), garantindo que quedas momentâneas de rede não reduzam o denominador dos contadores de check-in e "Terminei"
+- Todas as telas de retro observam mudanças de `participantCount` no subscriber do store e re-renderizam quando o valor sobe — o denominador atualiza em tempo real para todos os participantes sem recarregar a página
 
 ## 🛠️ Tecnologias
 

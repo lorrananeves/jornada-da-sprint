@@ -333,7 +333,9 @@ export function renderMissions(root) {
   }
 
   // Subscription em tempo real: re-renderiza quando missões mudam remotamente
-  let _lastCount = getState().missions.length;
+  // ou quando participantCount sobe (entrada tardia — atualiza contador de "Terminei").
+  let _lastCount            = getState().missions.length;
+  let _lastParticipantCount = parseInt(getState().team?.participantCount, 10) || 0;
   _unsub = subscribe((state) => {
     if (state.currentPhase !== 'missions') {
       _unsub?.();
@@ -341,8 +343,10 @@ export function renderMissions(root) {
       if (_typing) { _typing.destroy(); _typing = null; }
       return;
     }
-    if (state.missions.length !== _lastCount) {
-      _lastCount = state.missions.length;
+    const newCount = parseInt(state.team?.participantCount, 10) || 0;
+    if (state.missions.length !== _lastCount || newCount !== _lastParticipantCount) {
+      _lastCount            = state.missions.length;
+      _lastParticipantCount = newCount;
       render();
     }
   });
