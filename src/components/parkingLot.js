@@ -7,7 +7,7 @@
  */
 
 import { getState, subscribe, addParkingItem, removeParkingItem } from '../state/store.js';
-import { escapeHTML } from '../utils/dom.js';
+import { escapeHTML, preserveInputs } from '../utils/dom.js';
 
 const HIDDEN_PHASES = new Set(['home', 'auth', 'smDashboard', 'roleSelect', 'lobby']);
 
@@ -34,35 +34,37 @@ function _render() {
 
   const items = state.parkingLot || [];
 
-  _root.innerHTML = `
-    <button class="parking-lot-fab" id="parking-lot-toggle" aria-label="Parking lot — assuntos para depois" title="📌 Para depois (${items.length})">
-      📌
-      ${items.length > 0 ? `<span class="parking-lot-badge">${items.length}</span>` : ''}
-    </button>
-    ${_open ? `
-      <div class="parking-lot-panel" role="dialog" aria-label="Parking lot">
-        <div class="parking-lot-header">
-          <span class="parking-lot-header-title">📌 Para depois</span>
-          <button class="parking-lot-close" id="parking-lot-close" aria-label="Fechar">✕</button>
+  preserveInputs(_root, () => {
+    _root.innerHTML = `
+      <button class="parking-lot-fab" id="parking-lot-toggle" aria-label="Parking lot — assuntos para depois" title="📌 Para depois (${items.length})">
+        📌
+        ${items.length > 0 ? `<span class="parking-lot-badge">${items.length}</span>` : ''}
+      </button>
+      ${_open ? `
+        <div class="parking-lot-panel" role="dialog" aria-label="Parking lot">
+          <div class="parking-lot-header">
+            <span class="parking-lot-header-title">📌 Para depois</span>
+            <button class="parking-lot-close" id="parking-lot-close" aria-label="Fechar">✕</button>
+          </div>
+          <p class="parking-lot-hint">Assuntos fora do escopo da fase atual. Revise ao final.</p>
+          <div class="parking-lot-input-row">
+            <input class="form-input parking-lot-input" id="parking-lot-input" type="text" placeholder="Anotação para depois…" />
+            <button class="btn btn-primary btn-sm" id="parking-lot-add">+</button>
+          </div>
+          <ul class="parking-lot-list">
+            ${items.length === 0
+              ? '<li class="parking-lot-empty">Nenhuma nota ainda.</li>'
+              : items.map((item) => `
+                <li class="parking-lot-item">
+                  <span class="parking-lot-item-text">${escapeHTML(item.text)}</span>
+                  <button class="parking-lot-remove" data-id="${escapeHTML(item.id)}" aria-label="Remover">✕</button>
+                </li>
+              `).join('')}
+          </ul>
         </div>
-        <p class="parking-lot-hint">Assuntos fora do escopo da fase atual. Revise ao final.</p>
-        <div class="parking-lot-input-row">
-          <input class="form-input parking-lot-input" id="parking-lot-input" type="text" placeholder="Anotação para depois…" />
-          <button class="btn btn-primary btn-sm" id="parking-lot-add">+</button>
-        </div>
-        <ul class="parking-lot-list">
-          ${items.length === 0
-            ? '<li class="parking-lot-empty">Nenhuma nota ainda.</li>'
-            : items.map((item) => `
-              <li class="parking-lot-item">
-                <span class="parking-lot-item-text">${escapeHTML(item.text)}</span>
-                <button class="parking-lot-remove" data-id="${escapeHTML(item.id)}" aria-label="Remover">✕</button>
-              </li>
-            `).join('')}
-        </ul>
-      </div>
-    ` : ''}
-  `;
+      ` : ''}
+    `;
+  });
 
   _root.querySelector('#parking-lot-toggle').addEventListener('click', () => {
     _open = !_open;
