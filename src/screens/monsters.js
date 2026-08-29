@@ -45,6 +45,7 @@ function buildMonsterCard(m, draggable) {
       <div style="flex:1">
         <span class="card-text">${escapeHTML(m.text)}</span>
         ${m.mergedFrom?.length ? `<span class="badge monster-badge-merged mt-1 flex" title="Agrupa ${m.mergedFrom.length} monstros">🔗 Mesclado (${m.mergedFrom.length + 1})</span>` : ''}
+        ${m.priorityRank != null ? `<span class="badge badge-info mt-1 flex" title="Posição no ranking de votos">#${m.priorityRank + 1}</span>` : ''}
         ${m.selected ? '<span class="badge badge-accent mt-1 flex">🎯 Selecionado</span>' : ''}
       </div>
       ${draggable ? '<span class="monster-drag-handle" title="Arraste sobre outro card para mesclar">⠿</span>' : ''}
@@ -191,7 +192,7 @@ export function renderMonsters(root) {
           <div class="monsters-toolbar-actions">
             ${selectedCount > 0 ? `<span class="badge badge-accent" data-selected-count>🎯 ${selectedCount} selecionado${selectedCount !== 1 ? 's' : ''}</span>` : ''}
             ${canMergeMonsters() && selectedCount === 2 ? '<button class="btn btn-info btn-sm" id="btn-merge-selected">🔗 MESCLAR SELECIONADOS</button>' : ''}
-            ${canPrioritizeMonsters() ? '<button class="btn btn-ghost btn-sm" id="btn-prioritize">🔥 PRIORIZAR AUTOMATICAMENTE</button>' : ''}
+            ${canPrioritizeMonsters() ? '<button class="btn btn-ghost btn-sm" id="btn-prioritize">↕️ ORDENAR POR VOTOS</button>' : ''}
           </div>
         </div>
 

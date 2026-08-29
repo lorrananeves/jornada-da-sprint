@@ -93,11 +93,20 @@ export function mergeMonsters(sessionId, monsters, keepId, dropId, newText, noti
   );
 }
 
+/**
+ * Pontuação composta: 🔥 tem peso 3 (alto impacto), 👀 peso 2 (precisa discutir),
+ * 💡 peso 1 (ideia). Usa a soma de todas as reações do time para ordenar os monstros
+ * — o botão apenas organiza, não decide quais serão combatidos.
+ */
+function monsterScore(m) {
+  return (m.reactions?.fire || 0) * 3
+       + (m.reactions?.eyes || 0) * 2
+       + (m.reactions?.bulb || 0) * 1;
+}
+
 export function prioritizeMonsters(sessionId, monsters, notifyFn) {
   if (!sessionId) return;
-  const sorted = [...monsters].sort(
-    (a, b) => (b.reactions?.fire || 0) - (a.reactions?.fire || 0)
-  );
+  const sorted = [...monsters].sort((a, b) => monsterScore(b) - monsterScore(a));
   // Batch write atômico: todos os priorityRanks numa única operação
   const ops = sorted.map((m, i) => ({
     type: 'update',
