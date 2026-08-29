@@ -179,6 +179,9 @@ export function setScalarState(scalars) {
       // _prefillMission é estado local do SM (pre-preenche o form de missões).
       // Não existe no schema Firestore — enviar causaria rejeição pela Rule.
       _prefillMission: _pf,
+      // parkingLot é estado local — não vai ao Firestore para evitar crescimento
+      // ilimitado do documento raiz (limite de 1 MB do Firestore).
+      parkingLot: _pl,
       ..._firestoreScalars
     } = _state;
     saveSession(_sessionId, _firestoreScalars).catch((e) => {

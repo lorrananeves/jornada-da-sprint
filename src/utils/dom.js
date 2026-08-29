@@ -75,16 +75,21 @@ export function setHTML(el, html) {
  * @param {Function}    fn    - função que faz o re-render (innerHTML = ...)
  */
 export function preserveInputs(root, fn) {
-  // Captura estado dos campos
+  // Captura estado dos campos (inputs, textareas e selects com id)
   const saved = {};
   const focusedId = document.activeElement?.id || null;
-  root.querySelectorAll('input[id], textarea[id]').forEach((el) => {
+  root.querySelectorAll('input[id], textarea[id], select[id]').forEach((el) => {
     saved[el.id] = { value: el.value, selectionStart: el.selectionStart, selectionEnd: el.selectionEnd };
+  });
+  // Captura selects sem id via data-attribute composto (usado pelas missões anteriores)
+  const savedSelects = [];
+  root.querySelectorAll('select[data-prev-mission-id]').forEach((el) => {
+    savedSelects.push({ key: el.dataset.prevMissionId, value: el.value });
   });
 
   fn();
 
-  // Restaura valores e foco
+  // Restaura valores e foco para elementos com id
   for (const [id, state] of Object.entries(saved)) {
     const el = root.querySelector(`#${CSS.escape(id)}`);
     if (!el) continue;
@@ -94,9 +99,14 @@ export function preserveInputs(root, fn) {
       try {
         el.setSelectionRange(state.selectionStart, state.selectionEnd);
       } catch {
-        // inputs tipo date/number não suportam setSelectionRange
+        // inputs tipo date/number e selects não suportam setSelectionRange
       }
     }
+  }
+  // Restaura selects de missões anteriores pelo data-prev-mission-id
+  for (const { key, value } of savedSelects) {
+    const el = root.querySelector(`select[data-prev-mission-id="${CSS.escape(key)}"]`);
+    if (el) el.value = value;
   }
 }
 

@@ -15,6 +15,7 @@ import { getState, setState, setPhase, setLocalPhase } from '../state/store.js';
 import { getRole } from '../state/store.js';
 import { joinSession, getSessionUrl, subscribeParticipants, stopHeartbeat, leaveSession } from '../services/presence.js';
 import { escapeHTML } from '../utils/dom.js';
+import { formatDate } from '../utils/format.js';
 
 // Contagem atual de participantes vivos no lobby (atualizada pelo subscribe)
 let _liveParticipantCount = 0;
@@ -162,8 +163,3 @@ function cleanupFull() {
   leaveSession();
 }
 
-function formatDate(dateStr) {
-  if (!dateStr) return '';
-  const [y, m, d] = dateStr.split('-');
-  return `${d}/${m}/${y}`;
-}

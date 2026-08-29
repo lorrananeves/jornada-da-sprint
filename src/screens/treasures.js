@@ -187,10 +187,11 @@ export function renderTreasures(root) {
     });
   }
 
-  // Retorna uma string que muda sempre que qualquer reação ou o conjunto de
-  // itens muda — permite detectar atualizações remotas além de length.
+  // Retorna uma string que muda sempre que qualquer reação, o conjunto de itens
+  // ou o total de itens muda — o prefixo de length garante que uma remoção
+  // simultânea a uma adição (mesmo hash de concatenação) seja detectada.
   function _fingerprint(treasures) {
-    return treasures.map((t) =>
+    return `${treasures.length}:` + treasures.map((t) =>
       `${t.id}:${t.reactions.heart||0},${t.reactions.thumbs||0},${t.reactions.bulb||0}`
     ).join('|');
   }

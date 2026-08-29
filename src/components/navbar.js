@@ -21,13 +21,12 @@ const PHASES = [
 // Phases where navbar is hidden (no progress bar needed)
 const HIDDEN_PHASES = new Set(['home', 'roleSelect', 'lobby', 'auth', 'smDashboard']);
 
-/** Unsubscribe handle para a assinatura de presença atual */
-let _unsubPresence = null;
-/** Unsubscribe handle para o indicador de conectividade */
-let _unsubConnectivity = null;
-/** Estado atual de conectividade (true = online) */
+/** Estado atual de conectividade (true = online) — atualizado pela sub */
 let _isOnline = true;
+/** Contagem atual de presença — atualizada pela sub */
+let _presenceCount = 0;
 
+/** Renderiza (ou atualiza) o DOM da navbar sem recriar as subscriptions. */
 function renderNavbar() {
   const root = qs('#navbar-root');
   if (!root) return;
@@ -35,14 +34,23 @@ function renderNavbar() {
   const state = getState();
   const { currentPhase, xp, completedPhases } = state;
 
-  // hide navbar on pre-retro screens
+  // Oculta navbar nas telas pré-retro
   if (HIDDEN_PHASES.has(currentPhase)) {
-    _stopPresence();
-    _stopConnectivity();
     root.innerHTML = '';
     return;
   }
 
+  // Atualização cirúrgica: se o skeleton da navbar já existe, atualiza apenas
+  // os elementos que podem mudar (XP, passos de fase) sem recriar o DOM todo.
+  // Isso evita que as subscriptions de presença e conectividade precisem ser
+  // recriadas a cada mudança de estado — elas são abertas uma única vez em
+  // initNavbar() e ficam ativas durante toda a sessão.
+  if (root.querySelector('nav.navbar')) {
+    _patchNavbar(root, state, currentPhase, xp, completedPhases);
+    return;
+  }
+
+  // Primeira renderização: cria o skeleton completo
   root.innerHTML = `
     <nav class="navbar">
       <div class="navbar-inner">
@@ -53,35 +61,72 @@ function renderNavbar() {
               <span class="connectivity-dot"></span>
               <span class="connectivity-label">${_isOnline ? 'conectado' : 'offline'}</span>
             </span>
-            <span class="online-pill" id="online-pill" title="Participantes online">
+            <span class="online-pill" id="online-pill" title="${_presenceCount} participante${_presenceCount !== 1 ? 's' : ''} online">
               <span class="online-dot"></span>
-              <span class="online-count">–</span>
+              <span class="online-count">${_presenceCount || '–'}</span>
             </span>
-            <span class="xp-badge">⭐ ${xp.toLocaleString('pt-BR')} XP</span>
+            <span class="xp-badge" id="xp-badge">⭐ ${xp.toLocaleString('pt-BR')} XP</span>
           </div>
         </div>
-        <div class="progress-bar-track" role="progressbar">
-          ${PHASES.map((phase) => {
-            const isActive = phase.id === currentPhase;
-            const isCompleted = completedPhases.includes(phase.id);
-            let cls = 'phase-step';
-            if (isActive) cls += ' active';
-            else if (isCompleted) cls += ' completed';
-            return `
-              <div class="${cls}" data-phase="${phase.id}" title="${phase.emoji} ${phase.label}">
-                <div class="phase-step-dot"></div>
-                <span class="phase-step-label">${phase.label}</span>
-              </div>
-            `;
-          }).join('')}
+        <div class="progress-bar-track" id="progress-bar-track" role="progressbar">
+          ${_buildPhaseSteps(currentPhase, completedPhases)}
         </div>
       </div>
     </nav>
   `;
 
-  // Assina conectividade — cancela assinatura anterior se houver
-  _stopConnectivity();
-  _unsubConnectivity = subscribeConnectivity((online) => {
+  _attachPhaseStepClicks(root);
+}
+
+/** Atualiza apenas XP e passos de fase no DOM existente. */
+function _patchNavbar(root, state, currentPhase, xp, completedPhases) {
+  const xpBadge = qs('#xp-badge');
+  if (xpBadge) xpBadge.textContent = `⭐ ${xp.toLocaleString('pt-BR')} XP`;
+
+  const track = qs('#progress-bar-track');
+  if (track) {
+    track.innerHTML = _buildPhaseSteps(currentPhase, completedPhases);
+    _attachPhaseStepClicks(root);
+  }
+}
+
+function _buildPhaseSteps(currentPhase, completedPhases) {
+  return PHASES.map((phase) => {
+    const isActive    = phase.id === currentPhase;
+    const isCompleted = completedPhases.includes(phase.id);
+    let cls = 'phase-step';
+    if (isActive) cls += ' active';
+    else if (isCompleted) cls += ' completed';
+    return `
+      <div class="${cls}" data-phase="${phase.id}" title="${phase.emoji} ${phase.label}">
+        <div class="phase-step-dot"></div>
+        <span class="phase-step-label">${phase.label}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function _attachPhaseStepClicks(root) {
+  root.querySelectorAll('.phase-step').forEach((el) => {
+    el.addEventListener('click', () => {
+      const phase = el.dataset.phase;
+      const state = getState();
+      if (
+        state.completedPhases.includes(phase) ||
+        phase === state.currentPhase
+      ) {
+        if (isSM()) setPhase(phase);
+        else setLocalPhase(phase);
+      }
+    });
+  });
+}
+
+export function initNavbar() {
+  // Abre as subscriptions uma única vez — ficam ativas durante toda a sessão.
+  // Os callbacks atualizam o DOM diretamente via patch cirúrgico, sem recriar
+  // as subs a cada mudança de estado (era o bug: renderNavbar() as recriava).
+  subscribeConnectivity((online) => {
     _isOnline = online;
     const badge = qs('#connectivity-badge');
     if (!badge) return;
@@ -91,10 +136,8 @@ function renderNavbar() {
     badge.querySelector('.connectivity-label').textContent = online ? 'conectado' : 'offline';
   });
 
-  // Assina contagem de presença — cancela assinatura anterior se houver
-  _stopPresence();
-  _unsubPresence = subscribeParticipants((count) => {
-    // Atualiza o pill de presença na navbar
+  subscribeParticipants((count) => {
+    _presenceCount = count;
     const pill = qs('#online-pill');
     if (pill) {
       pill.querySelector('.online-count').textContent = count;
@@ -115,39 +158,6 @@ function renderNavbar() {
     }
   });
 
-  // Phase step click — allow navigating to completed phases
-  root.querySelectorAll('.phase-step').forEach((el) => {
-    el.addEventListener('click', () => {
-      const phase = el.dataset.phase;
-      const state = getState();
-      if (
-        state.completedPhases.includes(phase) ||
-        phase === state.currentPhase
-      ) {
-        // SM avança globalmente (persiste no Firestore); membros do time
-        // navegam só localmente, igual ao padrão dos botões "← Voltar"
-        if (isSM()) setPhase(phase);
-        else setLocalPhase(phase);
-      }
-    });
-  });
-}
-
-function _stopPresence() {
-  if (_unsubPresence) {
-    _unsubPresence();
-    _unsubPresence = null;
-  }
-}
-
-function _stopConnectivity() {
-  if (_unsubConnectivity) {
-    _unsubConnectivity();
-    _unsubConnectivity = null;
-  }
-}
-
-export function initNavbar() {
   renderNavbar();
   subscribe(renderNavbar);
 }
