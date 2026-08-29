@@ -72,6 +72,7 @@ import {
   setLocalPhase,
   completePhase,
   addXP,
+  mergeMonsters,
   prioritizeMonsters,
   subscribe,
   resetState,
@@ -537,5 +538,120 @@ describe('prioritizeMonsters', () => {
 
     const ids = getState().monsters.map((m) => m.id);
     expect(ids).toEqual(['b', 'c', 'a']);
+  });
+});
+
+// ── mergeMonsters ─────────────────────────────────────────────────────────────
+
+describe('mergeMonsters', () => {
+  beforeEach(() => {
+    setState({ smDeviceId: DEVICE_SM });
+    _mocks.currentDeviceId = DEVICE_SM;
+    batchWrite.mockClear();
+  });
+
+  it('emite batchWrite com keepUpdate e dropUpdate corretos', () => {
+    seedMonsters([
+      { id: 'keep', text: 'Keep', reactions: { fire: 2, eyes: 1, bulb: 0 }, selected: false },
+      { id: 'drop', text: 'Drop', reactions: { fire: 1, eyes: 0, bulb: 2 }, selected: false },
+    ]);
+    batchWrite.mockClear();
+
+    mergeMonsters('keep', 'drop', 'Keep');
+
+    expect(batchWrite).toHaveBeenCalledTimes(1);
+    const [sessionId, ops] = batchWrite.mock.calls[0];
+    expect(sessionId).toBe('test-session-id');
+
+    // keepUpdate: reações somadas, mergedFrom incluído
+    const keepOp = ops.find((o) => o.itemId === 'keep');
+    expect(keepOp).toMatchObject({
+      type: 'update',
+      colName: 'monsters',
+      data: {
+        reactions: { fire: 3, eyes: 1, bulb: 2 },
+        selected: false,
+        mergedFrom: ['keep', 'drop'],
+      },
+    });
+    // keepUpdate não deve incluir merged nem mergedInto (o keep não é descartado)
+    expect(keepOp.data).not.toHaveProperty('merged');
+    expect(keepOp.data).not.toHaveProperty('mergedInto');
+
+    // dropUpdate: apenas merged=true e mergedInto=keepId
+    const dropOp = ops.find((o) => o.itemId === 'drop');
+    expect(dropOp).toMatchObject({
+      type: 'update',
+      colName: 'monsters',
+      data: { merged: true, mergedInto: 'keep' },
+    });
+    // dropUpdate não deve tocar em text, reactions nem mergedFrom
+    expect(dropOp.data).not.toHaveProperty('text');
+    expect(dropOp.data).not.toHaveProperty('reactions');
+    expect(dropOp.data).not.toHaveProperty('mergedFrom');
+  });
+
+  it('o drop some da lista local após o merge (optimistic update)', () => {
+    seedMonsters([
+      { id: 'keep', text: 'Keep', reactions: { fire: 2, eyes: 0, bulb: 0 }, selected: false },
+      { id: 'drop', text: 'Drop', reactions: { fire: 1, eyes: 0, bulb: 0 }, selected: false },
+    ]);
+
+    mergeMonsters('keep', 'drop', 'Keep');
+
+    const ids = getState().monsters.map((m) => m.id);
+    expect(ids).not.toContain('drop');
+    expect(ids).toContain('keep');
+  });
+
+  it('o keep absorve as reações do drop corretamente', () => {
+    seedMonsters([
+      { id: 'keep', text: 'Keep', reactions: { fire: 3, eyes: 2, bulb: 1 }, selected: false },
+      { id: 'drop', text: 'Drop', reactions: { fire: 1, eyes: 1, bulb: 4 }, selected: false },
+    ]);
+
+    mergeMonsters('keep', 'drop', 'Keep');
+
+    const keep = getState().monsters.find((m) => m.id === 'keep');
+    expect(keep.reactions).toEqual({ fire: 4, eyes: 3, bulb: 5 });
+  });
+
+  it('aceita texto personalizado para o keep', () => {
+    seedMonsters([
+      { id: 'keep', text: 'Original', reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false },
+      { id: 'drop', text: 'Outros',   reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false },
+    ]);
+
+    mergeMonsters('keep', 'drop', 'Novo Título');
+
+    // batchWrite do keep deve ter o novo texto
+    const keepOp = batchWrite.mock.calls[0][1].find((o) => o.itemId === 'keep');
+    expect(keepOp.data.text).toBe('Novo Título');
+
+    // estado local também deve refletir o novo texto
+    const keep = getState().monsters.find((m) => m.id === 'keep');
+    expect(keep.text).toBe('Novo Título');
+  });
+
+  it('keep herda selected=true se qualquer um dos dois estava selecionado', () => {
+    seedMonsters([
+      { id: 'keep', text: 'Keep', reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false },
+      { id: 'drop', text: 'Drop', reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: true },
+    ]);
+
+    mergeMonsters('keep', 'drop', 'Keep');
+
+    const keep = getState().monsters.find((m) => m.id === 'keep');
+    expect(keep.selected).toBe(true);
+  });
+
+  it('não faz nada quando um dos ids não existe', () => {
+    seedMonsters([
+      { id: 'keep', text: 'Keep', reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false },
+    ]);
+    batchWrite.mockClear();
+
+    mergeMonsters('keep', 'fantasma', 'Keep');
+    expect(batchWrite).not.toHaveBeenCalled();
   });
 });

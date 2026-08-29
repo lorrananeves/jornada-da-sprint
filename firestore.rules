@@ -90,7 +90,8 @@ service cloud.firestore {
         allow create: if
           validSessionId(sessionId)
           && isValidMonster(request.resource.data);
-        // Permite atualizar reações, flag selected, priorityRank, text e mergedFrom
+        // Permite atualizar: reações, selected, priorityRank, text, mergedFrom,
+        // merged (flag de monstro absorvido) e mergedInto (id do monstro keeper).
         allow update: if
           validSessionId(sessionId)
           && isMonsterUpdate(request.resource.data, resource.data);
@@ -367,7 +368,7 @@ function isReactionUpdate(newData, oldData) {
 }
 
 // Monstro: permite mudar reactions.*, selected, priorityRank, text, mergedFrom,
-// e os campos de marcação de merge inativo (merged, mergedInto).
+// merged (flag de monstro absorvido) e mergedInto (id do keeper).
 //
 // Há três tipos de update válidos:
 //   1. Reação simples: apenas reactions.* sobe +1 (nunca decrementa)
@@ -379,31 +380,37 @@ function isReactionUpdate(newData, oldData) {
 // permitia fabricar mergedFrom para inflar contadores arbitrariamente.
 // Agora o merge de reações é limitado a <= soma dos dois monstros.
 function isMonsterUpdate(newData, oldData) {
-  // Caso 3: marcação de monstro descartado no merge (drop)
-  // Só merged e mergedInto podem mudar — todos os outros campos ficam iguais.
-  // Casos 1 e 2: atualização normal ou merge do keep.
-  // Usamos isDropMark || (schemaOk && ...) para evitar if/let como statements.
   return (
-    // Caso 3 — drop mark
+    // Caso 3 — drop mark: apenas merged e mergedInto mudam.
+    // text, selected, reactions e mergedFrom ficam idênticos ao documento atual.
+    // Isso impede que alguém use o drop mark para sobrescrever mergedFrom
+    // com ids fabricados.
     newData.get('merged', false) == true
     && newData.get('mergedInto', '') is string
     && newData.get('mergedInto', '').size() > 0
-    && newData.get('text', '')        == oldData.get('text', '')
-    && newData.get('selected', false) == oldData.get('selected', false)
-    && newData.get('reactions', {})   == oldData.get('reactions', {})
+    && newData.get('mergedInto', '').size() <= 32
+    && newData.get('text', '')               == oldData.get('text', '')
+    && newData.get('selected', false)        == oldData.get('selected', false)
+    && newData.get('reactions', {})          == oldData.get('reactions', {})
+    && newData.get('mergedFrom', null)       == oldData.get('mergedFrom', null)
   ) || (
-    // Casos 1 e 2 — reação simples ou merge do keep
+    // Casos 1 e 2 — reação simples ou merge do keep.
+    // merged e mergedInto são permitidos no schema mas não podem virar true/set
+    // neste path (o keep nunca é marcado como merged).
     newData.keys().hasOnly(['text', 'reactions', 'selected', 'priorityRank', 'mergedFrom', 'merged', 'mergedInto'])
     && newData.get('text', '') is string
     && newData.get('text', '').size() >= 1
     && newData.get('text', '').size() <= 1000
     && (!('priorityRank' in newData.diff(oldData).affectedKeys())
         || newData.get('priorityRank', null) is number)
+    && (newData.get('mergedFrom', null) == null || newData.get('mergedFrom', []) is list)
+    && (newData.get('merged', null) == null || newData.get('merged', false) is bool)
+    && (newData.get('mergedInto', null) == null || newData.get('mergedInto', '') is string)
     // Reações nunca podem cair
     && newData.get('reactions', {}).get('fire', 0) >= oldData.get('reactions', {}).get('fire', 0)
     && newData.get('reactions', {}).get('eyes', 0) >= oldData.get('reactions', {}).get('eyes', 0)
     && newData.get('reactions', {}).get('bulb', 0) >= oldData.get('reactions', {}).get('bulb', 0)
-    // Reação simples (+1 máx) ou merge do keep (mergedFrom cresceu)
+    // Reação simples (+1 máx por campo) ou merge do keep (mergedFrom cresceu)
     && (
       (
         newData.get('reactions', {}).get('fire', 0) <= oldData.get('reactions', {}).get('fire', 0) + 1
