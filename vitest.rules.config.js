@@ -13,7 +13,7 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   test: {
     environment: 'node',
-    include:     ['e2e/rules.test.js'],
+    include:     ['rules/rules.test.js'],
     // Sem clearMocks global — os testes de Rules não usam vi.mock
     clearMocks: false,
     // Timeout generoso: cada teste faz I/O real com o emulador

@@ -6,8 +6,8 @@
  * pelo front-end da aplicação.
  *
  * Pré-requisito: emulador Firestore rodando em localhost:8080.
- *   npm run emulator   (em outro terminal)
- *   npm run test:rules (roda este arquivo)
+ *   npm run emulator    (em outro terminal — requer Java)
+ *   npm run test:rules  (roda este arquivo via vitest.rules.config.js)
  *
  * Estrutura dos grupos:
  *   Doc raiz (sessions/{id})

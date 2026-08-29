@@ -54,6 +54,18 @@ jobs:
           VITE_FIREBASE_USE_EMULATOR: 'true'
           FIREBASE_TOKEN: unused
 
+      # Testes de segurança das Firestore Rules — cenários adversariais.
+      # Rodam no mesmo emulador (só Firestore; Auth não é necessário aqui).
+      - name: Run Firestore Rules tests (inside emulator)
+        run: |
+          npx firebase emulators:exec \
+            --only firestore \
+            --project demo-jornada-rules \
+            "npm run test:rules"
+        env:
+          CI: 'true'
+          FIREBASE_TOKEN: unused
+
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
