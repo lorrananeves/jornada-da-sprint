@@ -30,6 +30,10 @@ service cloud.firestore {
         // smDeviceId e smUid são imutáveis após a criação da sessão:
         // nenhum participante — nem mesmo o SM — pode alterá-los via update.
         && !isChangingIdentityFields(request.resource.data, resource.data)
+        // xp só pode crescer e o incremento por operação é limitado ao maior
+        // valor de XP do jogo (30 pts — criação de missão). Impede que qualquer
+        // cliente grave um valor absoluto arbitrário (ex: xp = 999999).
+        && isXpUpdateValid(request.resource.data, resource.data)
         // participantCount é imutável após a primeira definição pelo SM:
         // evita que participantes manipulem o denominador do check-in.
         && (
@@ -261,6 +265,21 @@ function isChangingIdentityFields(newData, oldData) {
   return
     newData.get('smDeviceId', null) != oldData.get('smDeviceId', null)
     || newData.get('smUid', null) != oldData.get('smUid', null);
+}
+
+// Valida alterações no campo xp:
+//   1. xp nunca pode diminuir (impede "zerar" ou manipular pontuação).
+//   2. O incremento por write é limitado a 30 pts — o maior valor de XP
+//      do jogo (criação de missão). Impede escritas absolutas arbitrárias
+//      como xp = 999999, que passariam pela validação de tipo (is number && >= 0).
+//
+// Nota: o frontend legítimo só grava xp via FieldValue.increment em addXP(),
+// nunca via setScalarState/saveSession. Esta rule é uma camada de defesa
+// extra no servidor para o caso de chamadas diretas à API do Firestore.
+function isXpUpdateValid(newData, oldData) {
+  let newXp = newData.get('xp', 0);
+  let oldXp = oldData.get('xp', 0);
+  return newXp >= oldXp && newXp <= oldXp + 30;
 }
 
 // Verifica se o request vem do Scrum Master legítimo da sessão.

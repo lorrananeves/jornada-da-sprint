@@ -171,6 +171,11 @@ export function setScalarState(scalars) {
       checkins: _c, treasures: _t, monsters: _m, solutions: _s, missions: _mi,
       role: _r,
       _guestAutoJoin: _g,
+      // xp nunca é enviado via setScalarState/saveSession — apenas addXP()
+      // pode alterar o XP no Firestore, usando FieldValue.increment atômico.
+      // Enviar um valor absoluto aqui abriria o vetor de qualquer participante
+      // gravar xp = 999999 diretamente no documento raiz.
+      xp: _xp,
       ..._firestoreScalars
     } = _state;
     saveSession(_sessionId, _firestoreScalars).catch((e) => {
