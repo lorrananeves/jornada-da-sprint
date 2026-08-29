@@ -940,6 +940,131 @@
 }
 
 /* ============================================================
+   Voting Screen
+   ============================================================ */
+.screen-voting {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* Banner de orçamento de votos */
+.voting-budget-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
+
+.voting-budget-icon {
+  font-size: 1.75rem;
+  flex-shrink: 0;
+}
+
+.voting-budget-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.voting-budget-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.voting-budget-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.voting-budget-dot--used {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.voting-budget-remaining {
+  margin-left: auto;
+  font-size: 0.875rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* Lista de monstros para votação */
+.voting-monsters-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.monster-vote-card {
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.monster-vote-card--voted {
+  border-color: var(--success);
+  box-shadow: 0 0 0 2px rgba(63,185,80,0.2);
+}
+
+.monster-vote-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.monster-vote-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  min-width: 40px;
+}
+
+.monster-vote-count-number {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.monster-vote-count-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* Sumário de notas da discussão no card de votação */
+.monster-vote-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.monster-vote-note-tag {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 3px 8px;
+}
+
+.monster-vote-btn {
+  margin-top: 8px;
+}
+
+/* ============================================================
    Missions Screen
    ============================================================ */
 .screen-missions {
