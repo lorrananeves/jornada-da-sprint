@@ -16,7 +16,8 @@ export function showXPToast(amount, reason = '') {
   const root = qs('#toast-root');
   if (!root) return;
 
-  root.innerHTML = '';
+  const existingXP = root.querySelector('.xp-toast');
+  if (existingXP) existingXP.remove();
   if (_xpTimer) clearTimeout(_xpTimer);
 
   const toast = document.createElement('div');
