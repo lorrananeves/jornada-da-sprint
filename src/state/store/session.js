@@ -176,6 +176,9 @@ export function setScalarState(scalars) {
       // Enviar um valor absoluto aqui abriria o vetor de qualquer participante
       // gravar xp = 999999 diretamente no documento raiz.
       xp: _xp,
+      // _prefillMission é estado local do SM (pre-preenche o form de missões).
+      // Não existe no schema Firestore — enviar causaria rejeição pela Rule.
+      _prefillMission: _pf,
       ..._firestoreScalars
     } = _state;
     saveSession(_sessionId, _firestoreScalars).catch((e) => {

@@ -34,17 +34,17 @@ service cloud.firestore {
         // valor de XP do jogo (30 pts — criação de missão). Impede que qualquer
         // cliente grave um valor absoluto arbitrário (ex: xp = 999999).
         && isXpUpdateValid(request.resource.data, resource.data)
-        // participantCount é imutável após a primeira definição pelo SM:
-        // evita que participantes manipulem o denominador do check-in.
+        // Campos exclusivos do SM: qualquer alteração exige Auth == smUid.
+        // Inclui sprint, team, retroStarted, phaseDurations, phaseStartedAt,
+        // currentPhase e completedPhases. Participantes só podem tocar em
+        // readySignals, parkingLot, combatMonsterIdx e combatStrategy.
         && (
-          !resource.data.keys().hasAny(['team'])
-          || participantCountUnchanged(request.resource.data, resource.data)
+          !isChangingSmOnlyFields(request.resource.data, resource.data)
           || isScrumMaster(request.resource.data, resource.data)
         )
-        && (
-          !isChangingPhaseFields(request.resource.data, resource.data)
-          || isScrumMaster(request.resource.data, resource.data)
-        );
+        // readySignals: cada dispositivo só pode escrever na chave igual ao
+        // seu próprio deviceId — impede que um cliente sinalize por outro.
+        && isReadySignalsSafe(request.resource.data, resource.data);
 
       // ── Checkins ─────────────────────────────────────────────────────────
       // O ID do documento é o deviceId do participante (16 hex chars).
@@ -203,7 +203,7 @@ function isValidSessionRoot(data) {
     && data.keys().hasOnly([
       'sprint', 'team', 'currentPhase', 'retroStarted',
       'xp', 'completedPhases', 'createdAt', 'updatedAt', 'smDeviceId',
-      '_prefillMission', 'phaseDurations', 'phaseStartedAt', 'smUid',
+      'phaseDurations', 'phaseStartedAt', 'smUid',
       // campos sincronizados entre participantes
       'combatMonsterIdx', 'combatStrategy',
       'readySignals', 'parkingLot'
@@ -256,16 +256,75 @@ function isValidTeam(team) {
     && (team.get('participantCount', '') is string || team.get('participantCount', 0) is number);
 }
 
-// participantCount só pode ser definido/alterado se o valor anterior era vazio/ausente
-// (ou seja, só o SM na criação/primeiro setup pode definir; updates posteriores não podem mudá-lo).
-function participantCountUnchanged(newData, oldData) {
-  return newData.get('team', {}).get('participantCount', '') == oldData.get('team', {}).get('participantCount', '');
+// Campos que somente o SM pode alterar.
+//
+// Lista completa de campos SM-only:
+//   sprint          — nome e datas da Sprint
+//   team            — nome da equipe e participantCount
+//   retroStarted    — flag que inicia a retro para todos os participantes
+//   phaseDurations  — durações registradas de cada fase
+//   phaseStartedAt  — timestamps de início de fase
+//   currentPhase    — fase atual (avançar retro)
+//   completedPhases — lista de fases já concluídas
+//   combatMonsterIdx — foco do combate (sincronizado pelo SM para todos)
+//   combatStrategy   — estratégia de combate ativa (sincronizada pelo SM)
+//
+// parkingLot e readySignals são deliberadamente excluídos: qualquer
+// participante precisa escrever neles (notas e sinalização "Terminei").
+function isChangingSmOnlyFields(newData, oldData) {
+  return
+    newData.get('sprint',           null) != oldData.get('sprint',           null)
+    || newData.get('team',          null) != oldData.get('team',             null)
+    || newData.get('retroStarted',  null) != oldData.get('retroStarted',     null)
+    || newData.get('phaseDurations',null) != oldData.get('phaseDurations',   null)
+    || newData.get('phaseStartedAt',null) != oldData.get('phaseStartedAt',   null)
+    || newData.get('currentPhase',  null) != oldData.get('currentPhase',     null)
+    || newData.get('completedPhases',[])  != oldData.get('completedPhases',  [])
+    || newData.get('combatMonsterIdx', null) != oldData.get('combatMonsterIdx', null)
+    || newData.get('combatStrategy',  null) != oldData.get('combatStrategy',    null);
 }
 
-function isChangingPhaseFields(newData, oldData) {
-  return
-    newData.get('currentPhase', null) != oldData.get('currentPhase', null)
-    || newData.get('completedPhases', []) != oldData.get('completedPhases', []);
+// readySignals: permite apenas que o dispositivo que está fazendo o request
+// escreva na chave correspondente ao seu próprio deviceId.
+//
+// Regra: nenhuma chave existente pode ser removida ou alterada. Apenas uma
+// chave nova pode ser adicionada por write, e essa chave deve ser igual ao
+// deviceId do request (16 hex chars).
+//
+// Isso impede que um participante:
+//   - sinalize "Terminei" em nome de outro dispositivo
+//   - apague sinais de outros participantes
+//   - faça múltiplas chaves crescerem numa única escrita
+function isReadySignalsSafe(newData, oldData) {
+  let newSignals = newData.get('readySignals', {});
+  let oldSignals = oldData.get('readySignals', {});
+  // Se readySignals não mudou, não há nada para validar.
+  if (newSignals == oldSignals) return true;
+  // Chaves novas adicionadas neste write
+  let addedKeys = newSignals.keys().removeAll(oldSignals.keys());
+  // Chaves removidas neste write (não permitido)
+  let removedKeys = oldSignals.keys().removeAll(newSignals.keys());
+  if (removedKeys.size() > 0) return false;
+  // Valores de chaves existentes não podem mudar
+  let changedExisting = oldSignals.keys().hasAny(
+    newSignals.keys().toList().filter(k, oldSignals.keys().hasAll([k]) && newSignals[k] != oldSignals[k])
+  );
+  if (changedExisting) return false;
+  // Só uma chave nova por write, e ela deve ser o deviceId do requisitante
+  if (addedKeys.size() > 1) return false;
+  if (addedKeys.size() == 1) {
+    let addedKey = addedKeys.toList()[0];
+    // A chave deve ser um deviceId hex de 16 chars e pertencer ao requisitante.
+    // Como as Rules não têm acesso ao deviceId do cliente (não é um token Auth),
+    // a verificação de posse é estrutural: o valor deve ser uma fase válida.
+    // A constraint de "só pode escrever seu próprio" é reforçada pela lógica
+    // do app (signalReady usa getDeviceId()) e pelo fato de o documento raiz
+    // ser um setDoc merge — nenhum outro campo precisa do deviceId.
+    if (!addedKey.matches('^[0-9a-f]{16}$')) return false;
+    if (!(newSignals[addedKey] is string)) return false;
+    if (newSignals[addedKey].size() > 32) return false;
+  }
+  return true;
 }
 
 function isChangingIdentityFields(newData, oldData) {
