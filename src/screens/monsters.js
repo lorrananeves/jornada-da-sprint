@@ -110,21 +110,28 @@ function showMergeModal(keepMonster, dropMonster) {
     input.focus();
     input.select();
 
-    backdrop.querySelector('#btn-merge-cancel').addEventListener('click', () => {
+    // cleanup centralizado: remove o listener de teclado e o backdrop.
+    // Chamado em todos os caminhos de fechar para evitar leak do onKey.
+    const cleanup = () => {
+      document.removeEventListener('keydown', onKey);
       backdrop.remove();
+    };
+
+    backdrop.querySelector('#btn-merge-cancel').addEventListener('click', () => {
+      cleanup();
       resolve({ confirmed: false, keepText: '' });
     });
 
     backdrop.querySelector('#btn-merge-confirm').addEventListener('click', () => {
       const keepText = input.value.trim() || keepMonster.text;
-      backdrop.remove();
+      cleanup();
       resolve({ confirmed: true, keepText });
     });
 
     // Fechar clicando fora
     backdrop.addEventListener('click', (e) => {
       if (e.target === backdrop) {
-        backdrop.remove();
+        cleanup();
         resolve({ confirmed: false, keepText: '' });
       }
     });
@@ -132,8 +139,7 @@ function showMergeModal(keepMonster, dropMonster) {
     // Fechar com Escape
     const onKey = (e) => {
       if (e.key === 'Escape') {
-        backdrop.remove();
-        document.removeEventListener('keydown', onKey);
+        cleanup();
         resolve({ confirmed: false, keepText: '' });
       }
     };
