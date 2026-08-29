@@ -39,30 +39,25 @@ export function showModal({
       </div>
     `;
 
-    backdrop.querySelector('#modal-cancel').addEventListener('click', () => {
+    // cleanup centralizado: remove o listener de teclado e fecha o modal.
+    // Chamado em todos os caminhos de fechar para evitar leak do onKey
+    // (mesmo padrão aplicado ao modal de merge em monsters.js).
+    const cleanup = (result) => {
+      document.removeEventListener('keydown', onKey);
       closeModal();
-      resolve(false);
-    });
+      resolve(result);
+    };
 
-    backdrop.querySelector('#modal-confirm').addEventListener('click', () => {
-      closeModal();
-      resolve(true);
-    });
+    backdrop.querySelector('#modal-cancel').addEventListener('click', () => cleanup(false));
+    backdrop.querySelector('#modal-confirm').addEventListener('click', () => cleanup(true));
 
     backdrop.addEventListener('click', (e) => {
-      if (e.target === backdrop) {
-        closeModal();
-        resolve(false);
-      }
+      if (e.target === backdrop) cleanup(false);
     });
 
-    // Fecha com Escape — consistente com o modal de merge em monsters.js
+    // Fecha com Escape
     const onKey = (e) => {
-      if (e.key === 'Escape') {
-        document.removeEventListener('keydown', onKey);
-        closeModal();
-        resolve(false);
-      }
+      if (e.key === 'Escape') cleanup(false);
     };
     document.addEventListener('keydown', onKey);
 

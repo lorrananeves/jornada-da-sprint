@@ -82,3 +82,14 @@ export function unmarkReacted(sessionId, colName, itemId, deviceId, reactionKey)
   _getCache().delete(key);
   _persist();
 }
+
+/**
+ * Invalida o cache em memória, forçando releitura do localStorage na próxima
+ * operação. Deve ser chamado ao iniciar ou resetar uma sessão para que entradas
+ * da sessão anterior não ocupem memória indefinidamente.
+ * As chaves incluem o sessionId, então hasReacted() nunca produz falso positivo
+ * entre sessões — mas sem esta limpeza o cache cresce sem limite na mesma aba.
+ */
+export function clearReactionsCache() {
+  _cache = null;
+}

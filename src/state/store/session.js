@@ -47,6 +47,7 @@ import { getDeviceId } from '../../services/presence.js';
 import { initAuth, getCurrentUser, onAuthChange, signInAnon } from '../../services/auth.js';
 import { showErrorToast } from '../../components/xpToast.js';
 import { isSM as _isSM } from './role.js';
+import { clearReactionsCache } from '../../services/reactions.js';
 
 const STORAGE_KEY = 'jornada_sprint_session';
 
@@ -448,6 +449,8 @@ export function resetState() {
   _clearCheckinDoneFlags();
   sessionStorage.removeItem('_jornada_prev_mission_status');
   sessionStorage.removeItem('_jornada_role');
+  // Invalida o cache de reações para não acumular entradas da sessão encerrada
+  clearReactionsCache();
 
   notify();
 }
@@ -467,6 +470,8 @@ export async function startNewSession() {
   // Limpa flags de sessão anteriores para garantir estado limpo
   _clearCheckinDoneFlags();
   sessionStorage.removeItem('_jornada_prev_mission_status');
+  // Invalida o cache de reações para não acumular entradas da sessão anterior
+  clearReactionsCache();
 
   // Garante que o SM tem um uid antes de criar a sessão.
   // As Firestore Rules exigem auth.uid == smUid para que o SM possa

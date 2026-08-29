@@ -309,6 +309,9 @@ async function renderTrends(container, sessions) {
   for (const r of results) {
     const seen = new Set();
     for (const m of r.monsters) {
+      // Ignora monstros absorvidos por merge — seu texto já está representado
+      // pelo card que os absorveu, evitando contagem duplicada de recorrências.
+      if (m.merged) continue;
       const key = m.text?.trim().toLowerCase();
       if (!key || seen.has(key)) continue;
       seen.add(key);
