@@ -8,7 +8,7 @@
 import { getState, setPhase, setLocalPhase, isSM } from '../state/store.js';
 import { calcSummaryStats, getMoodLabel } from '../services/stats.js';
 import { exportAsPDF, exportAsPNG } from '../services/export.js';
-import { formatDate, formatISO, formatXP, getScoreEmoji, getPriorityLabel, getStrategyLabel } from '../utils/format.js';
+import { formatDate, formatISO, formatXP, getScoreEmoji, getPriorityLabel, getStrategyLabel, DISCUSSION_TYPES, getDiscussionTypeEmoji, getDiscussionTypeLabel } from '../utils/format.js';
 import { escapeHTML } from '../utils/dom.js';
 
 export function renderReport(root) {
@@ -16,7 +16,7 @@ export function renderReport(root) {
   const stats = calcSummaryStats(state);
   const mood = getMoodLabel(stats.checkinStats.average);
 
-  const { sprint, team, treasures, monsters, solutions, missions, checkins } = state;
+  const { sprint, team, treasures, monsters, solutions, missions, checkins, discussions } = state;
 
   const treasureItems = treasures.filter((t) => t.category === 'treasure');
   const recognitionItems = treasures.filter((t) => t.category === 'recognition');
@@ -27,9 +27,24 @@ export function renderReport(root) {
     return items.map((item) => `<div class="report-item">${emoji} ${escapeHTML(item.text || item.title)}</div>`).join('');
   }
 
+  /** Notas de discussão vinculadas a um monstro */
+  function renderDiscussionNotesForMonster(monsterId) {
+    const notes = discussions.filter((n) => n.monsterId === monsterId);
+    if (!notes.length) return '';
+    return `<div class="report-discussion-notes">` +
+      notes.map((n) => `
+        <div class="report-discussion-note">
+          <span class="report-discussion-note-type">${getDiscussionTypeEmoji(n.type)} ${getDiscussionTypeLabel(n.type)}</span>
+          <span class="report-discussion-note-text">${escapeHTML(n.text)}</span>
+        </div>
+      `).join('') +
+    `</div>`;
+  }
+
+  /** Soluções legadas (sessões antigas sem discussions) */
   function renderSolutionsForMonster(monsterId) {
     const sols = solutions.filter((s) => s.monsterId === monsterId);
-    if (!sols.length) return '<p class="text-muted text-sm" style="margin-left:16px">Sem soluções registradas.</p>';
+    if (!sols.length) return '';
     return sols.map((s) => `
       <div class="report-item report-solution-row">
         <span>${getStrategyLabel(s.strategy)}</span>
@@ -37,6 +52,49 @@ export function renderReport(root) {
         <span class="report-solution-votes">👍 ${s.votes}</span>
       </div>
     `).join('');
+  }
+
+  /** Missões vinculadas a um monstro (via monsterId) */
+  function renderMissionsForMonster(monsterId) {
+    const linked = missions.filter((m) => m.monsterId === monsterId);
+    if (!linked.length) return '';
+    return linked.map((m) => `
+      <div class="report-mission-linked">
+        <span>🚀 ${escapeHTML(m.title)}</span>
+        ${m.owner ? `<span class="text-xs text-muted">👤 ${escapeHTML(m.owner)}</span>` : ''}
+      </div>
+    `).join('');
+  }
+
+  /** Sumário global de notas por tipo */
+  function renderDiscussionSummary() {
+    if (!discussions.length) return '';
+    const byType = {};
+    DISCUSSION_TYPES.forEach((t) => { byType[t.id] = discussions.filter((n) => n.type === t.id); });
+
+    const hasAny = DISCUSSION_TYPES.some((t) => byType[t.id].length > 0);
+    if (!hasAny) return '';
+
+    return `
+      <div class="report-section">
+        <div class="report-section-title">📝 Resultados da Discussão</div>
+        <div class="report-discussion-summary">
+          ${DISCUSSION_TYPES.map((t) => {
+            const items = byType[t.id];
+            if (!items.length) return '';
+            return `
+              <div class="report-discussion-type-block">
+                <div class="report-discussion-type-header">
+                  <span>${t.emoji} ${t.label}</span>
+                  <span class="badge badge-info">${items.length}</span>
+                </div>
+                ${items.map((n) => `<div class="report-discussion-note-text" style="margin:4px 0 4px 16px">• ${escapeHTML(n.text)}</div>`).join('')}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
   }
 
   root.innerHTML = `
@@ -138,25 +196,29 @@ export function renderReport(root) {
           ${treasures.length === 0 ? '<p class="text-muted text-sm">Nenhum tesouro registrado.</p>' : ''}
         </div>
 
-        <!-- Monsters & Solutions -->
+        <!-- Monsters & Discussions (novas sessões) + soluções legadas -->
         <div class="report-section">
-          <div class="report-section-title">👹 Monstros & Soluções</div>
+          <div class="report-section-title">👹 Monstros & Discussões</div>
           ${monsters.length === 0
             ? '<p class="text-muted text-sm">Nenhum monstro identificado.</p>'
             : monsters.map((m) => `
               <div class="report-monster-block">
                 <div class="report-item report-item--monster">
-                  👹 <strong>${escapeHTML(m.text)}</strong>
-                  ${m.selected ? ' <span class="text-accent">🎯</span>' : ''}
+                  ${m.mergedFrom?.length ? '🔗' : '👹'} <strong>${escapeHTML(m.text)}</strong>
                   <span class="report-monster-reactions text-xs text-muted">
-                    🔥${m.reactions.fire||0} 👀${m.reactions.eyes||0} 💡${m.reactions.bulb||0}
+                    🔥${m.reactions?.fire||0} 👀${m.reactions?.eyes||0} 💡${m.reactions?.bulb||0}
+                    ${m.voteCount ? ` · 🗳️${m.voteCount}` : ''}
                   </span>
                 </div>
+                ${renderDiscussionNotesForMonster(m.id)}
                 ${renderSolutionsForMonster(m.id)}
+                ${renderMissionsForMonster(m.id)}
               </div>
             `).join('')
           }
         </div>
+
+        ${renderDiscussionSummary()}
 
         <!-- Missions -->
         <div class="report-section">
@@ -169,9 +231,11 @@ export function renderReport(root) {
                   <div>
                     <strong>🚀 ${escapeHTML(m.title)}</strong>
                     ${m.description ? `<div class="report-mission-desc">${escapeHTML(m.description)}</div>` : ''}
+                    ${m.successCriteria ? `<div class="report-mission-desc" style="color:var(--text-muted)">🎯 ${escapeHTML(m.successCriteria)}</div>` : ''}
                   </div>
                   <div class="report-mission-meta">
                     <span class="meta-priority">${getPriorityLabel(m.priority)}</span>
+                    ${m.strategy ? `<span class="badge badge-info text-xs">${getStrategyLabel(m.strategy)}</span>` : ''}
                     ${m.owner ? `<span class="meta-owner">👤 ${escapeHTML(m.owner)}</span>` : ''}
                     ${m.deadline ? `<span class="meta-deadline">📅 ${formatDate(m.deadline)}</span>` : ''}
                   </div>

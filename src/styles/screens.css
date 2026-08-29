@@ -1363,6 +1363,69 @@
   white-space: nowrap;
 }
 
+/* Notas de discussão aninhadas sob o monstro no relatório */
+.report-discussion-notes {
+  margin-left: 16px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.report-discussion-note {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 0.875rem;
+}
+
+.report-discussion-note-type {
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.report-discussion-note-text {
+  color: var(--text);
+}
+
+/* Missão vinculada diretamente ao monstro */
+.report-mission-linked {
+  margin-left: 20px;
+  margin-top: 6px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+/* Sumário de resultados da discussão */
+.report-discussion-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.report-discussion-type-block {
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.report-discussion-type-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
 /* Card de missão */
 .report-mission-row {
   display: flex;
