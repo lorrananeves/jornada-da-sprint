@@ -414,6 +414,21 @@ export function addXP(amount) {
 
 // ── Reset & Nova sessão ───────────────────────────────────────────────────────
 
+/**
+ * Remove todas as chaves de check-in com sessionId embutido do sessionStorage.
+ * A chave tem o formato `_jornada_checkin_done_<sessionId>` — sem prefixo fixo
+ * não há como remover por nome exato, por isso percorremos todas as chaves.
+ */
+function _clearCheckinDoneFlags() {
+  const prefix = '_jornada_checkin_done_';
+  const toRemove = [];
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i);
+    if (key && key.startsWith(prefix)) toRemove.push(key);
+  }
+  toRemove.forEach((k) => sessionStorage.removeItem(k));
+}
+
 export function resetState() {
   // Cancela todas as subscriptions do Firestore antes de limpar o estado
   _unsubs.forEach((u) => u());
@@ -424,7 +439,7 @@ export function resetState() {
 
   localStorage.removeItem(STORAGE_KEY);
   // Limpa flags de sessão do sessionStorage (check-in, missões anteriores, role)
-  sessionStorage.removeItem('_jornada_checkin_done');
+  _clearCheckinDoneFlags();
   sessionStorage.removeItem('_jornada_prev_mission_status');
   sessionStorage.removeItem('_jornada_role');
 
@@ -444,7 +459,7 @@ export async function startNewSession() {
   _state = DEFAULT_STATE();
   localStorage.removeItem(STORAGE_KEY);
   // Limpa flags de sessão anteriores para garantir estado limpo
-  sessionStorage.removeItem('_jornada_checkin_done');
+  _clearCheckinDoneFlags();
   sessionStorage.removeItem('_jornada_prev_mission_status');
 
   // Garante que o SM tem um uid antes de criar a sessão.
