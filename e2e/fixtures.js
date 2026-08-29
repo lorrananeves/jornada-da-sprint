@@ -71,18 +71,38 @@ export const test = base.extend({
     const sessionId = new URL(smPage.url()).searchParams.get('s');
     if (!sessionId) throw new Error('App não gerou ?s= na URL — setup falhou.');
 
+    // Aguarda que o Firestore confirme o estado de lobby antes de o membro abrir.
+    // O setScalarState é fire-and-forget (não awaita o saveSession), então
+    // waitForSelector('#btn-start-retro') pode ser satisfeito localmente antes
+    // de o write chegar ao emulador. Sem esse guard, o membro pode carregar
+    // o snapshot antigo (currentPhase = 'setup') do Firestore.
+    //
+    // Estratégia: polling na REST API do emulador até o documento confirmar lobby.
+    const firestoreUrl =
+      `http://127.0.0.1:8080/v1/projects/demo-project/databases/(default)/documents/sessions/${sessionId}`;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const res  = await fetch(firestoreUrl).catch(() => null);
+      const body = res ? await res.json().catch(() => null) : null;
+      const phase = body?.fields?.currentPhase?.stringValue;
+      if (phase === 'lobby') break;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+
     // ── Membro: entra na sessão já criada ─────────────────────────────────
     const memberContext = await browser.newContext();
     const memberPage    = await memberContext.newPage();
 
-    await memberPage.goto(`/?s=${sessionId}`);
-    await waitForApp(memberPage);
-
-    // Captura logs do console do membro para diagnóstico
+    // Captura logs e erros do membro ANTES do goto para não perder mensagens do bootstrap
     const memberConsoleLogs = [];
     memberPage.on('console', (msg) => {
       memberConsoleLogs.push(`[${msg.type()}] ${msg.text()}`);
     });
+    memberPage.on('pageerror', (err) => {
+      memberConsoleLogs.push(`[pageerror] ${err.message}`);
+    });
+
+    await memberPage.goto(`/?s=${sessionId}`);
+    await waitForApp(memberPage);
 
     // Com ?s= na URL e sessão existente, o store seta _guestAutoJoin=true e vai
     // direto para o lobby de espera sem exibir roleSelect.
@@ -92,7 +112,11 @@ export const test = base.extend({
     } catch (e) {
       // Dump diagnóstico: HTML visível + logs do console
       const html = await memberPage.locator('#screen-root').innerHTML().catch(() => '(sem #screen-root)');
+      const storeState = await memberPage.evaluate(() => {
+        try { return JSON.parse(localStorage.getItem('jornada_sprint_session') || 'null'); } catch { return null; }
+      }).catch(() => null);
       console.log('[DIAG] memberPage HTML no timeout:\n', html.slice(0, 2000));
+      console.log('[DIAG] memberPage localStorage state:', JSON.stringify(storeState, null, 2));
       console.log('[DIAG] memberPage console logs:\n', memberConsoleLogs.join('\n'));
       throw e;
     }
