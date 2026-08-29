@@ -15,6 +15,7 @@ import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySigna
 import { getDeviceId } from '../services/presence.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
 import { createTypingIndicator } from '../components/typingIndicator.js';
+import { canSelectMonster, canMergeMonsters, canPrioritizeMonsters } from '../utils/permissions.js';
 
 const SUGGESTIONS = [
   'Dependências externas', 'Problemas técnicos', 'Comunicação',
@@ -47,17 +48,17 @@ function buildMonsterCard(m, draggable) {
         ${m.selected ? '<span class="badge badge-accent mt-1 flex">🎯 Selecionado</span>' : ''}
       </div>
       ${draggable ? '<span class="monster-drag-handle" title="Arraste sobre outro card para mesclar">⠿</span>' : ''}
-    </div>
-    <div class="monster-card-actions">
-      ${REACTIONS.map((r) => `
-        <button class="reaction-btn" aria-label="${r.title} (${r.label})" data-id="${escapeHTML(m.id)}" data-reaction="${r.key}" title="${r.title}">
-          ${r.label} <span class="reaction-count">${m.reactions[r.key] || 0}</span>
-        </button>
-      `).join('')}
-      <button class="btn btn-sm ${m.selected ? 'btn-danger' : 'btn-ghost'}" data-select="${escapeHTML(m.id)}" aria-pressed="${m.selected}" style="margin-left:auto">
-        ${m.selected ? '✕ Remover' : '🎯 Selecionar'}
-      </button>
-    </div>
+   </div>
+   <div class="monster-card-actions">
+     ${REACTIONS.map((r) => `
+       <button class="reaction-btn" aria-label="${r.title} (${r.label})" data-id="${escapeHTML(m.id)}" data-reaction="${r.key}" title="${r.title}">
+         ${r.label} <span class="reaction-count">${m.reactions[r.key] || 0}</span>
+       </button>
+     `).join('')}
+     ${canSelectMonster() ? `<button class="btn btn-sm ${m.selected ? 'btn-danger' : 'btn-ghost'}" data-select="${escapeHTML(m.id)}" aria-pressed="${m.selected}" style="margin-left:auto">
+       ${m.selected ? '✕ Remover' : '🎯 Selecionar'}
+     </button>` : ''}
+   </div>
   `;
 
   return card;
@@ -168,7 +169,7 @@ export function renderMonsters(root) {
           </div>
           <p class="phase-description">
             O que atrapalhou a equipe? Identifique os problemas e priorize os mais críticos.
-            ${sm ? '<span class="merge-hint">Arraste um card sobre outro para mesclar, ou selecione 2 e clique em <strong>Mesclar</strong>.</span>' : ''}
+            ${canMergeMonsters() ? '<span class="merge-hint">Arraste um card sobre outro para mesclar, ou selecione 2 e clique em <strong>Mesclar</strong>.</span>' : ''}
           </p>
         </div>
 
@@ -189,8 +190,8 @@ export function renderMonsters(root) {
           <h4>Monstros identificados <span class="badge badge-info">${monsters.length}</span></h4>
           <div class="monsters-toolbar-actions">
             ${selectedCount > 0 ? `<span class="badge badge-accent" data-selected-count>🎯 ${selectedCount} selecionado${selectedCount !== 1 ? 's' : ''}</span>` : ''}
-            ${sm && selectedCount === 2 ? '<button class="btn btn-info btn-sm" id="btn-merge-selected">🔗 MESCLAR SELECIONADOS</button>' : ''}
-            <button class="btn btn-ghost btn-sm" id="btn-prioritize">🔥 PRIORIZAR AUTOMATICAMENTE</button>
+            ${canMergeMonsters() && selectedCount === 2 ? '<button class="btn btn-info btn-sm" id="btn-merge-selected">🔗 MESCLAR SELECIONADOS</button>' : ''}
+            ${canPrioritizeMonsters() ? '<button class="btn btn-ghost btn-sm" id="btn-prioritize">🔥 PRIORIZAR AUTOMATICAMENTE</button>' : ''}
           </div>
         </div>
 
@@ -209,7 +210,7 @@ export function renderMonsters(root) {
     `; // end preserveInputs
       const grid = root.querySelector('#monsters-grid');
       if (monsters.length > 0) {
-        monsters.forEach((m) => grid.appendChild(buildMonsterCard(m, sm)));
+        monsters.forEach((m) => grid.appendChild(buildMonsterCard(m, canMergeMonsters())));
       }
     });
 
@@ -226,7 +227,6 @@ export function renderMonsters(root) {
 
   function attachEvents() {
     attachReadySignal(root, signalReady);
-    const sm = isSM();
 
     // Suggestion chips
     root.querySelectorAll('[data-suggestion]').forEach((chip) => {
@@ -299,10 +299,11 @@ export function renderMonsters(root) {
       });
     });
 
-    // Select — patch cirúrgico
+    // Select — patch cirúrgico (somente SM)
     root.querySelectorAll('[data-select]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (!canSelectMonster()) return;
         const id = btn.dataset.select;
         selectMonster(id);
         const card = root.querySelector(`.monster-card[data-id="${CSS.escape(id)}"]`);
@@ -331,8 +332,8 @@ export function renderMonsters(root) {
       });
     });
 
-    // ── Drag & Drop (SM only) ──────────────────────────────────────────────
-    if (sm) {
+    // ── Drag & Drop (SM only — merge é ação destrutiva) ───────────────────
+    if (canMergeMonsters()) {
       root.querySelectorAll('.monster-card[draggable]').forEach((card) => {
         card.addEventListener('dragstart', (e) => {
           _dragId = card.dataset.id;

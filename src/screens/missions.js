@@ -12,6 +12,7 @@ import { xpForMission } from '../services/xp.js';
 import { showXPToast, showErrorToast } from '../components/xpToast.js';
 import { showModal } from '../components/modal.js';
 import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
+import { canCreateMission, canRemoveMission } from '../utils/permissions.js';
 import { getDeviceId } from '../services/presence.js';
 import { getPriorityLabel, getStrategyLabel, formatDate } from '../utils/format.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
@@ -120,9 +121,10 @@ export function renderMissions(root) {
               }).join('')}
             </div>
           </div>
-        ` : (_prevMissions === null && isSM() ? '<div id="prev-missions-loading" style="display:none"></div>' : '')}
+        ` : (_prevMissions === null && canCreateMission() ? '<div id="prev-missions-loading" style="display:none"></div>' : '')}
 
-        <!-- Add Mission Form -->
+        <!-- Add Mission Form (somente SM) -->
+        ${canCreateMission() ? `
         <div class="card mb-5">
           <h4 style="margin-bottom:16px">+ Nova Missão</h4>
           <div style="display:flex;flex-direction:column;gap:12px">
@@ -168,6 +170,7 @@ export function renderMissions(root) {
             <button class="btn btn-primary" id="btn-add-mission">🚀 ADICIONAR MISSÃO</button>
           </div>
         </div>
+        ` : ''}
 
         <!-- Missions List -->
         ${missions.length > 0 ? `
@@ -184,7 +187,7 @@ export function renderMissions(root) {
                       <div class="mission-title">🚀 ${escapeHTML(m.title)}</div>
                       ${m.description ? `<p style="font-size:0.875rem;color:var(--text-muted);margin-top:4px">${escapeHTML(m.description)}</p>` : ''}
                     </div>
-                    <button class="btn btn-danger btn-sm btn-icon" data-remove="${escapeHTML(m.id)}" title="Remover missão">🗑️</button>
+                    ${canRemoveMission() ? `<button class="btn btn-danger btn-sm btn-icon" data-remove="${escapeHTML(m.id)}" title="Remover missão">🗑️</button>` : ''}
                   </div>
                   <div class="mission-meta">
                     <span class="badge ${PRIORITIES.find((p) => p.id === m.priority)?.class || 'badge-info'}">
@@ -222,8 +225,8 @@ export function renderMissions(root) {
 
     attachEvents(prefill);
 
-    // Carrega missões anteriores na primeira vez (somente SM)
-    if (_prevMissions === null && isSM()) {
+    // Carrega missões anteriores na primeira vez (somente SM — quem pode criar missões)
+    if (_prevMissions === null && canCreateMission()) {
       loadPreviousMissions(
         new URLSearchParams(window.location.search).get('s') || '',
         getState().team?.name || ''
@@ -236,7 +239,7 @@ export function renderMissions(root) {
 
   function attachEvents(prefill) {
     attachReadySignal(root, signalReady);
-    root.querySelector('#btn-add-mission').addEventListener('click', async () => {
+    root.querySelector('#btn-add-mission')?.addEventListener('click', async () => {
       const title = root.querySelector('#mission-title').value.trim();
       if (!title) {
         root.querySelector('#mission-title').style.borderColor = 'var(--danger)';

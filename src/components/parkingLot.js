@@ -8,6 +8,7 @@
 
 import { getState, subscribe, addParkingItem, removeParkingItem } from '../state/store.js';
 import { escapeHTML, preserveInputs } from '../utils/dom.js';
+import { canRemoveParkingItem } from '../utils/permissions.js';
 
 const HIDDEN_PHASES = new Set(['home', 'auth', 'smDashboard', 'roleSelect', 'lobby']);
 
@@ -57,7 +58,7 @@ function _render() {
               : items.map((item) => `
                 <li class="parking-lot-item">
                   <span class="parking-lot-item-text">${escapeHTML(item.text)}</span>
-                  <button class="parking-lot-remove" data-id="${escapeHTML(item.id)}" aria-label="Remover">✕</button>
+                  ${canRemoveParkingItem() ? `<button class="parking-lot-remove" data-id="${escapeHTML(item.id)}" aria-label="Remover">✕</button>` : ''}
                 </li>
               `).join('')}
           </ul>

@@ -11,6 +11,7 @@ import {
 import { xpForSolution } from '../services/xp.js';
 import { showXPToast, showErrorToast } from '../components/xpToast.js';
 import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
+import { canConvertToMission } from '../utils/permissions.js';
 import { getDeviceId } from '../services/presence.js';
 import { getStrategyLabel } from '../utils/format.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
@@ -132,9 +133,9 @@ export function renderCombat(root) {
                   <button class="vote-btn" data-vote="${escapeHTML(sol.id)}" aria-label="Votar nesta solução (${sol.votes || 0} votos)">
                     👍 ${sol.votes || 0}
                   </button>
-                  <button class="btn btn-ghost btn-sm" data-to-mission="${escapeHTML(sol.id)}" title="Transformar em Missão" aria-label="Transformar solução em missão">
+                  ${canConvertToMission() ? `<button class="btn btn-ghost btn-sm" data-to-mission="${escapeHTML(sol.id)}" title="Transformar em Missão" aria-label="Transformar solução em missão">
                     🚀
-                  </button>
+                  </button>` : ''}
                 </div>
               `).join('')}
             </div>
