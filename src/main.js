@@ -15,6 +15,8 @@ import { renderCheckin } from './screens/checkin.js';
 import { renderTreasures } from './screens/treasures.js';
 import { renderMonsters } from './screens/monsters.js';
 import { renderCombat } from './screens/combat.js';
+import { renderDiscussion } from './screens/discussion.js';
+import { renderVoting } from './screens/voting.js';
 import { renderMissions } from './screens/missions.js';
 import { renderComplete } from './screens/complete.js';
 import { renderReport } from './screens/report.js';
@@ -29,7 +31,10 @@ const SCREENS = {
   checkin:      renderCheckin,
   treasures:    renderTreasures,
   monsters:     renderMonsters,
+  // combat mantido para compatibilidade com sessões existentes
   combat:       renderCombat,
+  discussion:   renderDiscussion,
+  voting:       renderVoting,
   missions:     renderMissions,
   complete:     renderComplete,
   report:       renderReport,
@@ -39,7 +44,7 @@ const SCREENS = {
 // Fases pré-retro (home, auth, smDashboard, roleSelect, setup, lobby) são
 // locais/transitórias e não devem criar entradas de histórico.
 const HISTORY_PHASES = new Set([
-  'checkin', 'treasures', 'monsters', 'combat', 'missions', 'complete', 'report',
+  'checkin', 'treasures', 'monsters', 'combat', 'discussion', 'voting', 'missions', 'complete', 'report',
 ]);
 
 function getScreenRoot() {
