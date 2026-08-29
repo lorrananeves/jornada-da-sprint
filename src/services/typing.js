@@ -61,8 +61,10 @@ function typingColRef(sessionId) {
 let _debounceTimer = null; // timer para remover o indicador após parar de digitar
 let _renewTimer    = null; // timer de renovação de TTL enquanto digita
 let _isTyping      = false; // true enquanto há um documento ativo no Firestore
+let _currentPhase  = null; // fase gravada no último _writeTyping
 
 async function _writeTyping(phase) {
+  _currentPhase = phase;
   const sessionId = getOrCreateSessionId();
   try {
     await setDoc(typingRef(sessionId, getDeviceId()), {
@@ -95,20 +97,33 @@ export function signalTyping(phase) {
 
   // Agenda a remoção após DEBOUNCE_MS de inatividade
   _debounceTimer = setTimeout(() => {
-    clearTyping();
+    clearTyping(phase);
   }, DEBOUNCE_MS);
 }
 
 /**
  * Remove imediatamente o status de digitação deste dispositivo.
+ * Aceita `phase` opcional: se fornecida, só apaga o documento quando a fase
+ * gravada corresponde à fase informada — evita que o blur num campo de uma
+ * fase limpe o indicador que foi gravado por outra fase/aba.
  * Chamar ao dar blur no campo ou ao submeter o formulário.
  */
-export function clearTyping() {
+export function clearTyping(phase) {
+  // Se a fase não corresponde ao documento ativo, não apaga o Firestore
+  // mas ainda para os timers locais para não vazar setInterval/setTimeout.
+  if (phase !== undefined && _currentPhase !== null && phase !== _currentPhase) {
+    clearTimeout(_debounceTimer);
+    clearInterval(_renewTimer);
+    _debounceTimer = null;
+    _renewTimer    = null;
+    return;
+  }
   clearTimeout(_debounceTimer);
   clearInterval(_renewTimer);
   _debounceTimer = null;
   _renewTimer    = null;
   _isTyping      = false;
+  _currentPhase  = null;
   const sessionId = getOrCreateSessionId();
   deleteDoc(typingRef(sessionId, getDeviceId())).catch(() => {});
 }

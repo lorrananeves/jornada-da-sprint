@@ -3,11 +3,14 @@
  */
 
 /**
- * Format a date string (YYYY-MM-DD) to localised Brazilian format
+ * Format a date string (YYYY-MM-DD or ISO timestamp) to localised Brazilian format.
+ * Trunca para os primeiros 10 caracteres antes do split para que strings ISO
+ * completas (ex: "2024-01-15T10:00:00Z") não incluam a parte de tempo no campo do dia.
  */
 export function formatDate(dateStr) {
   if (!dateStr) return '—';
-  const [year, month, day] = dateStr.split('-');
+  const [year, month, day] = String(dateStr).slice(0, 10).split('-');
+  if (!year || !month || !day) return '—';
   return `${day}/${month}/${year}`;
 }
 

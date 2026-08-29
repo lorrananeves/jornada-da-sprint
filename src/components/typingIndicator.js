@@ -53,7 +53,7 @@ export function createTypingIndicator(container, phase) {
     if (_watched.has(fieldEl)) return;
 
     const onInput = () => signalTyping(phase);
-    const onBlur  = () => clearTyping();
+    const onBlur  = () => clearTyping(phase);
 
     fieldEl.addEventListener('input', onInput);
     fieldEl.addEventListener('blur',  onBlur);
@@ -63,7 +63,7 @@ export function createTypingIndicator(container, phase) {
   /** Remove todos os listeners e a subscription do Firestore. */
   function destroy() {
     unsub();
-    clearTyping();
+    clearTyping(phase);
     for (const [fieldEl, { onInput, onBlur }] of _watched) {
       fieldEl.removeEventListener('input', onInput);
       fieldEl.removeEventListener('blur',  onBlur);

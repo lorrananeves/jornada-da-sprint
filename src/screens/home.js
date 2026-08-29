@@ -8,6 +8,7 @@
 import { setLocalPhase, hasSavedSession, resetState, getState, startNewSession } from '../state/store.js';
 import { getCurrentUser } from '../services/auth.js';
 import { showModal } from '../components/modal.js';
+import { escapeHTML } from '../utils/dom.js';
 
 export function renderHome(root) {
   const hasSession = hasSavedSession();
@@ -25,7 +26,7 @@ export function renderHome(root) {
             ⏩ CONTINUAR JORNADA
           </button>
           ${user ? `
-            <button class="btn btn-ghost btn-lg" id="btn-dashboard" aria-label="Acessar meu painel de retrospectivas (${user.displayName || user.email})">🧙 MEU PAINEL (${user.displayName || user.email})</button>
+            <button class="btn btn-ghost btn-lg" id="btn-dashboard" aria-label="Acessar meu painel de retrospectivas (${escapeHTML(user.displayName || user.email)})">🧙 MEU PAINEL (${escapeHTML(user.displayName || user.email)})</button>
           ` : ''}
           ${hasSession
             ? `<button class="btn btn-danger btn-sm" id="btn-reset" aria-label="Apagar todos os dados salvos">🗑️ APAGAR TODOS OS DADOS</button>`

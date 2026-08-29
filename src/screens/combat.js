@@ -241,17 +241,20 @@ export function renderCombat(root) {
       });
     });
 
-    // Monster navigation — só o SM navega (sincroniza para todos)
+    // Monster navigation — só o SM navega (sincroniza para todos).
+    // Guards explícitos nos índices evitam ir abaixo de 0 ou acima do último
+    // elemento quando o botão é acionado programaticamente (ex: btn.click())
+    // antes de ser desabilitado pelo próximo render.
     const prevBtn = root.querySelector('#btn-prev-monster');
     const nextMonBtn = root.querySelector('#btn-next-monster');
     if (prevBtn) prevBtn.addEventListener('click', () => {
-      if (!isSM()) return;
+      if (!isSM() || currentMonsterIdx <= 0) return;
       currentMonsterIdx--;
       setCombatFocus(currentMonsterIdx, currentStrategy);
       render();
     });
     if (nextMonBtn) nextMonBtn.addEventListener('click', () => {
-      if (!isSM()) return;
+      if (!isSM() || currentMonsterIdx >= selectedMonsters.length - 1) return;
       currentMonsterIdx++;
       setCombatFocus(currentMonsterIdx, currentStrategy);
       render();
