@@ -197,6 +197,9 @@ export function renderReport(root) {
     btn.textContent = '⏳ Gerando PDF...';
     try {
       await exportAsPDF(state, `jornada-sprint-${sprint.name || 'relatorio'}.pdf`);
+    } catch (e) {
+      console.error('exportAsPDF failed:', e);
+      alert('Não foi possível gerar o PDF. Verifique o console para mais detalhes.');
     } finally {
       btn.disabled = false;
       btn.innerHTML = '📄 BAIXAR PDF';
@@ -209,6 +212,9 @@ export function renderReport(root) {
     btn.textContent = '⏳ Gerando imagem...';
     try {
       await exportAsPNG(reportEl, `jornada-sprint-${sprint.name || 'relatorio'}.png`);
+    } catch (e) {
+      console.error('exportAsPNG failed:', e);
+      alert('Não foi possível gerar a imagem. Verifique o console para mais detalhes.');
     } finally {
       btn.disabled = false;
       btn.innerHTML = '🖼️ BAIXAR IMAGEM';

@@ -263,7 +263,7 @@ export function renderCombat(root) {
   // Retorna uma string que muda sempre que qualquer voto ou o conjunto de
   // soluções muda — permite detectar atualizações remotas além de length.
   function _fingerprint(solutions) {
-    return solutions.map((s) => `${s.id}:${s.votes|0}`).join('|');
+    return solutions.map((s) => `${s.id}:${s.votes||0}`).join('|');
   }
 
   // Subscription em tempo real: re-renderiza quando soluções, votos ou foco mudam remotamente

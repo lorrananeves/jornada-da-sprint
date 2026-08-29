@@ -191,7 +191,7 @@ export function renderTreasures(root) {
   // itens muda — permite detectar atualizações remotas além de length.
   function _fingerprint(treasures) {
     return treasures.map((t) =>
-      `${t.id}:${t.reactions.heart|0},${t.reactions.thumbs|0},${t.reactions.bulb|0}`
+      `${t.id}:${t.reactions.heart||0},${t.reactions.thumbs||0},${t.reactions.bulb||0}`
     ).join('|');
   }
 

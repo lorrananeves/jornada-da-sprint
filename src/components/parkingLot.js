@@ -87,8 +87,8 @@ function _render() {
     const doAdd = () => {
       const text = input.value.trim();
       if (!text) return;
-      addParkingItem(text);
-      input.value = '';
+      input.value = '';        // limpa antes: addParkingItem() dispara notify() síncrono
+      addParkingItem(text);    // que recria o DOM via _render() — input seria nó órfão
     };
 
     addBtn.addEventListener('click', doAdd);

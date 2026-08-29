@@ -390,7 +390,7 @@ export function renderMonsters(root) {
   // conjunto de monstros muda — permite detectar atualizações remotas além de length.
   function _fingerprint(monsters) {
     return monsters.map((m) =>
-      `${m.id}:${m.reactions.fire|0},${m.reactions.eyes|0},${m.reactions.bulb|0},${m.selected ? 1 : 0}`
+      `${m.id}:${m.reactions.fire||0},${m.reactions.eyes||0},${m.reactions.bulb||0},${m.selected ? 1 : 0}`
     ).join('|');
   }
 

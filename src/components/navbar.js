@@ -2,7 +2,7 @@
  * Navbar + Phase Progress Bar Component
  */
 
-import { getState, subscribe, setPhase, setState, isSM } from '../state/store.js';
+import { getState, subscribe, setPhase, setLocalPhase, setState, isSM } from '../state/store.js';
 import { subscribeParticipants } from '../services/presence.js';
 import { subscribeConnectivity } from '../services/firebase.js';
 import { qs } from '../utils/dom.js';
@@ -124,7 +124,10 @@ function renderNavbar() {
         state.completedPhases.includes(phase) ||
         phase === state.currentPhase
       ) {
-        setPhase(phase);
+        // SM avança globalmente (persiste no Firestore); membros do time
+        // navegam só localmente, igual ao padrão dos botões "← Voltar"
+        if (isSM()) setPhase(phase);
+        else setLocalPhase(phase);
       }
     });
   });
