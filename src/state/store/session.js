@@ -311,13 +311,17 @@ async function initFirebase() {
         remoteScalars.updatedAt <= _state.updatedAt
       ) return;
 
-      // Fases locais do membro que não devem ser sobrescritas por snapshots remotos:
-      //   - 'roleSelect': membro ainda está escolhendo o papel
+      // Fases locais que não devem ser sobrescritas por snapshots remotos:
+      //   - 'roleSelect': participante ainda está identificando o papel
       //   - 'lobby': membro está na sala de espera; só segue o SM quando retroStarted=true
+      //   - 'home' sem role: bootstrap ainda em andamento; o initFirebase vai resolver
+      //     a fase correta. Sem essa proteção, um snapshot remoto pode forçar o membro
+      //     para 'setup' ou outra fase do SM antes que _guestAutoJoin seja setado.
       const localPhase = _state.currentPhase;
       const keepPhase =
         localPhase === 'roleSelect' ||
-        (localPhase === 'lobby' && !remoteScalars.retroStarted);
+        (localPhase === 'lobby' && !remoteScalars.retroStarted) ||
+        (localPhase === 'home' && !getRole());
 
       _state = { ..._state, ...remoteScalars };
       if (keepPhase) _state.currentPhase = localPhase;
