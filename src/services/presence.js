@@ -94,6 +94,11 @@ export async function joinSession() {
     return;
   }
 
+  // Para o intervalo anterior antes de criar um novo — evita acúmulo de
+  // setIntervals quando joinSession() é chamado mais de uma vez na mesma
+  // aba (ex: roleSelect → lobby sem reload).
+  stopHeartbeat();
+
   // Inicia o heartbeat: renova lastSeen e expiresAt a cada ciclo
   _heartbeatTimer = setInterval(async () => {
     try {
