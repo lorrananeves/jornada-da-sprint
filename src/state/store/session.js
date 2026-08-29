@@ -389,6 +389,9 @@ export function setPhase(phase) {
 
 export function setLocalPhase(phase) {
   _state = { ..._state, currentPhase: phase };
+  // Persiste no localStorage para que um reload após navegação via popstate
+  // restaure a fase correta em vez da última fase salva por setScalarState.
+  saveToStorage(_state);
   notify();
 }
 

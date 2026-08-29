@@ -149,7 +149,6 @@ function showMergeModal(keepMonster, dropMonster) {
 
 export function renderMonsters(root) {
   let _timer  = null;
-  let _unsub  = null;
   let _typing = null;
   // Id do card sendo arrastado (só relevante para o SM)
   let _dragId = null;
@@ -397,11 +396,14 @@ export function renderMonsters(root) {
     });
   }
 
-  // Retorna uma string que muda sempre que qualquer reação, seleção ou o
-  // conjunto de monstros muda — permite detectar atualizações remotas além de length.
+  // Retorna uma string que muda sempre que qualquer reação, seleção, ordem de
+  // prioridade ou o conjunto de monstros muda — permite detectar todas as
+  // atualizações remotas além do simples comprimento da lista.
+  // priorityRank incluído para que prioritizeMonsters() dispare re-render
+  // mesmo quando reações e seleção não mudam (bug #09).
   function _fingerprint(monsters) {
     return monsters.map((m) =>
-      `${m.id}:${m.reactions.fire||0},${m.reactions.eyes||0},${m.reactions.bulb||0},${m.selected ? 1 : 0}`
+      `${m.id}:${m.reactions.fire||0},${m.reactions.eyes||0},${m.reactions.bulb||0},${m.selected ? 1 : 0},${m.priorityRank ?? ''}`
     ).join('|');
   }
 
@@ -409,12 +411,9 @@ export function renderMonsters(root) {
   // ou quando participantCount sobe (entrada tardia — atualiza contador de "Terminei").
   let _lastFingerprint      = _fingerprint(getState().monsters);
   let _lastParticipantCount = parseInt(getState().team?.participantCount, 10) || 0;
-  // A referência a _unsub é capturada via closure após a atribuição para evitar
-  // a janela de corrida onde o callback dispara antes de _unsub ser atribuído.
   const unsub = subscribe((state) => {
     if (state.currentPhase !== 'monsters') {
       unsub();
-      _unsub = null;
       if (_typing) { _typing.destroy(); _typing = null; }
       return;
     }
@@ -426,7 +425,6 @@ export function renderMonsters(root) {
       render();
     }
   });
-  _unsub = unsub;
 
   render();
 }

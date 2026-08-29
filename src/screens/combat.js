@@ -31,7 +31,6 @@ export function renderCombat(root) {
   const state = getState();
   const selectedMonsters = state.monsters.filter((m) => m.selected);
   let _timer  = null;
-  let _unsub  = null;
   let _typing = null;
 
   // Lê o foco inicial do store (pode ter sido sincronizado pelo SM)
@@ -281,12 +280,9 @@ export function renderCombat(root) {
   let _lastStrategy         = currentStrategy;
   let _lastParticipantCount = parseInt(getState().team?.participantCount, 10) || 0;
 
-  // A referência a _unsub é capturada via closure após a atribuição para evitar
-  // a janela de corrida onde o callback dispara antes de _unsub ser atribuído.
   const unsub = subscribe((state) => {
     if (state.currentPhase !== 'combat') {
       unsub();
-      _unsub = null;
       if (_typing) { _typing.destroy(); _typing = null; }
       return;
     }
@@ -311,7 +307,6 @@ export function renderCombat(root) {
       render();
     }
   });
-  _unsub = unsub;
 
   render();
 }

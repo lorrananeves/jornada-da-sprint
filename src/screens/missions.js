@@ -56,7 +56,6 @@ async function loadPreviousMissions(currentSessionId, currentTeamName) {
 
 export function renderMissions(root) {
   let _timer  = null;
-  let _unsub  = null;
   let _typing = null;
   /** Missões da retro anterior (carregadas uma vez, apenas para SM). */
   let _prevMissions = null;
@@ -334,25 +333,27 @@ export function renderMissions(root) {
 
   // Subscription em tempo real: re-renderiza quando missões mudam remotamente
   // ou quando participantCount sobe (entrada tardia — atualiza contador de "Terminei").
-  let _lastCount            = getState().missions.length;
+  // Usa fingerprint de conteúdo (id + título + status) para detectar também
+  // edições remotas a missões existentes, não apenas adições/remoções (bug #11).
+  const _missionFingerprint = (missions) =>
+    missions.map((m) => `${m.id}:${m.title}:${m.status || ''}`).join('|');
+
+  let _lastFingerprint      = _missionFingerprint(getState().missions);
   let _lastParticipantCount = parseInt(getState().team?.participantCount, 10) || 0;
-  // A referência a _unsub é capturada via closure após a atribuição para evitar
-  // a janela de corrida onde o callback dispara antes de _unsub ser atribuído.
   const unsub = subscribe((state) => {
     if (state.currentPhase !== 'missions') {
       unsub();
-      _unsub = null;
       if (_typing) { _typing.destroy(); _typing = null; }
       return;
     }
+    const fp       = _missionFingerprint(state.missions);
     const newCount = parseInt(state.team?.participantCount, 10) || 0;
-    if (state.missions.length !== _lastCount || newCount !== _lastParticipantCount) {
-      _lastCount            = state.missions.length;
+    if (fp !== _lastFingerprint || newCount !== _lastParticipantCount) {
+      _lastFingerprint      = fp;
       _lastParticipantCount = newCount;
       render();
     }
   });
-  _unsub = unsub;
 
   render();
 }

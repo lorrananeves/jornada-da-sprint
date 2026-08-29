@@ -117,6 +117,10 @@ export async function joinSession() {
   // mas agora não é crítico — o TTL cobre a falha.
   // Remove o handler anterior antes de registrar um novo para evitar
   // acúmulo quando joinSession() é chamado mais de uma vez na mesma aba.
+  // Não usa { once: true }: essa opção remove o listener após o primeiro disparo,
+  // mas o removeEventListener manual acima já garante que só existe um handler
+  // por vez. Combiná-los cria uma janela onde dois listeners coexistem brevemente
+  // (entre o addEventListener e o próximo removeEventListener).
   if (_beforeUnloadHandler) {
     window.removeEventListener('beforeunload', _beforeUnloadHandler);
   }
@@ -124,7 +128,7 @@ export async function joinSession() {
     stopHeartbeat();
     leaveSession();
   };
-  window.addEventListener('beforeunload', _beforeUnloadHandler, { once: true });
+  window.addEventListener('beforeunload', _beforeUnloadHandler);
 }
 
 /**

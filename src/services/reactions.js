@@ -7,24 +7,33 @@
  * Antes de enviar uma reação, o chamador verifica se ela já foi registrada.
  * Isso é uma defesa de UX (não um controle de segurança absoluto — as Firestore
  * Rules devem ser o guardião real).
+ *
+ * Cache em memória: o Set é carregado do localStorage apenas uma vez e mantido
+ * em `_cache`. Todas as operações de leitura/escrita usam o cache, evitando
+ * parse/serialize a cada reação e eliminando race conditions entre chamadas
+ * síncronas consecutivas (bug #08).
  */
 
 const STORAGE_KEY = '_jornada_reactions';
 const MAX_ENTRIES = 5000; // evita crescimento ilimitado do localStorage
 
-function _load() {
+/** Cache em memória — null antes da primeira leitura */
+let _cache = null;
+
+function _getCache() {
+  if (_cache !== null) return _cache;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? new Set(JSON.parse(raw)) : new Set();
+    _cache = raw ? new Set(JSON.parse(raw)) : new Set();
   } catch {
-    return new Set();
+    _cache = new Set();
   }
+  return _cache;
 }
 
-function _save(set) {
+function _persist() {
   try {
-    // Mantém apenas as últimas MAX_ENTRIES entradas para não acumular indefinidamente
-    const entries = [...set];
+    const entries = [..._cache];
     const trimmed = entries.length > MAX_ENTRIES ? entries.slice(-MAX_ENTRIES) : entries;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
   } catch {
@@ -43,7 +52,7 @@ function _save(set) {
  */
 export function hasReacted(sessionId, colName, itemId, deviceId, reactionKey) {
   const key = `${sessionId}:${colName}:${itemId}:${deviceId}:${reactionKey}`;
-  return _load().has(key);
+  return _getCache().has(key);
 }
 
 /**
@@ -56,9 +65,8 @@ export function hasReacted(sessionId, colName, itemId, deviceId, reactionKey) {
  */
 export function markReacted(sessionId, colName, itemId, deviceId, reactionKey) {
   const key = `${sessionId}:${colName}:${itemId}:${deviceId}:${reactionKey}`;
-  const set = _load();
-  set.add(key);
-  _save(set);
+  _getCache().add(key);
+  _persist();
 }
 
 /**
@@ -71,7 +79,6 @@ export function markReacted(sessionId, colName, itemId, deviceId, reactionKey) {
  */
 export function unmarkReacted(sessionId, colName, itemId, deviceId, reactionKey) {
   const key = `${sessionId}:${colName}:${itemId}:${deviceId}:${reactionKey}`;
-  const set = _load();
-  set.delete(key);
-  _save(set);
+  _getCache().delete(key);
+  _persist();
 }
