@@ -3,11 +3,20 @@
  *   interpole valores vindos do usuário ou do Firestore sem escapar.
  *
  * Monsters Screen
+ *
+ * Mudanças em relação à versão anterior:
+ *   - Seleção obrigatória removida: todos os monstros vão para a discussão
+ *   - SM pode renomear monstros (inline ou via modal)
+ *   - SM pode excluir monstros (com confirmação)
+ *   - SM pode desfazer merge de monstros agrupados
+ *   - Botão "Ir para Combate" substituído por "Ir para Discussão"
+ *   - Botão "Ordenar por votos" (antes "Priorizar automaticamente") — comportamento inalterado
  */
 
 import {
-  getState, subscribe, addMonster, reactToMonster, selectMonster, prioritizeMonsters,
-  mergeMonsters, addXP, setPhase, setLocalPhase, completePhase, isSM, signalReady,
+  getState, subscribe, addMonster, reactToMonster, prioritizeMonsters,
+  mergeMonsters, unmergeMonster, renameMonster, deleteMonster,
+  addXP, setPhase, setLocalPhase, completePhase, isSM, signalReady,
 } from '../state/store.js';
 import { xpForMonster } from '../services/xp.js';
 import { showXPToast, showErrorToast } from '../components/xpToast.js';
@@ -15,7 +24,8 @@ import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySigna
 import { getDeviceId } from '../services/presence.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
 import { createTypingIndicator } from '../components/typingIndicator.js';
-import { canSelectMonster, canMergeMonsters, canPrioritizeMonsters } from '../utils/permissions.js';
+import { canMergeMonsters, canUnmergeMonster, canRenameMonster, canDeleteMonster, canPrioritizeMonsters } from '../utils/permissions.js';
+import { showModal } from '../components/modal.js';
 
 const SUGGESTIONS = [
   'Dependências externas', 'Problemas técnicos', 'Comunicação',
@@ -29,37 +39,47 @@ const REACTIONS = [
   { key: 'bulb', label: '💡', title: 'Tenho uma ideia' },
 ];
 
-function buildMonsterCard(m, draggable) {
+function buildMonsterCard(m, isSMUser) {
   const card = document.createElement('div');
-  card.className = `card card-sm monster-card card-appear${m.selected ? ' selected-monster' : ''}${m.mergedFrom?.length ? ' monster-card--merged' : ''}`;
+  card.className = `card card-sm monster-card card-appear${m.mergedFrom?.length ? ' monster-card--merged' : ''}`;
   card.dataset.id = m.id;
 
-  if (draggable) {
+  if (isSMUser) {
     card.setAttribute('draggable', 'true');
     card.setAttribute('aria-grabbed', 'false');
   }
 
+  // Conta quantos relatos originais o monstro agrupou
+  const mergedCount = m.mergedFrom?.length ?? 0;
+  // Número de relatos = originais absorvidos + 1 (o próprio card)
+  const relatosCount = mergedCount > 0 ? mergedCount + 1 : null;
+
   card.innerHTML = `
     <div class="card-header" style="align-items:flex-start">
-      <span class="card-emoji">${m.mergedFrom?.length ? '🔗' : '👹'}</span>
-      <div style="flex:1">
+      <span class="card-emoji">${mergedCount > 0 ? '🔗' : '👹'}</span>
+      <div style="flex:1;min-width:0">
         <span class="card-text">${escapeHTML(m.text)}</span>
-        ${m.mergedFrom?.length ? `<span class="badge monster-badge-merged mt-1 flex" title="Agrupa ${m.mergedFrom.length} monstros">🔗 Mesclado (${m.mergedFrom.length + 1})</span>` : ''}
+        ${mergedCount > 0 ? `<span class="badge monster-badge-merged mt-1 flex" title="Agrupa ${relatosCount} relatos">🔗 ${relatosCount} relatos</span>` : ''}
         ${m.priorityRank != null ? `<span class="badge badge-info mt-1 flex" title="Posição no ranking de votos">#${m.priorityRank + 1}</span>` : ''}
-        ${m.selected ? '<span class="badge badge-accent mt-1 flex">🎯 Selecionado</span>' : ''}
       </div>
-      ${draggable ? '<span class="monster-drag-handle" title="Arraste sobre outro card para mesclar">⠿</span>' : ''}
-   </div>
-   <div class="monster-card-actions">
-     ${REACTIONS.map((r) => `
-       <button class="reaction-btn" aria-label="${r.title} (${r.label})" data-id="${escapeHTML(m.id)}" data-reaction="${r.key}" title="${r.title}">
-         ${r.label} <span class="reaction-count">${m.reactions[r.key] || 0}</span>
-       </button>
-     `).join('')}
-     ${canSelectMonster() ? `<button class="btn btn-sm ${m.selected ? 'btn-danger' : 'btn-ghost'}" data-select="${escapeHTML(m.id)}" aria-pressed="${m.selected}" style="margin-left:auto">
-       ${m.selected ? '✕ Remover' : '🎯 Selecionar'}
-     </button>` : ''}
-   </div>
+      <div style="display:flex;gap:4px;flex-shrink:0">
+        ${isSMUser ? `<span class="monster-drag-handle" title="Arraste sobre outro card para mesclar">⠿</span>` : ''}
+      </div>
+    </div>
+    <div class="monster-card-actions">
+      ${REACTIONS.map((r) => `
+        <button class="reaction-btn" aria-label="${r.title} (${r.label})" data-id="${escapeHTML(m.id)}" data-reaction="${r.key}" title="${r.title}">
+          ${r.label} <span class="reaction-count">${m.reactions[r.key] || 0}</span>
+        </button>
+      `).join('')}
+      ${isSMUser ? `
+        <div style="margin-left:auto;display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm btn-icon" data-rename="${escapeHTML(m.id)}" title="Renomear monstro">✏️</button>
+          ${mergedCount > 0 ? `<button class="btn btn-ghost btn-sm btn-icon" data-unmerge="${escapeHTML(m.id)}" title="Desfazer agrupamento">↩️</button>` : ''}
+          <button class="btn btn-danger btn-sm btn-icon" data-delete="${escapeHTML(m.id)}" title="Excluir monstro">🗑️</button>
+        </div>
+      ` : ''}
+    </div>
   `;
 
   return card;
@@ -67,8 +87,7 @@ function buildMonsterCard(m, draggable) {
 
 /**
  * Modal de confirmação de merge.
- * Retorna Promise<{ confirmed: boolean, keepText: string }> — o keepText é o
- * texto que o SM escolheu usar como nome do card resultante.
+ * Retorna Promise<{ confirmed: boolean, keepText: string }>
  */
 function showMergeModal(keepMonster, dropMonster) {
   return new Promise((resolve) => {
@@ -78,7 +97,7 @@ function showMergeModal(keepMonster, dropMonster) {
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="merge-modal-title" style="max-width:500px">
         <h2 class="modal-title" id="merge-modal-title">🔗 Mesclar Monstros?</h2>
         <p class="modal-body" style="margin-bottom:16px">
-          Os dois cards serão unidos em um só. As reactions serão somadas.
+          Os dois cards serão unidos em um só. Os relatos originais ficam preservados.
           Edite o nome do card resultante se quiser.
         </p>
 
@@ -95,7 +114,7 @@ function showMergeModal(keepMonster, dropMonster) {
         </div>
 
         <div class="form-group" style="margin:16px 0">
-          <label class="form-label" for="merge-name-input">Nome do card mesclado</label>
+          <label class="form-label" for="merge-name-input">Nome do card agrupado</label>
           <input class="form-input" id="merge-name-input" type="text" value="${escapeHTML(keepMonster.text)}" />
         </div>
 
@@ -112,8 +131,6 @@ function showMergeModal(keepMonster, dropMonster) {
     input.focus();
     input.select();
 
-    // cleanup centralizado: remove o listener de teclado e o backdrop.
-    // Chamado em todos os caminhos de fechar para evitar leak do onKey.
     const cleanup = () => {
       document.removeEventListener('keydown', onKey);
       backdrop.remove();
@@ -130,7 +147,6 @@ function showMergeModal(keepMonster, dropMonster) {
       resolve({ confirmed: true, keepText });
     });
 
-    // Fechar clicando fora
     backdrop.addEventListener('click', (e) => {
       if (e.target === backdrop) {
         cleanup();
@@ -138,7 +154,6 @@ function showMergeModal(keepMonster, dropMonster) {
       }
     });
 
-    // Fechar com Escape
     const onKey = (e) => {
       if (e.key === 'Escape') {
         cleanup();
@@ -149,15 +164,68 @@ function showMergeModal(keepMonster, dropMonster) {
   });
 }
 
+/**
+ * Modal inline para renomear um monstro.
+ * Retorna Promise<string | null> — o novo texto, ou null se cancelado.
+ */
+function showRenameModal(monster) {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rename-modal-title" style="max-width:460px">
+        <h2 class="modal-title" id="rename-modal-title">✏️ Renomear Monstro</h2>
+        <div class="form-group" style="margin:16px 0">
+          <label class="form-label" for="rename-monster-input">Novo nome</label>
+          <textarea class="form-textarea" id="rename-monster-input" style="min-height:64px">${escapeHTML(monster.text)}</textarea>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" id="btn-rename-cancel">Cancelar</button>
+          <button class="btn btn-primary" id="btn-rename-confirm">✏️ Salvar</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(backdrop);
+    const input = backdrop.querySelector('#rename-monster-input');
+    input.focus();
+    input.select();
+
+    const cleanup = () => {
+      document.removeEventListener('keydown', onKey);
+      backdrop.remove();
+    };
+
+    backdrop.querySelector('#btn-rename-cancel').addEventListener('click', () => {
+      cleanup(); resolve(null);
+    });
+
+    backdrop.querySelector('#btn-rename-confirm').addEventListener('click', () => {
+      const val = input.value.trim();
+      cleanup();
+      resolve(val || null);
+    });
+
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) { cleanup(); resolve(null); }
+    });
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') { cleanup(); resolve(null); }
+    };
+    document.addEventListener('keydown', onKey);
+  });
+}
+
 export function renderMonsters(root) {
   let _timer  = null;
   let _typing = null;
-  // Id do card sendo arrastado (só relevante para o SM)
   let _dragId = null;
 
   function render() {
     const state = getState();
     const monsters = state.monsters;
+    // Selecionar não é mais necessário para avançar — mantemos canMergeMonsters para merge
     const selectedCount = monsters.filter((m) => m.selected).length;
     const sm = isSM();
 
@@ -169,7 +237,7 @@ export function renderMonsters(root) {
             <h2 class="phase-title">Monstros da Sprint</h2>
           </div>
           <p class="phase-description">
-            O que atrapalhou a equipe? Identifique os problemas e priorize os mais críticos.
+            O que atrapalhou a equipe? Identifique os problemas enfrentados nessa Sprint.
             ${canMergeMonsters() ? '<span class="merge-hint">Arraste um card sobre outro para mesclar, ou selecione 2 e clique em <strong>Mesclar</strong>.</span>' : ''}
           </p>
         </div>
@@ -190,7 +258,6 @@ export function renderMonsters(root) {
         <div class="monsters-toolbar">
           <h4>Monstros identificados <span class="badge badge-info">${monsters.length}</span></h4>
           <div class="monsters-toolbar-actions">
-            ${selectedCount > 0 ? `<span class="badge badge-accent" data-selected-count>🎯 ${selectedCount} selecionado${selectedCount !== 1 ? 's' : ''}</span>` : ''}
             ${canMergeMonsters() && selectedCount === 2 ? '<button class="btn btn-info btn-sm" id="btn-merge-selected">🔗 MESCLAR SELECIONADOS</button>' : ''}
             ${canPrioritizeMonsters() ? '<button class="btn btn-ghost btn-sm" id="btn-prioritize">↕️ ORDENAR POR VOTOS</button>' : ''}
           </div>
@@ -204,7 +271,7 @@ export function renderMonsters(root) {
           <button class="btn btn-ghost" id="btn-back">← Voltar</button>
           ${buildReadySignalHTML('monsters', state, sm, getDeviceId())}
           ${sm
-            ? `<button class="btn btn-primary" id="btn-next" ${selectedCount > 0 ? '' : 'disabled'}>🛡️ IR PARA COMBATE →</button>`
+            ? `<button class="btn btn-primary" id="btn-next">🗣️ IR PARA DISCUSSÃO →</button>`
             : `<span class="text-muted text-sm">Aguardando o Scrum Master avançar…</span>`}
         </div>
       </div>
@@ -264,6 +331,69 @@ export function renderMonsters(root) {
       }
     });
 
+    // Renomear monstro (SM only)
+    root.querySelectorAll('[data-rename]').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!canRenameMonster()) return;
+        const id = btn.dataset.rename;
+        const monster = getState().monsters.find((m) => m.id === id);
+        if (!monster) return;
+        const newText = await showRenameModal(monster);
+        if (!newText || newText === monster.text) return;
+        try {
+          await renameMonster(id, newText);
+        } catch (err) {
+          console.warn('Firestore renameMonster failed:', err);
+          showErrorToast('Falha ao renomear — verifique sua conexão.');
+        }
+      });
+    });
+
+    // Excluir monstro (SM only)
+    root.querySelectorAll('[data-delete]').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!canDeleteMonster()) return;
+        const id = btn.dataset.delete;
+        const confirmed = await showModal({
+          title: 'Excluir Monstro',
+          body: 'Deseja excluir este monstro? Esta ação não pode ser desfeita.',
+          confirmLabel: 'Excluir',
+          confirmClass: 'btn btn-danger',
+        });
+        if (!confirmed) return;
+        try {
+          await deleteMonster(id);
+        } catch (err) {
+          console.warn('Firestore deleteMonster failed:', err);
+          showErrorToast('Falha ao excluir — verifique sua conexão.');
+        }
+      });
+    });
+
+    // Desfazer merge (SM only)
+    root.querySelectorAll('[data-unmerge]').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!canUnmergeMonster()) return;
+        const id = btn.dataset.unmerge;
+        const confirmed = await showModal({
+          title: '↩️ Desfazer Agrupamento',
+          body: 'Os relatos originais voltarão como cards individuais. Notas de discussão associadas a este agrupamento serão mantidas.',
+          confirmLabel: 'Desfazer',
+          confirmClass: 'btn btn-primary',
+        });
+        if (!confirmed) return;
+        try {
+          unmergeMonster(id);
+        } catch (err) {
+          console.warn('Firestore unmergeMonster failed:', err);
+          showErrorToast('Falha ao desfazer merge — verifique sua conexão.');
+        }
+      });
+    });
+
     // Mesclar selecionados (fallback mobile — disponível quando exatamente 2 cards estão selecionados)
     root.querySelector('#btn-merge-selected')?.addEventListener('click', async () => {
       const state = getState();
@@ -275,61 +405,22 @@ export function renderMonsters(root) {
       mergeMonsters(keepMon.id, dropMon.id, keepText);
     });
 
-    // Prioritize
-    root.querySelector('#btn-prioritize').addEventListener('click', () => {
+    // Ordenar por votos (antes "Priorizar automaticamente")
+    root.querySelector('#btn-prioritize')?.addEventListener('click', () => {
       prioritizeMonsters();
       render();
     });
 
-    // Reactions — patch cirúrgico.
-    // reactToMonster retorna Promise<false> se o dispositivo já reagiu.
+    // Reactions — patch cirúrgico
     root.querySelectorAll('.reaction-btn[data-reaction]').forEach((btn) => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        // Desabilita durante o await para evitar duplo-clique e race condition:
-        // dois cliques rápidos disparariam duas transações simultâneas no Firestore
-        // e duplicariam o contador local antes da resposta chegar.
         btn.disabled = true;
-        // Otimismo local: atualiza imediatamente para feedback rápido
         const span = btn.querySelector('.reaction-count');
         if (span) span.textContent = Number(span.textContent) + 1;
         const accepted = await reactToMonster(btn.dataset.id, btn.dataset.reaction);
-        // Reverte se rejeitado (já reagiu ou erro)
         if (!accepted && span) span.textContent = Number(span.textContent) - 1;
         btn.disabled = false;
-      });
-    });
-
-    // Select — patch cirúrgico (somente SM)
-    root.querySelectorAll('[data-select]').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (!canSelectMonster()) return;
-        const id = btn.dataset.select;
-        selectMonster(id);
-        const card = root.querySelector(`.monster-card[data-id="${CSS.escape(id)}"]`);
-        if (card) {
-          const isNowSelected = !card.classList.contains('selected-monster');
-          card.classList.toggle('selected-monster', isNowSelected);
-          btn.className = `btn btn-sm ${isNowSelected ? 'btn-danger' : 'btn-ghost'}`;
-          btn.setAttribute('aria-pressed', String(isNowSelected));
-          btn.textContent = isNowSelected ? '✕ Remover' : '🎯 Selecionar';
-          const badge = card.querySelector('.badge-accent');
-          if (isNowSelected && !badge) {
-            const textDiv = card.querySelector('.card-text').parentElement;
-            const newBadge = document.createElement('span');
-            newBadge.className = 'badge badge-accent mt-1 flex';
-            newBadge.textContent = '🎯 Selecionado';
-            textDiv.appendChild(newBadge);
-          } else if (!isNowSelected && badge) {
-            badge.remove();
-          }
-          const newCount = root.querySelectorAll('.monster-card.selected-monster').length;
-          const nextBtn = root.querySelector('#btn-next');
-          if (nextBtn) nextBtn.disabled = newCount === 0;
-          const countBadge = root.querySelector('[data-selected-count]');
-          if (countBadge) countBadge.textContent = `🎯 ${newCount} selecionado${newCount !== 1 ? 's' : ''}`;
-        }
       });
     });
 
@@ -341,7 +432,6 @@ export function renderMonsters(root) {
           card.setAttribute('aria-grabbed', 'true');
           card.classList.add('monster-card--dragging');
           e.dataTransfer.effectAllowed = 'move';
-          // Pequeno delay para o browser capturar o snapshot antes de adicionar a classe
           setTimeout(() => card.classList.add('monster-card--ghost'), 0);
         });
 
@@ -349,7 +439,6 @@ export function renderMonsters(root) {
           _dragId = null;
           card.setAttribute('aria-grabbed', 'false');
           card.classList.remove('monster-card--dragging', 'monster-card--ghost');
-          // Remove highlight de todos os alvos
           root.querySelectorAll('.monster-card--drop-target').forEach((c) =>
             c.classList.remove('monster-card--drop-target')
           );
@@ -383,7 +472,6 @@ export function renderMonsters(root) {
           if (!confirmed) return;
 
           mergeMonsters(keepId, dropId, keepText);
-          // render() será chamado via subscribeCollection (Firestore) ou pelo optimistic update
         });
       });
     }
@@ -392,25 +480,20 @@ export function renderMonsters(root) {
       if (isSM()) setPhase('treasures');
       else setLocalPhase('roleSelect');
     });
+
+    // Avança para a nova fase de Discussão (não mais Combat)
     root.querySelector('#btn-next')?.addEventListener('click', () => {
       completePhase('monsters');
-      setPhase('combat');
+      setPhase('discussion');
     });
   }
 
-  // Retorna uma string que muda sempre que qualquer reação, seleção, ordem de
-  // prioridade ou o conjunto de monstros muda — permite detectar todas as
-  // atualizações remotas além do simples comprimento da lista.
-  // priorityRank incluído para que prioritizeMonsters() dispare re-render
-  // mesmo quando reações e seleção não mudam (bug #09).
   function _fingerprint(monsters) {
     return monsters.map((m) =>
-      `${m.id}:${m.reactions.fire||0},${m.reactions.eyes||0},${m.reactions.bulb||0},${m.selected ? 1 : 0},${m.priorityRank ?? ''}`
+      `${m.id}:${m.reactions.fire||0},${m.reactions.eyes||0},${m.reactions.bulb||0},${m.selected ? 1 : 0},${m.priorityRank ?? ''},${m.text}`
     ).join('|');
   }
 
-  // Subscription em tempo real: re-renderiza quando monstros/reações mudam remotamente
-  // ou quando participantCount sobe (entrada tardia — atualiza contador de "Terminei").
   let _lastFingerprint      = _fingerprint(getState().monsters);
   let _lastParticipantCount = parseInt(getState().team?.participantCount, 10) || 0;
   const unsub = subscribe((state) => {
