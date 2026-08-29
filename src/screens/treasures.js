@@ -9,7 +9,7 @@ import {
   getState, subscribe, addTreasure, reactToTreasure, addXP, setPhase, setLocalPhase, completePhase, isSM, signalReady,
 } from '../state/store.js';
 import { xpForTreasure } from '../services/xp.js';
-import { showXPToast } from '../components/xpToast.js';
+import { showXPToast, showErrorToast } from '../components/xpToast.js';
 import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
 import { getDeviceId } from '../services/presence.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
@@ -130,7 +130,7 @@ export function renderTreasures(root) {
       if (!col) return;
 
       // Add item event
-      col.querySelector(`[data-add="${cat.id}"]`).addEventListener('click', () => {
+      col.querySelector(`[data-add="${cat.id}"]`).addEventListener('click', async () => {
         const textarea = col.querySelector(`.treasure-input[data-cat="${cat.id}"]`);
         const text = textarea.value.trim();
         if (!text) {
@@ -139,7 +139,10 @@ export function renderTreasures(root) {
           return;
         }
         textarea.style.borderColor = '';
-          addTreasure({
+        const addBtn = col.querySelector(`[data-add="${cat.id}"]`);
+        addBtn.disabled = true;
+        try {
+          await addTreasure({
             id: uid(),
             text,
             category: cat.id,
@@ -151,6 +154,11 @@ export function renderTreasures(root) {
           textarea.value = '';
           if (_typing) _typing.destroy();
           render();
+        } catch (e) {
+          console.warn('Firestore addTreasure failed:', e);
+          showErrorToast('Tesouro não foi salvo — verifique sua conexão.');
+          addBtn.disabled = false;
+        }
       });
 
       // Reaction events — patch cirúrgico: só atualiza o contador no DOM,

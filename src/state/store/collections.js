@@ -13,26 +13,19 @@ import {
   castVote,
   castReaction,
 } from '../../services/firebase.js';
-import { showErrorToast } from '../../components/xpToast.js';
 
 // ── Checkins ──────────────────────────────────────────────────────────────────
 
 export function addCheckin(sessionId, checkin) {
-  if (!sessionId) return;
-  saveItem(sessionId, 'checkins', checkin).catch((e) => {
-    console.warn('Firestore addCheckin failed:', e);
-    showErrorToast('Check-in não foi salvo — verifique sua conexão.');
-  });
+  if (!sessionId) return Promise.reject(new Error('sessionId ausente'));
+  return saveItem(sessionId, 'checkins', checkin);
 }
 
 // ── Treasures ─────────────────────────────────────────────────────────────────
 
 export function addTreasure(sessionId, treasure) {
-  if (!sessionId) return;
-  saveItem(sessionId, 'treasures', treasure).catch((e) => {
-    console.warn('Firestore addTreasure failed:', e);
-    showErrorToast('Tesouro não foi salvo — verifique sua conexão.');
-  });
+  if (!sessionId) return Promise.reject(new Error('sessionId ausente'));
+  return saveItem(sessionId, 'treasures', treasure);
 }
 
 export function reactToTreasure(sessionId, id, reaction, deviceId) {
@@ -43,11 +36,8 @@ export function reactToTreasure(sessionId, id, reaction, deviceId) {
 // ── Monsters ──────────────────────────────────────────────────────────────────
 
 export function addMonster(sessionId, monster) {
-  if (!sessionId) return;
-  saveItem(sessionId, 'monsters', monster).catch((e) => {
-    console.warn('Firestore addMonster failed:', e);
-    showErrorToast('Monstro não foi salvo — verifique sua conexão.');
-  });
+  if (!sessionId) return Promise.reject(new Error('sessionId ausente'));
+  return saveItem(sessionId, 'monsters', monster);
 }
 
 export function reactToMonster(sessionId, id, reaction, deviceId) {
@@ -126,11 +116,8 @@ export function prioritizeMonsters(sessionId, monsters, notifyFn) {
 // ── Solutions ─────────────────────────────────────────────────────────────────
 
 export function addSolution(sessionId, solution) {
-  if (!sessionId) return;
-  saveItem(sessionId, 'solutions', solution).catch((e) => {
-    console.warn('Firestore addSolution failed:', e);
-    showErrorToast('Solução não foi salva — verifique sua conexão.');
-  });
+  if (!sessionId) return Promise.reject(new Error('sessionId ausente'));
+  return saveItem(sessionId, 'solutions', solution);
 }
 
 export function voteSolution(sessionId, id, deviceId) {
@@ -141,17 +128,11 @@ export function voteSolution(sessionId, id, deviceId) {
 // ── Missions ──────────────────────────────────────────────────────────────────
 
 export function addMission(sessionId, mission) {
-  if (!sessionId) return;
-  saveItem(sessionId, 'missions', mission).catch((e) => {
-    console.warn('Firestore addMission failed:', e);
-    showErrorToast('Missão não foi salva — verifique sua conexão.');
-  });
+  if (!sessionId) return Promise.reject(new Error('sessionId ausente'));
+  return saveItem(sessionId, 'missions', mission);
 }
 
 export function removeMission(sessionId, id) {
-  if (!sessionId) return;
-  removeItem(sessionId, 'missions', id).catch((e) => {
-    console.warn('Firestore removeMission failed:', e);
-    showErrorToast('Falha ao remover missão — verifique sua conexão.');
-  });
+  if (!sessionId) return Promise.reject(new Error('sessionId ausente'));
+  return removeItem(sessionId, 'missions', id);
 }

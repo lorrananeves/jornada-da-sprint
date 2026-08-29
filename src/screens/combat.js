@@ -9,7 +9,7 @@ import {
   getState, subscribe, setState, addSolution, voteSolution, addXP, setPhase, setLocalPhase, completePhase, isSM, signalReady,
 } from '../state/store.js';
 import { xpForSolution } from '../services/xp.js';
-import { showXPToast } from '../components/xpToast.js';
+import { showXPToast, showErrorToast } from '../components/xpToast.js';
 import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
 import { getDeviceId } from '../services/presence.js';
 import { getStrategyLabel } from '../utils/format.js';
@@ -174,7 +174,7 @@ export function renderCombat(root) {
     });
 
     // Add solution
-    root.querySelector('#btn-add-solution').addEventListener('click', () => {
+    root.querySelector('#btn-add-solution').addEventListener('click', async () => {
       const input = root.querySelector('#solution-input');
       const text = input.value.trim();
       if (!text) {
@@ -183,18 +183,26 @@ export function renderCombat(root) {
         return;
       }
       input.style.borderColor = '';
-      addSolution({
-        id: uid(),
-        monsterId: monster.id,
-        text,
-        strategy: currentStrategy,
-        votes: 0,
-      });
-      addXP(xpForSolution());
-      showXPToast(xpForSolution(), 'Solução adicionada');
-      input.value = '';
-      if (_typing) _typing.destroy();
-      render();
+      const addBtn = root.querySelector('#btn-add-solution');
+      addBtn.disabled = true;
+      try {
+        await addSolution({
+          id: uid(),
+          monsterId: monster.id,
+          text,
+          strategy: currentStrategy,
+          votes: 0,
+        });
+        addXP(xpForSolution());
+        showXPToast(xpForSolution(), 'Solução adicionada');
+        input.value = '';
+        if (_typing) _typing.destroy();
+        render();
+      } catch (e) {
+        console.warn('Firestore addSolution failed:', e);
+        showErrorToast('Solução não foi salva — verifique sua conexão.');
+        addBtn.disabled = false;
+      }
     });
 
     // Vote — patch cirúrgico: incrementa o contador sem re-render completo.

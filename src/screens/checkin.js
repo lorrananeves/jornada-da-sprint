@@ -9,7 +9,7 @@ import { getState, subscribe, addCheckin, addXP, setPhase, setLocalPhase, comple
 import { escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
 import { xpForCheckin } from '../services/xp.js';
 import { calcCheckinStats, getMoodLabel } from '../services/stats.js';
-import { showXPToast } from '../components/xpToast.js';
+import { showXPToast, showErrorToast } from '../components/xpToast.js';
 import { getScoreEmoji, getScoreLabel } from '../utils/format.js';
 import { getDeviceId } from '../services/presence.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
@@ -220,7 +220,7 @@ export function renderCheckin(root) {
     // Register answer
     const regBtn = root.querySelector('#btn-register');
     if (regBtn) {
-      regBtn.addEventListener('click', () => {
+      regBtn.addEventListener('click', async () => {
         if (!selectedScore) return;
         const commentText = root.querySelector('#checkin-comment').value.trim();
         // Usa o deviceId como ID do documento e como campo no payload.
@@ -231,14 +231,21 @@ export function renderCheckin(root) {
         const checkin = commentText
           ? { id: deviceId, deviceId, score: selectedScore, comment: commentText }
           : { id: deviceId, deviceId, score: selectedScore };
-        addCheckin(checkin);
-        addXP(xpForCheckin());
-        showXPToast(xpForCheckin(), 'Check-in registrado');
-        // Marca dispositivo como "já respondeu" — impede reenvio nesta sessão de browser
-        sessionStorage.setItem(checkinDoneKey(), 'true');
-        selectedScore = null;
-        if (_typing) _typing.destroy();
-        render();
+        regBtn.disabled = true;
+        try {
+          await addCheckin(checkin);
+          addXP(xpForCheckin());
+          showXPToast(xpForCheckin(), 'Check-in registrado');
+          // Marca dispositivo como "já respondeu" — impede reenvio nesta sessão de browser
+          sessionStorage.setItem(checkinDoneKey(), 'true');
+          selectedScore = null;
+          if (_typing) _typing.destroy();
+          render();
+        } catch (e) {
+          console.warn('Firestore addCheckin failed:', e);
+          showErrorToast('Check-in não foi salvo — verifique sua conexão.');
+          regBtn.disabled = false;
+        }
       });
     }
 

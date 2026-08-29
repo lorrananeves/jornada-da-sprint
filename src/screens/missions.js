@@ -9,7 +9,7 @@ import {
   getState, subscribe, addMission, removeMission, addXP, setPhase, setLocalPhase, completePhase, setState, isSM, signalReady,
 } from '../state/store.js';
 import { xpForMission } from '../services/xp.js';
-import { showXPToast } from '../components/xpToast.js';
+import { showXPToast, showErrorToast } from '../components/xpToast.js';
 import { showModal } from '../components/modal.js';
 import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
 import { getDeviceId } from '../services/presence.js';
@@ -237,7 +237,7 @@ export function renderMissions(root) {
 
   function attachEvents(prefill) {
     attachReadySignal(root, signalReady);
-    root.querySelector('#btn-add-mission').addEventListener('click', () => {
+    root.querySelector('#btn-add-mission').addEventListener('click', async () => {
       const title = root.querySelector('#mission-title').value.trim();
       if (!title) {
         root.querySelector('#mission-title').style.borderColor = 'var(--danger)';
@@ -260,10 +260,18 @@ export function renderMissions(root) {
       // Clear prefill
       if (prefill) setState({ _prefillMission: null });
 
-      addMission(mission);
-      addXP(xpForMission());
-      showXPToast(xpForMission(), 'Missão adicionada');
-      render();
+      const addBtn = root.querySelector('#btn-add-mission');
+      addBtn.disabled = true;
+      try {
+        await addMission(mission);
+        addXP(xpForMission());
+        showXPToast(xpForMission(), 'Missão adicionada');
+        render();
+      } catch (e) {
+        console.warn('Firestore addMission failed:', e);
+        showErrorToast('Missão não foi salva — verifique sua conexão.');
+        addBtn.disabled = false;
+      }
     });
 
     // Status das missões anteriores: persiste no Firestore + cache em sessionStorage
@@ -303,8 +311,13 @@ export function renderMissions(root) {
           confirmClass: 'btn btn-danger',
         });
         if (confirmed) {
-          removeMission(btn.dataset.remove);
-          render();
+          try {
+            await removeMission(btn.dataset.remove);
+            render();
+          } catch (e) {
+            console.warn('Firestore removeMission failed:', e);
+            showErrorToast('Falha ao remover missão — verifique sua conexão.');
+          }
         }
       });
     });

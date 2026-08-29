@@ -10,7 +10,7 @@ import {
   mergeMonsters, addXP, setPhase, setLocalPhase, completePhase, isSM, signalReady,
 } from '../state/store.js';
 import { xpForMonster } from '../services/xp.js';
-import { showXPToast } from '../components/xpToast.js';
+import { showXPToast, showErrorToast } from '../components/xpToast.js';
 import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
 import { getDeviceId } from '../services/presence.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
@@ -233,7 +233,7 @@ export function renderMonsters(root) {
     });
 
     // Add monster
-    root.querySelector('#btn-add-monster').addEventListener('click', () => {
+    root.querySelector('#btn-add-monster').addEventListener('click', async () => {
       const input = root.querySelector('#monster-input');
       const text = input.value.trim();
       if (!text) {
@@ -242,12 +242,20 @@ export function renderMonsters(root) {
         return;
       }
       input.style.borderColor = '';
-      addMonster({ id: uid(), text, reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false });
-      addXP(xpForMonster());
-      showXPToast(xpForMonster(), 'Monstro adicionado');
-      input.value = '';
-      if (_typing) _typing.destroy();
-      render();
+      const addBtn = root.querySelector('#btn-add-monster');
+      addBtn.disabled = true;
+      try {
+        await addMonster({ id: uid(), text, reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false });
+        addXP(xpForMonster());
+        showXPToast(xpForMonster(), 'Monstro adicionado');
+        input.value = '';
+        if (_typing) _typing.destroy();
+        render();
+      } catch (e) {
+        console.warn('Firestore addMonster failed:', e);
+        showErrorToast('Monstro não foi salvo — verifique sua conexão.');
+        addBtn.disabled = false;
+      }
     });
 
     // Mesclar selecionados (fallback mobile — disponível quando exatamente 2 cards estão selecionados)
