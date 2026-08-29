@@ -515,6 +515,9 @@ initAuth().then((user) => {
 
     _state = { ..._state, currentPhase: 'smDashboard' };
     notify();
+    // Não há sessão ativa para abrir — sai sem chamar initFirebase() para
+    // evitar duplas subscriptions quando o SM entrar numa sessão pelo dashboard.
+    return;
   }
 
   initFirebase();

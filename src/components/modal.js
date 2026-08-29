@@ -56,6 +56,16 @@ export function showModal({
       }
     });
 
+    // Fecha com Escape — consistente com o modal de merge em monsters.js
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        document.removeEventListener('keydown', onKey);
+        closeModal();
+        resolve(false);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+
     const root = qs('#modal-root');
     root.appendChild(backdrop);
     activeModal = backdrop;

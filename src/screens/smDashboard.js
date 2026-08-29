@@ -54,9 +54,14 @@ export async function renderSmDashboard(root) {
     </div>
   `;
 
-  root.querySelector('#btn-new-retro').addEventListener('click', () => {
-    startNewSession();
-    setLocalPhase('setup');
+  root.querySelector('#btn-new-retro').addEventListener('click', async () => {
+    // startNewSession() é async: seta smDeviceId, smUid e currentPhase='setup'
+    // internamente via setScalarState. Aguardar garante que o estado esteja
+    // pronto antes de navegar — sem o await, setLocalPhase poderia disparar
+    // a renderização de setup com o estado ainda vazio da sessão anterior.
+    // setLocalPhase('setup') é desnecessário pois startNewSession já seta
+    // currentPhase: 'setup' e notifica os listeners.
+    await startNewSession();
   });
 
   root.querySelector('#btn-logout').addEventListener('click', async () => {

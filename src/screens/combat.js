@@ -209,6 +209,10 @@ export function renderCombat(root) {
     // voteSolution retorna Promise<false> se o dispositivo já votou.
     root.querySelectorAll('[data-vote]').forEach((btn) => {
       btn.addEventListener('click', async () => {
+        // Desabilita durante o await para evitar duplo-clique e race condition
+        // de otimismo local: sem isso, dois cliques incrementariam duas vezes
+        // mas apenas o segundo seria revertido.
+        btn.disabled = true;
         // Otimismo local: incrementa imediatamente para feedback rápido
         const match = btn.textContent.match(/\d+/);
         if (match) btn.textContent = `👍 ${Number(match[0]) + 1}`;
@@ -218,6 +222,7 @@ export function renderCombat(root) {
           const matchAfter = btn.textContent.match(/\d+/);
           if (matchAfter) btn.textContent = `👍 ${Number(matchAfter[0]) - 1}`;
         }
+        btn.disabled = false;
       });
     });
 
@@ -273,9 +278,11 @@ export function renderCombat(root) {
   let _lastStrategy         = currentStrategy;
   let _lastParticipantCount = parseInt(getState().team?.participantCount, 10) || 0;
 
-  _unsub = subscribe((state) => {
+  // A referência a _unsub é capturada via closure após a atribuição para evitar
+  // a janela de corrida onde o callback dispara antes de _unsub ser atribuído.
+  const unsub = subscribe((state) => {
     if (state.currentPhase !== 'combat') {
-      _unsub?.();
+      unsub();
       _unsub = null;
       if (_typing) { _typing.destroy(); _typing = null; }
       return;
@@ -301,6 +308,7 @@ export function renderCombat(root) {
       render();
     }
   });
+  _unsub = unsub;
 
   render();
 }

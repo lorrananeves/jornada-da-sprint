@@ -199,9 +199,11 @@ export function renderTreasures(root) {
   // ou quando participantCount sobe (entrada tardia — atualiza contador de "Terminei").
   let _lastFingerprint      = _fingerprint(getState().treasures);
   let _lastParticipantCount = parseInt(getState().team?.participantCount, 10) || 0;
-  _unsub = subscribe((state) => {
+  // A referência a _unsub é capturada via closure após a atribuição para evitar
+  // a janela de corrida onde o callback dispara antes de _unsub ser atribuído.
+  const unsub = subscribe((state) => {
     if (state.currentPhase !== 'treasures') {
-      _unsub?.();
+      unsub();
       _unsub = null;
       if (_typing) { _typing.destroy(); _typing = null; }
       return;
@@ -214,6 +216,7 @@ export function renderTreasures(root) {
       render();
     }
   });
+  _unsub = unsub;
 
   render();
 }
