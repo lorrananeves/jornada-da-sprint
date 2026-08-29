@@ -44,7 +44,7 @@ import {
   upsertSmSession,
 } from '../../services/firebase.js';
 import { getDeviceId } from '../../services/presence.js';
-import { initAuth, getCurrentUser, onAuthChange } from '../../services/auth.js';
+import { initAuth, getCurrentUser, onAuthChange, signInAnon } from '../../services/auth.js';
 import { showErrorToast } from '../../components/xpToast.js';
 import { isSM as _isSM } from './role.js';
 
@@ -195,7 +195,7 @@ export function setScalarState(scalars) {
 function _syncSmProfile() {
   if (!isSM()) return;
   const user = getCurrentUser();
-  if (!user) return;
+  if (!user || user.isAnonymous) return;
   if (!_sessionId) return;
 
   const status = _state.completedPhases.includes('complete') || _state.currentPhase === 'report'
@@ -434,7 +434,16 @@ export async function startNewSession() {
   sessionStorage.removeItem('_jornada_checkin_done');
   sessionStorage.removeItem('_jornada_prev_mission_status');
 
-  const user = getCurrentUser();
+  // Garante que o SM tem um uid antes de criar a sessão.
+  // As Firestore Rules exigem auth.uid == smUid para que o SM possa
+  // avançar fases (isChangingSmOnlyFields). Sem uid, todos os updates
+  // de campo SM-only seriam negados silenciosamente.
+  // signInAnon é no-op se o SM já está autenticado (Google/email).
+  let user = getCurrentUser();
+  if (!user) {
+    user = await signInAnon();
+  }
+
   setScalarState({
     smDeviceId: getDeviceId(),
     smUid:      user ? user.uid : null,
@@ -468,7 +477,7 @@ loadFromStorage();
 
 initAuth().then((user) => {
   const preSessionPhases = new Set(['auth', 'home', 'roleSelect']);
-  if (user && preSessionPhases.has(_state.currentPhase)) {
+  if (user && !user.isAnonymous && preSessionPhases.has(_state.currentPhase)) {
     saveSmProfile(user.uid, {
       displayName: user.displayName || '',
       email:       user.email || '',
@@ -487,14 +496,18 @@ onAuthChange((user) => {
   const phase = _state.currentPhase;
 
   if (user) {
-    saveSmProfile(user.uid, {
-      displayName: user.displayName || '',
-      email:       user.email       || '',
-      photoURL:    user.photoURL    || '',
-    }).catch((e) => console.warn('[store] saveSmProfile failed:', e));
+    // Usuários anônimos (criados por signInAnon para satisfazer as Firestore Rules)
+    // não têm perfil persistível e não devem ser redirecionados para o dashboard.
+    if (!user.isAnonymous) {
+      saveSmProfile(user.uid, {
+        displayName: user.displayName || '',
+        email:       user.email       || '',
+        photoURL:    user.photoURL    || '',
+      }).catch((e) => console.warn('[store] saveSmProfile failed:', e));
+    }
 
     const preSessionPhases = new Set(['auth', 'home', 'roleSelect']);
-    if (preSessionPhases.has(phase)) {
+    if (!user.isAnonymous && preSessionPhases.has(phase)) {
       _state = { ..._state, currentPhase: 'smDashboard' };
       notify();
     }

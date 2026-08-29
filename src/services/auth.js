@@ -14,6 +14,7 @@ import {
   getAuth,
   connectAuthEmulator,
   onAuthStateChanged,
+  signInAnonymously,
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -82,6 +83,20 @@ export function initAuth() {
 }
 
 // ── Login / Cadastro ──────────────────────────────────────────────────────────
+
+/**
+ * Faz login anônimo — garante que o SM tem um uid mesmo sem conta explícita.
+ * Retorna o usuário criado/existente, ou null se falhar.
+ */
+export async function signInAnon() {
+  try {
+    const result = await signInAnonymously(getAuthInstance());
+    return result.user;
+  } catch (e) {
+    console.warn('[auth] signInAnon failed:', e);
+    return null;
+  }
+}
 
 /**
  * Login com Google via popup.
