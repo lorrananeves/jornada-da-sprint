@@ -1,9 +1,9 @@
 /**
  * Testes unitários para src/screens/lobby.js
  *
- * Garante que o SM é registrado como presente (joinSession chamado)
- * ao entrar no lobby, corrigindo o bug onde o SM nunca era contabilizado
- * em subscribeParticipants.
+ * Garante que SM e membros do time são registrados como presentes
+ * (joinSession chamado) ao entrar no lobby — incluindo após F5, onde o
+ * heartbeat em memória foi perdido e precisa ser reiniciado.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
@@ -80,12 +80,12 @@ describe('lobby.js — presença do SM', () => {
     expect(_mocks.joinSession).toHaveBeenCalledTimes(1);
   });
 
-  it('NÃO chama joinSession() quando um membro do time entra no lobby', () => {
+  it('chama joinSession() quando um membro do time entra no lobby (garante heartbeat após F5)', () => {
     _mocks.role = 'team_member';
     const root = buildRoot();
 
     renderLobby(root);
 
-    expect(_mocks.joinSession).not.toHaveBeenCalled();
+    expect(_mocks.joinSession).toHaveBeenCalledTimes(1);
   });
 });

@@ -101,6 +101,11 @@ export function renderLobby(root) {
 
   } else {
     // ── Team member view ─────────────────────────────────────────────────────
+    // Reinicia o heartbeat após F5: o setInterval estava em memória e foi
+    // perdido no reload — sem isso a presença expira em ≤ EXPIRE_MS e o
+    // membro some do contador sem poder voltar sem reentrar pelo link.
+    joinSession();
+
     root.innerHTML = `
       <main class="screen-lobby screen-enter" role="main" aria-label="Sala de espera — aguardando início">
         <div class="lobby-card">
