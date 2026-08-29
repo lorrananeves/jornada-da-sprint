@@ -847,6 +847,99 @@
 }
 
 /* ============================================================
+   Discussion Screen
+   ============================================================ */
+.screen-discussion {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* Seção de notas da discussão */
+.discussion-notes-section {
+  margin-top: 28px;
+}
+
+.discussion-notes-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+}
+
+.discussion-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.discussion-notes-empty {
+  padding: 16px;
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 20px;
+}
+
+/* Card individual de nota */
+.discussion-note {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  border-left-width: 3px;
+}
+
+.discussion-note--insight     { border-left-color: #a3b3fb; }
+.discussion-note--mitigation  { border-left-color: var(--success); }
+.discussion-note--agreement   { border-left-color: var(--info); }
+.discussion-note--action      { border-left-color: var(--accent); }
+.discussion-note--observation { border-left-color: var(--text-muted); }
+.discussion-note--editing     { border-left-color: var(--warning, #d29922); }
+
+.discussion-note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.discussion-note-type {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.discussion-note-text {
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.discussion-note-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* Formulário de adicionar nota */
+.discussion-add-note {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ============================================================
    Missions Screen
    ============================================================ */
 .screen-missions {
