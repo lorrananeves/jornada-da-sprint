@@ -7,16 +7,19 @@
  *   sessions/{sessionId}/typing/{deviceId}
  *     { phase, expiresAt }
  *
- * Estratégia TTL:
- *   - Ao digitar, grava/renova o documento com expiresAt = now + EXPIRE_MS.
- *   - Um debounce de DEBOUNCE_MS é aplicado: a gravação real acontece somente
- *     após o usuário parar de digitar por esse tempo.
- *   - Ao parar (blur ou submit), remove o documento imediatamente.
+ * Estratégia:
+ *   - Na primeira tecla, grava imediatamente para que o indicador apareça
+ *     em tempo real para os outros participantes.
+ *   - A cada RENEW_MS (enquanto a pessoa continua digitando), renova o
+ *     documento para manter o TTL vivo — evita flood de writes.
+ *   - Um debounce de DEBOUNCE_MS é aplicado apenas ao clearTyping():
+ *     o documento é removido somente após o usuário parar por esse tempo.
  *   - subscribeTyping() filtra client-side: conta apenas docs com expiresAt > now.
  *     Isso garante que "fantasmas" de conexões perdidas desapareçam automaticamente.
  *
  * Custo de writes:
- *   Máximo 1 write por DEBOUNCE_MS (1 s) por usuário — negligível.
+ *   Máximo 1 write por RENEW_MS (3 s) por usuário enquanto digita,
+ *   mais 1 write ao parar — negligível.
  */
 
 import { getApps } from 'firebase/app';
@@ -31,11 +34,15 @@ import {
 import { getOrCreateSessionId } from './firebase.js';
 import { getDeviceId } from './presence.js';
 
-// Após parar de digitar, aguarda este tempo antes de registrar no Firestore.
+// Intervalo mínimo entre renovações de TTL enquanto a pessoa digita.
+// Evita flood de writes sem atrasar a aparição do indicador.
+const RENEW_MS = 3_000;
+
+// Quanto tempo após parar de digitar o indicador permanece visível.
 const DEBOUNCE_MS = 1_000;
 
 // Quanto tempo (ms) um registro de "digitando" é considerado vivo.
-// Deve ser bem maior que DEBOUNCE_MS para cobrir redigitações rápidas.
+// Deve ser > RENEW_MS + DEBOUNCE_MS para cobrir o pior caso de renovação.
 const EXPIRE_MS = 8_000;
 
 function getDb() {
@@ -51,24 +58,44 @@ function typingColRef(sessionId) {
   return collection(getDb(), 'sessions', sessionId, 'typing');
 }
 
-let _debounceTimer = null;
+let _debounceTimer = null; // timer para remover o indicador após parar de digitar
+let _renewTimer    = null; // timer de renovação de TTL enquanto digita
+let _isTyping      = false; // true enquanto há um documento ativo no Firestore
+
+async function _writeTyping(phase) {
+  const sessionId = getOrCreateSessionId();
+  try {
+    await setDoc(typingRef(sessionId, getDeviceId()), {
+      phase,
+      expiresAt: Date.now() + EXPIRE_MS,
+    });
+  } catch {
+    // Silencioso — indicador de digitação é melhor-esforço
+  }
+}
 
 /**
  * Registra que este dispositivo está digitando na fase `phase`.
- * Usa debounce para evitar flood de writes.
+ * Grava imediatamente na primeira tecla; renova o TTL a cada RENEW_MS;
+ * usa debounce apenas para remover o indicador ao parar de digitar.
  */
 export function signalTyping(phase) {
+  // Cancela o timer de remoção — a pessoa ainda está digitando
   clearTimeout(_debounceTimer);
-  _debounceTimer = setTimeout(async () => {
-    const sessionId = getOrCreateSessionId();
-    try {
-      await setDoc(typingRef(sessionId, getDeviceId()), {
-        phase,
-        expiresAt: Date.now() + EXPIRE_MS,
-      });
-    } catch {
-      // Silencioso — indicador de digitação é melhor-esforço
-    }
+  _debounceTimer = null;
+
+  if (!_isTyping) {
+    // Primeira tecla: grava imediatamente para aparecer em tempo real
+    _isTyping = true;
+    _writeTyping(phase);
+
+    // Agenda renovações periódicas de TTL enquanto a pessoa digita
+    _renewTimer = setInterval(() => _writeTyping(phase), RENEW_MS);
+  }
+
+  // Agenda a remoção após DEBOUNCE_MS de inatividade
+  _debounceTimer = setTimeout(() => {
+    clearTyping();
   }, DEBOUNCE_MS);
 }
 
@@ -78,7 +105,10 @@ export function signalTyping(phase) {
  */
 export function clearTyping() {
   clearTimeout(_debounceTimer);
+  clearInterval(_renewTimer);
   _debounceTimer = null;
+  _renewTimer    = null;
+  _isTyping      = false;
   const sessionId = getOrCreateSessionId();
   deleteDoc(typingRef(sessionId, getDeviceId())).catch(() => {});
 }
