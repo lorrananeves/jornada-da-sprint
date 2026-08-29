@@ -256,6 +256,34 @@ export async function castVote(sessionId, colName, itemId, deviceId) {
 }
 
 /**
+ * Registra o voto de um dispositivo em um monstro de forma atômica.
+ *
+ * ID do token de voto: `{deviceId}_{monsterId}` em monsterVotes/
+ * A unicidade (1 voto por dispositivo por monstro) é garantida pelo Firestore
+ * (create falha se o documento já existe).
+ *
+ * Operação atômica (runTransaction):
+ *   1. Tenta criar monsterVotes/{deviceId}_{monsterId} — lança 'already-voted' se existe.
+ *   2. Incrementa monsters/{monsterId}.voteCount += 1.
+ *
+ * O limite de 3 votos por dispositivo é validado no cliente antes de chamar.
+ */
+export async function castMonsterVote(sessionId, monsterId, deviceId) {
+  const tokenId  = `${deviceId}_${monsterId}`;
+  const tokenRef = doc(db, 'sessions', sessionId, 'monsterVotes', tokenId);
+  const monRef   = itemRef(sessionId, 'monsters', monsterId);
+
+  await runTransaction(db, async (tx) => {
+    const tokenSnap = await tx.get(tokenRef);
+    if (tokenSnap.exists()) {
+      throw new Error('already-voted');
+    }
+    tx.set(tokenRef, { deviceId, monsterId, votedAt: new Date().toISOString() });
+    tx.update(monRef, { voteCount: increment(1) });
+  });
+}
+
+/**
  * Registra uma reação de forma atômica usando transação:
  *   1. Cria sessions/{sessionId}/{colName}/{itemId}/reactions/{deviceId}_{reaction}
  *      (falha se já existe — um dispositivo só reage uma vez por tipo de reação).

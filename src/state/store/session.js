@@ -52,7 +52,7 @@ import { clearReactionsCache } from '../../services/reactions.js';
 const STORAGE_KEY = 'jornada_sprint_session';
 
 // Nomes das subcoleções
-const COLLECTIONS = ['checkins', 'treasures', 'monsters', 'solutions', 'missions'];
+const COLLECTIONS = ['checkins', 'treasures', 'monsters', 'solutions', 'missions', 'discussions', 'monsterVotes'];
 
 const DEFAULT_STATE = () => ({
   // ── doc raiz ──
@@ -68,19 +68,23 @@ const DEFAULT_STATE = () => ({
   phaseStartedAt:      {},
   createdAt:           null,
   updatedAt:           null,
-  // ── foco do Combate (sincronizado entre participantes) ──
+  // ── foco do Combate (sincronizado entre participantes — mantido para sessões legadas) ──
   combatMonsterIdx:    0,
   combatStrategy:      'prevent',
+  // ── foco da Discussão (índice do monstro em discussão — SM → participantes) ──
+  discussionFocus:     0,
   // ── sinais "Terminei" por fase { [deviceId]: phaseId } ──
   readySignals:        {},
   // ── parking lot (notas "para depois", acessíveis em qualquer fase) ──
   parkingLot:          [],
   // ── subcoleções ──
-  checkins:   [],
-  treasures:  [],
-  monsters:   [],
-  solutions:  [],
-  missions:   [],
+  checkins:      [],
+  treasures:     [],
+  monsters:      [],
+  solutions:     [],
+  missions:      [],
+  discussions:   [],
+  monsterVotes:  [],
 });
 
 let _state     = DEFAULT_STATE();
@@ -170,6 +174,7 @@ export function setScalarState(scalars) {
   if (_sessionId) {
     const {
       checkins: _c, treasures: _t, monsters: _m, solutions: _s, missions: _mi,
+      discussions: _d, monsterVotes: _mv,
       role: _r,
       _guestAutoJoin: _g,
       // xp nunca é enviado via setScalarState/saveSession — apenas addXP()
@@ -368,7 +373,7 @@ export function removeParkingItem(id) {
  * Qualquer participante pode chamar (não requer isSM).
  * Persiste em readySignals[deviceId] = phaseId no doc raiz.
  */
-const VALID_READY_PHASES = new Set(['checkin', 'treasures', 'monsters', 'combat', 'missions']);
+const VALID_READY_PHASES = new Set(['checkin', 'treasures', 'monsters', 'combat', 'discussion', 'voting', 'missions']);
 
 export function signalReady(phase) {
   if (!VALID_READY_PHASES.has(phase)) return;

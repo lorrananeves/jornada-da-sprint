@@ -95,3 +95,27 @@ export function getStrategyLabel(strategy) {
   };
   return labels[strategy] || strategy;
 }
+
+// ── Tipos de nota de discussão ────────────────────────────────────────────────
+
+export const DISCUSSION_TYPES = [
+  { id: 'insight',     emoji: '💡', label: 'Insight' },
+  { id: 'mitigation', emoji: '🛡️', label: 'Mitigação existente' },
+  { id: 'agreement',  emoji: '🤝', label: 'Acordo do time' },
+  { id: 'action',     emoji: '🚀', label: 'Ação' },
+  { id: 'observation',emoji: '📌', label: 'Observação' },
+];
+
+/**
+ * Retorna o emoji do tipo de nota de discussão.
+ */
+export function getDiscussionTypeEmoji(type) {
+  return DISCUSSION_TYPES.find((t) => t.id === type)?.emoji ?? '📝';
+}
+
+/**
+ * Retorna o label do tipo de nota de discussão.
+ */
+export function getDiscussionTypeLabel(type) {
+  return DISCUSSION_TYPES.find((t) => t.id === type)?.label ?? type;
+}

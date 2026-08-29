@@ -12,6 +12,7 @@ import {
   batchWrite,
   castVote,
   castReaction,
+  castMonsterVote,
 } from '../../services/firebase.js';
 
 // ── Checkins ──────────────────────────────────────────────────────────────────
@@ -54,6 +55,18 @@ export function selectMonster(sessionId, monsters, id) {
   );
 }
 
+export function renameMonster(sessionId, id, newText) {
+  if (!sessionId || !id || !newText?.trim()) return;
+  return patchItem(sessionId, 'monsters', id, { text: newText.trim() });
+}
+
+export function deleteMonster(sessionId, id) {
+  if (!sessionId || !id) return;
+  // Marcar como deletado em vez de removeItem — Rules não permitem delete em /monsters.
+  // unmerged=false garante que não seja confundido com unmerge.
+  return patchItem(sessionId, 'monsters', id, { merged: true, mergedInto: '__deleted__' });
+}
+
 export function mergeMonsters(sessionId, monsters, keepId, dropId, newText, notifyFn) {
   if (!sessionId) return;
   const keep = monsters.find((m) => m.id === keepId);
@@ -94,6 +107,47 @@ export function mergeMonsters(sessionId, monsters, keepId, dropId, newText, noti
 }
 
 /**
+ * Desfaz o merge de um monstro agrupado.
+ *
+ * Dado M com mergedFrom: [A.id, B.id, ...]:
+ *   - M é marcado como unmerged=true (desaparece da lista ativa via sortCollection)
+ *   - A, B, ... têm merged=false e mergedInto=null restaurados (voltam ativos)
+ *
+ * Notas de discussão vinculadas a M são mantidas (o monstro M continua no Firestore).
+ * Votos são descartados (voteCount zerado em A, B, C e M — votação não começou ainda).
+ * Missões vinculadas a M permanecem com monsterId=M.id (M existe como doc inativo).
+ */
+export function unmergeMonster(sessionId, monsters, keepId, notifyFn) {
+  if (!sessionId) return;
+  const keep = monsters.find((m) => m.id === keepId);
+  if (!keep?.mergedFrom?.length) return;
+
+  const originalIds = keep.mergedFrom;
+
+  const ops = [
+    // Marca o monstro agrupado como desfeito (sai da lista ativa)
+    { type: 'update', colName: 'monsters', itemId: keepId,
+      data: { merged: true, unmerged: true } },
+    // Restaura cada original
+    ...originalIds.map((id) => ({
+      type: 'update', colName: 'monsters', itemId: id,
+      data: { merged: false, mergedInto: null },
+    })),
+  ];
+
+  batchWrite(sessionId, ops).catch((e) =>
+    console.warn('Firestore unmergeMonster batch failed:', e)
+  );
+
+  // Optimistic local: remove o keep da lista, restaura originais
+  notifyFn(
+    monsters
+      .filter((m) => m.id !== keepId)
+      .map((m) => originalIds.includes(m.id) ? { ...m, merged: false, mergedInto: null } : m)
+  );
+}
+
+/**
  * Pontuação composta: 🔥 tem peso 3 (alto impacto), 👀 peso 2 (precisa discutir),
  * 💡 peso 1 (ideia). Usa a soma de todas as reações do time para ordenar os monstros
  * — o botão apenas organiza, não decide quais serão combatidos.
@@ -122,7 +176,7 @@ export function prioritizeMonsters(sessionId, monsters, notifyFn) {
   notifyFn(sorted.map((m, i) => ({ ...m, priorityRank: i })));
 }
 
-// ── Solutions ─────────────────────────────────────────────────────────────────
+// ── Solutions (legado — mantido para sessões antigas) ────────────────────────
 
 export function addSolution(sessionId, solution) {
   if (!sessionId) return Promise.reject(new Error('sessionId ausente'));
@@ -132,6 +186,58 @@ export function addSolution(sessionId, solution) {
 export function voteSolution(sessionId, id, deviceId) {
   if (!sessionId) return;
   return castVote(sessionId, 'solutions', id, deviceId);
+}
+
+// ── Discussions ───────────────────────────────────────────────────────────────
+
+/**
+ * Adiciona uma nota de discussão vinculada a um monstro.
+ * Apenas o SM pode chamar (verificado no cliente via canManageDiscussionNotes).
+ * Não gera XP — notas são ferramentas de facilitação, não de gamificação.
+ *
+ * @param {string} sessionId
+ * @param {{ id, monsterId, type, text, createdAt, updatedAt }} note
+ */
+export function addDiscussionNote(sessionId, note) {
+  if (!sessionId) return Promise.reject(new Error('sessionId ausente'));
+  return saveItem(sessionId, 'discussions', note);
+}
+
+/**
+ * Edita texto e/ou tipo de uma nota de discussão existente.
+ * @param {string} sessionId
+ * @param {string} noteId
+ * @param {{ type?: string, text?: string }} partial
+ */
+export function editDiscussionNote(sessionId, noteId, partial) {
+  if (!sessionId) return Promise.reject(new Error('sessionId ausente'));
+  const update = { ...partial, updatedAt: new Date().toISOString() };
+  return patchItem(sessionId, 'discussions', noteId, update);
+}
+
+/**
+ * Remove uma nota de discussão.
+ */
+export function removeDiscussionNote(sessionId, noteId) {
+  if (!sessionId) return Promise.reject(new Error('sessionId ausente'));
+  return removeItem(sessionId, 'discussions', noteId);
+}
+
+// ── MonsterVotes ──────────────────────────────────────────────────────────────
+
+/**
+ * Registra o voto de um dispositivo em um monstro de forma atômica.
+ *
+ * Usa runTransaction:
+ *   1. Tenta criar monsterVotes/{deviceId}_{monsterId} — falha se já existe.
+ *   2. Incrementa monsters/{monsterId}.voteCount += 1.
+ *
+ * Lança 'already-voted' se o dispositivo já votou neste monstro.
+ * Limite de 3 votos por dispositivo validado no cliente antes de chamar.
+ */
+export function castMonsterVoteOp(sessionId, monsterId, deviceId) {
+  if (!sessionId) return Promise.reject(new Error('sessionId ausente'));
+  return castMonsterVote(sessionId, monsterId, deviceId);
 }
 
 // ── Missions ──────────────────────────────────────────────────────────────────

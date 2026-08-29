@@ -47,10 +47,17 @@ import {
   addMonster    as _addMonster,
   reactToMonster as _reactToMonster,
   selectMonster  as _selectMonster,
+  renameMonster  as _renameMonster,
+  deleteMonster  as _deleteMonster,
   mergeMonsters  as _mergeMonsters,
+  unmergeMonster as _unmergeMonster,
   prioritizeMonsters as _prioritizeMonsters,
   addSolution   as _addSolution,
   voteSolution  as _voteSolution,
+  addDiscussionNote   as _addDiscussionNote,
+  editDiscussionNote  as _editDiscussionNote,
+  removeDiscussionNote as _removeDiscussionNote,
+  castMonsterVoteOp   as _castMonsterVoteOp,
   addMission    as _addMission,
   removeMission  as _removeMission,
 } from './collections.js';
@@ -101,10 +108,13 @@ export async function reactToMonster(id, reaction) {
   }
 }
 
-export const selectMonster    = (id)         => _selectMonster(sid(), monsters(), id);
-export const mergeMonsters    = (k, d, t)    => _mergeMonsters(sid(), monsters(), k, d, t, patchMonsters);
-export const prioritizeMonsters = ()         => _prioritizeMonsters(sid(), monsters(), patchMonsters);
-export const addSolution      = (s)          => _addSolution(sid(), s);
+export const selectMonster      = (id)         => _selectMonster(sid(), monsters(), id);
+export const renameMonster      = (id, text)   => _renameMonster(sid(), id, text);
+export const deleteMonster      = (id)         => _deleteMonster(sid(), id);
+export const mergeMonsters      = (k, d, t)    => _mergeMonsters(sid(), monsters(), k, d, t, patchMonsters);
+export const unmergeMonster     = (id)         => _unmergeMonster(sid(), monsters(), id, patchMonsters);
+export const prioritizeMonsters = ()           => _prioritizeMonsters(sid(), monsters(), patchMonsters);
+export const addSolution        = (s)          => _addSolution(sid(), s);
 
 export async function voteSolution(id) {
   const sessionId = sid();
@@ -123,6 +133,47 @@ export async function voteSolution(id) {
     return false;
   }
 }
+
+// ── Discussions ───────────────────────────────────────────────────────────────
+
+export const addDiscussionNote    = (note)           => _addDiscussionNote(sid(), note);
+export const editDiscussionNote   = (id, partial)    => _editDiscussionNote(sid(), id, partial);
+export const removeDiscussionNote = (id)             => _removeDiscussionNote(sid(), id);
+
+// ── MonsterVotes ──────────────────────────────────────────────────────────────
+
+/**
+ * Vota em um monstro durante a fase de priorização.
+ * Proteção dupla:
+ *   1. Client-side: verifica limite de 3 votos e duplicata local (hasReacted).
+ *   2. Firestore: transação atômica rejeita ID duplicado.
+ */
+export async function voteOnMonster(monsterId) {
+  const sessionId = sid();
+  const deviceId  = getDeviceId();
+
+  // Proteção de duplicata local (igual às reações e voteSolution)
+  if (hasReacted(sessionId, 'monsterVotes', monsterId, deviceId, 'vote')) return false;
+
+  // Limite de 3 votos por dispositivo
+  const myVotes = getState().monsterVotes.filter((v) => v.deviceId === deviceId);
+  if (myVotes.length >= 3) return false;
+
+  try {
+    await _castMonsterVoteOp(sessionId, monsterId, deviceId);
+    markReacted(sessionId, 'monsterVotes', monsterId, deviceId, 'vote');
+    return true;
+  } catch (e) {
+    if (e?.message === 'already-voted') {
+      markReacted(sessionId, 'monsterVotes', monsterId, deviceId, 'vote');
+      return false;
+    }
+    console.warn('Firestore voteOnMonster failed:', e);
+    return false;
+  }
+}
+
+// ── Missions ──────────────────────────────────────────────────────────────────
 
 export const addMission       = (m)          => _addMission(sid(), m);
 export const removeMission    = (id)         => _removeMission(sid(), id);

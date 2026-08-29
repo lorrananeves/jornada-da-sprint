@@ -10,6 +10,7 @@ export const XP_RULES = {
   MONSTER: 10,
   SOLUTION: 20,
   MISSION: 30,
+  MONSTER_VOTE: 5,
 };
 
 /**
@@ -50,4 +51,12 @@ export function xpForSolution() {
  */
 export function xpForMission() {
   return XP_RULES.MISSION;
+}
+
+/**
+ * Get XP for voting on a monster during the voting phase.
+ * Notas de discussão do SM não geram XP.
+ */
+export function xpForMonsterVote() {
+  return XP_RULES.MONSTER_VOTE;
 }
