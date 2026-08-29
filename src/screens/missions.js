@@ -3,6 +3,13 @@
  *   interpole valores vindos do usuário ou do Firestore sem escapar.
  *
  * Missions Screen
+ *
+ * Mudanças nesta versão:
+ *   - Campos novos (opcionais): monsterId, discussionId, successCriteria
+ *   - Pré-preenchimento a partir de notas de discussão (tipo 'action')
+ *     mantendo o vínculo Monstro → Ação → Missão
+ *   - Botão "Voltar" aponta para 'voting' (antes 'combat')
+ *   - Acordos do time não exigem responsável ou prazo — regra explicitada no form
  */
 
 import {
@@ -123,31 +130,41 @@ export function renderMissions(root) {
           </div>
         ` : (_prevMissions === null && canCreateMission() ? '<div id="prev-missions-loading" style="display:none"></div>' : '')}
 
+        <!-- Vínculo com discussão quando pré-preenchido de uma ação -->
+        ${prefill?.monsterId ? `
+          <div class="warning-banner" style="margin-bottom:16px;border-color:rgba(88,166,255,0.3);background:var(--info-dim);color:var(--info)">
+            <span>🔗</span>
+            <span>Missão vinculada a uma ação da discussão.
+              O vínculo <strong>Monstro → Ação → Missão</strong> será preservado no relatório.</span>
+          </div>
+        ` : ''}
+
         <!-- Add Mission Form (somente SM) -->
         ${canCreateMission() ? `
         <div class="card mb-5">
           <h4 style="margin-bottom:16px">+ Nova Missão</h4>
           <div style="display:flex;flex-direction:column;gap:12px">
+            ${prefill?.monsterId ? `
+              <input type="hidden" id="mission-monster-id" value="${escapeHTML(prefill.monsterId)}" />
+              <input type="hidden" id="mission-discussion-id" value="${escapeHTML(prefill.discussionId || '')}" />
+            ` : ''}
             <div class="form-group">
               <label class="form-label">Título *</label>
               <input class="form-input" type="text" id="mission-title"
-                placeholder="Ex: Estabelecer cerimônia de alinhamento semanal"
+                placeholder="Ex: Criar documentação do fluxo X"
                 value="${escapeHTML(prefill ? prefill.text : '')}" />
             </div>
             <div class="form-group">
+              <label class="form-label">Critério de sucesso (opcional)</label>
+              <textarea class="form-textarea" id="mission-success-criteria"
+                placeholder="Como saberemos que esta missão foi concluída com sucesso?"
+                style="min-height:56px"></textarea>
+            </div>
+            <div class="form-group">
               <label class="form-label">Descrição</label>
-              <textarea class="form-textarea" id="mission-desc" placeholder="Detalhe a missão..." style="min-height:64px"></textarea>
+              <textarea class="form-textarea" id="mission-desc" placeholder="Detalhes adicionais..." style="min-height:56px"></textarea>
             </div>
             <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Estratégia</label>
-                <select class="form-select" id="mission-strategy">
-                  <option value="">— Nenhuma —</option>
-                  <option value="prevent" ${prefill && prefill.strategy === 'prevent' ? 'selected' : ''}>🛡️ Prevenir</option>
-                  <option value="reduce" ${prefill && prefill.strategy === 'reduce' ? 'selected' : ''}>🧪 Reduzir Impacto</option>
-                  <option value="handle" ${prefill && prefill.strategy === 'handle' ? 'selected' : ''}>🤝 Lidar Melhor</option>
-                </select>
-              </div>
               <div class="form-group">
                 <label class="form-label">Prioridade</label>
                 <select class="form-select" id="mission-priority">
@@ -252,11 +269,14 @@ export function renderMissions(root) {
       const mission = {
         id: uid(),
         title,
-        description: root.querySelector('#mission-desc').value.trim(),
-        strategy: root.querySelector('#mission-strategy').value,
-        priority: root.querySelector('#mission-priority').value,
-        owner: root.querySelector('#mission-owner').value.trim(),
-        deadline: root.querySelector('#mission-deadline').value,
+        description:      root.querySelector('#mission-desc').value.trim(),
+        successCriteria:  root.querySelector('#mission-success-criteria')?.value.trim() || '',
+        priority:         root.querySelector('#mission-priority').value,
+        owner:            root.querySelector('#mission-owner').value.trim(),
+        deadline:         root.querySelector('#mission-deadline').value,
+        // Vínculos opcionais — preenchidos quando a missão vem de uma ação da discussão
+        monsterId:    root.querySelector('#mission-monster-id')?.value || '',
+        discussionId: root.querySelector('#mission-discussion-id')?.value || '',
       };
 
       // Clear prefill
@@ -325,7 +345,7 @@ export function renderMissions(root) {
     });
 
     root.querySelector('#btn-back').addEventListener('click', () => {
-      if (isSM()) setPhase('combat');
+      if (isSM()) setPhase('voting');
       else setLocalPhase('roleSelect');
     });
     root.querySelector('#btn-next')?.addEventListener('click', () => {
