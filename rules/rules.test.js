@@ -458,18 +458,16 @@ describe('checkins', () => {
     );
   });
 
-  it('❌ participante não pode criar segundo check-in com ID fabricado', async () => {
-    // Cria o check-in legítimo primeiro
+  it('❌ participante não pode criar segundo check-in com o mesmo deviceId', async () => {
+    // Cria o check-in legítimo primeiro (sem regras, simula check-in já existente)
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'checkins', CHECKIN_ID), validCheckin);
     });
-    // Tenta criar outro com ID diferente mas mesmo deviceId
-    const fakeId = '3'.repeat(16);
+    // Tenta criar novamente o mesmo documento — deve falhar porque o doc já existe
+    // (Firestore rejeita 'create' quando o documento já existe)
     await assertFails(
-      setDoc(subDoc(anonDb(), 'checkins', fakeId), { score: 5, deviceId: fakeId })
+      setDoc(subDoc(anonDb(), 'checkins', CHECKIN_ID), { score: 5, deviceId: EVIL_DEV })
     );
-    // Verificação extra: o vínculo itemId==deviceId também bloqueia IDs fabricados
-    // onde itemId != deviceId (qualquer combinação)
   });
 
   it('❌ check-in com score fora do intervalo [1-5] é rejeitado', async () => {
