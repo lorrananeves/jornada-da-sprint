@@ -97,7 +97,8 @@ service cloud.firestore {
           validSessionId(sessionId)
           && isValidMonster(request.resource.data);
         // Permite atualizar: reações, selected, priorityRank, text, mergedFrom,
-        // merged (flag de monstro absorvido) e mergedInto (id do monstro keeper).
+        // merged (flag de monstro absorvido), mergedInto (id do monstro keeper),
+        // unmerged (flag de merge desfeito), voteCount (incremento atômico).
         allow update: if
           validSessionId(sessionId)
           && isMonsterUpdate(request.resource.data, resource.data);
@@ -113,6 +114,32 @@ service cloud.firestore {
             && request.resource.data.reactedAt is string;
           allow update, delete: if false;
         }
+      }
+
+      // ── Notas de discussão ────────────────────────────────────────────────
+      // Somente criação e remoção (SM controla no cliente).
+      // Edição é permitida para que o SM possa refinar o texto durante a retro.
+      match /discussions/{itemId} {
+        allow read: if validSessionId(sessionId);
+        allow create: if
+          validSessionId(sessionId)
+          && isValidDiscussionNote(request.resource.data);
+        allow update: if
+          validSessionId(sessionId)
+          && isDiscussionNoteUpdate(request.resource.data, resource.data);
+        allow delete: if validSessionId(sessionId);
+      }
+
+      // ── Votos em monstros ─────────────────────────────────────────────────
+      // ID do documento: {deviceId}_{monsterId} — create falha se já existir.
+      // Unicidade garante 1 voto por dispositivo por monstro sem transação extra.
+      match /monsterVotes/{tokenId} {
+        allow read: if validSessionId(sessionId);
+        allow create: if
+          validSessionId(sessionId)
+          && tokenId.matches('^[0-9a-f]{16}_[0-9a-zA-Z_-]+$')
+          && isValidMonsterVote(request.resource.data);
+        allow update, delete: if false;
       }
 
       // ── Soluções ─────────────────────────────────────────────────────────
@@ -204,8 +231,10 @@ function isValidSessionRoot(data) {
       'sprint', 'team', 'currentPhase', 'retroStarted',
       'xp', 'completedPhases', 'createdAt', 'updatedAt', 'smDeviceId',
       'phaseDurations', 'phaseStartedAt', 'smUid',
-      // campos sincronizados entre participantes
+      // campos sincronizados entre participantes (legado)
       'combatMonsterIdx', 'combatStrategy',
+      // foco da discussão — SM controla, participantes seguem em tempo real
+      'discussionFocus',
       'readySignals', 'parkingLot'
     ])
     && data.currentPhase is string
@@ -259,15 +288,16 @@ function isValidTeam(team) {
 // Campos que somente o SM pode alterar.
 //
 // Lista completa de campos SM-only:
-//   sprint          — nome e datas da Sprint
-//   team            — nome da equipe e participantCount
-//   retroStarted    — flag que inicia a retro para todos os participantes
-//   phaseDurations  — durações registradas de cada fase
-//   phaseStartedAt  — timestamps de início de fase
-//   currentPhase    — fase atual (avançar retro)
-//   completedPhases — lista de fases já concluídas
-//   combatMonsterIdx — foco do combate (sincronizado pelo SM para todos)
-//   combatStrategy   — estratégia de combate ativa (sincronizada pelo SM)
+//   sprint           — nome e datas da Sprint
+//   team             — nome da equipe e participantCount
+//   retroStarted     — flag que inicia a retro para todos os participantes
+//   phaseDurations   — durações registradas de cada fase
+//   phaseStartedAt   — timestamps de início de fase
+//   currentPhase     — fase atual (avançar retro)
+//   completedPhases  — lista de fases já concluídas
+//   combatMonsterIdx — foco do combate legado (sincronizado pelo SM para todos)
+//   combatStrategy   — estratégia de combate legada (sincronizada pelo SM)
+//   discussionFocus  — índice do monstro em foco na discussão (SM → participantes)
 //
 // parkingLot e readySignals são deliberadamente excluídos: qualquer
 // participante precisa escrever neles (notas e sinalização "Terminei").
@@ -281,7 +311,8 @@ function isChangingSmOnlyFields(newData, oldData) {
     || newData.get('currentPhase',  null) != oldData.get('currentPhase',     null)
     || newData.get('completedPhases',[])  != oldData.get('completedPhases',  [])
     || newData.get('combatMonsterIdx', null) != oldData.get('combatMonsterIdx', null)
-    || newData.get('combatStrategy',  null) != oldData.get('combatStrategy',    null);
+    || newData.get('combatStrategy',  null) != oldData.get('combatStrategy',    null)
+    || newData.get('discussionFocus', null) != oldData.get('discussionFocus',   null);
 }
 
 // readySignals: permite apenas que o dispositivo que está fazendo o request
@@ -371,15 +402,20 @@ function isValidTreasure(data) {
 }
 
 function isValidMonster(data) {
-  return data.keys().hasOnly(['text', 'reactions', 'selected', 'priorityRank', 'mergedFrom', 'merged', 'mergedInto'])
+  return data.keys().hasOnly([
+      'text', 'reactions', 'selected', 'priorityRank',
+      'mergedFrom', 'merged', 'mergedInto', 'unmerged', 'voteCount'
+    ])
     && data.text is string
     && data.text.size() >= 1 && data.text.size() <= 1000
     && data.reactions is map
     && data.selected is bool
     && (data.get('priorityRank', null) == null || data.get('priorityRank', null) is number)
-    && (data.get('mergedFrom', null) == null || data.get('mergedFrom', []) is list)
-    && (data.get('merged', null) == null || data.get('merged', false) is bool)
-    && (data.get('mergedInto', null) == null || data.get('mergedInto', '') is string);
+    && (data.get('mergedFrom',   null) == null || data.get('mergedFrom',   []) is list)
+    && (data.get('merged',       null) == null || data.get('merged',       false) is bool)
+    && (data.get('mergedInto',   null) == null || data.get('mergedInto',   '') is string)
+    && (data.get('unmerged',     null) == null || data.get('unmerged',     false) is bool)
+    && (data.get('voteCount',    null) == null || data.get('voteCount',    0) is number);
 }
 
 function isValidSolution(data) {
@@ -393,7 +429,10 @@ function isValidSolution(data) {
 }
 
 function isValidMission(data) {
-  return data.keys().hasOnly(['title', 'description', 'strategy', 'priority', 'owner', 'deadline'])
+  return data.keys().hasOnly([
+      'title', 'description', 'strategy', 'priority', 'owner', 'deadline',
+      'monsterId', 'discussionId', 'successCriteria'
+    ])
     && data.title is string
     && data.title.size() >= 1 && data.title.size() <= 200
     && data.get('description', '') is string
@@ -403,7 +442,12 @@ function isValidMission(data) {
     && data.get('owner', '').size() <= 120
     && data.get('deadline', '') is string
     && data.priority is string
-    && data.priority in ['high', 'medium', 'low'];
+    && data.priority in ['high', 'medium', 'low']
+    && (data.get('monsterId', null) == null || data.get('monsterId', '') is string)
+    && (data.get('discussionId', null) == null || data.get('discussionId', '') is string)
+    && (data.get('successCriteria', null) == null
+        || (data.get('successCriteria', '') is string
+            && data.get('successCriteria', '').size() <= 1000));
 }
 
 // Tesouro: só reações podem mudar (campos text/category imutáveis).
@@ -421,36 +465,59 @@ function isReactionUpdate(newData, oldData) {
 }
 
 // Monstro: permite mudar reactions.*, selected, priorityRank, text, mergedFrom,
-// merged (flag de monstro absorvido) e mergedInto (id do keeper).
+// merged (flag de monstro absorvido), mergedInto (id do keeper),
+// unmerged (flag de merge desfeito), voteCount (incremento atômico).
 //
-// Há três tipos de update válidos:
+// Há quatro tipos de update válidos:
 //   1. Reação simples: apenas reactions.* sobe +1 (nunca decrementa)
 //   2. Merge — atualização do keep: mergedFrom cresce e reações sobem o valor
 //      combinado (não pode cair; o cliente calcula a soma exata via batchWrite)
-//   3. Marcação de drop: só merged=true e mergedInto=<id> mudam (sem reações)
-//
-// O bypass anterior ("qualquer reação quando isMerge") foi removido porque
-// permitia fabricar mergedFrom para inflar contadores arbitrariamente.
-// Agora o merge de reações é limitado a <= soma dos dois monstros.
+//   3. Marcação de drop/deleted: só merged=true e mergedInto=<id> mudam
+//   4. Unmerge / restore: merged vira false e mergedInto vira null (originais voltam)
+//      ou merged/unmerged viram true (monstro agrupado é desativado)
+//   5. voteCount: incremento de +1 por write (via transação castMonsterVote)
 function isMonsterUpdate(newData, oldData) {
   return (
-    // Caso 3 — drop mark: apenas merged e mergedInto mudam.
-    // text, selected, reactions e mergedFrom ficam idênticos ao documento atual.
-    // Isso impede que alguém use o drop mark para sobrescrever mergedFrom
-    // com ids fabricados.
+    // Caso 3 — drop mark ou delete: apenas merged e mergedInto mudam.
+    // mergedInto pode ser '__deleted__' para deleção lógica.
     newData.get('merged', false) == true
     && newData.get('mergedInto', '') is string
     && newData.get('mergedInto', '').size() > 0
-    && newData.get('mergedInto', '').size() <= 32
+    && newData.get('mergedInto', '').size() <= 64
     && newData.get('text', '')               == oldData.get('text', '')
     && newData.get('selected', false)        == oldData.get('selected', false)
     && newData.get('reactions', {})          == oldData.get('reactions', {})
     && newData.get('mergedFrom', null)       == oldData.get('mergedFrom', null)
   ) || (
+    // Caso 4a — unmerge do keep: marca como desfeito (unmerged=true, merged=true)
+    newData.get('merged', false)   == true
+    && newData.get('unmerged', false) == true
+    && newData.get('mergedInto', null) == oldData.get('mergedInto', null)
+    && newData.get('text', '')         == oldData.get('text', '')
+    && newData.get('reactions', {})    == oldData.get('reactions', {})
+    && newData.get('mergedFrom', null) == oldData.get('mergedFrom', null)
+  ) || (
+    // Caso 4b — restore dos originais: merged=false, mergedInto=null
+    newData.get('merged', true) == false
+    && newData.get('mergedInto', '') == null
+    && newData.get('text', '')         == oldData.get('text', '')
+    && newData.get('reactions', {})    == oldData.get('reactions', {})
+    && newData.get('mergedFrom', null) == oldData.get('mergedFrom', null)
+  ) || (
+    // Caso 5 — voteCount: apenas voteCount sobe +1 (nunca decrementar)
+    'voteCount' in newData.diff(oldData).affectedKeys()
+    && newData.get('voteCount', 0) == oldData.get('voteCount', 0) + 1
+    && newData.get('text', '')       == oldData.get('text', '')
+    && newData.get('selected', false)== oldData.get('selected', false)
+    && newData.get('reactions', {})  == oldData.get('reactions', {})
+  ) || (
     // Casos 1 e 2 — reação simples ou merge do keep.
     // merged e mergedInto são permitidos no schema mas não podem virar true/set
     // neste path (o keep nunca é marcado como merged).
-    newData.keys().hasOnly(['text', 'reactions', 'selected', 'priorityRank', 'mergedFrom', 'merged', 'mergedInto'])
+    newData.keys().hasOnly([
+        'text', 'reactions', 'selected', 'priorityRank',
+        'mergedFrom', 'merged', 'mergedInto', 'unmerged', 'voteCount'
+      ])
     && newData.get('text', '') is string
     && newData.get('text', '').size() >= 1
     && newData.get('text', '').size() <= 1000
@@ -459,6 +526,7 @@ function isMonsterUpdate(newData, oldData) {
     && (newData.get('mergedFrom', null) == null || newData.get('mergedFrom', []) is list)
     && (newData.get('merged', null) == null || newData.get('merged', false) is bool)
     && (newData.get('mergedInto', null) == null || newData.get('mergedInto', '') is string)
+    && (newData.get('unmerged', null) == null || newData.get('unmerged', false) is bool)
     // Reações nunca podem cair
     && newData.get('reactions', {}).get('fire', 0) >= oldData.get('reactions', {}).get('fire', 0)
     && newData.get('reactions', {}).get('eyes', 0) >= oldData.get('reactions', {}).get('eyes', 0)
@@ -483,15 +551,53 @@ function isVoteUpdate(newData, oldData) {
     && newData.votes == oldData.votes + 1;
 }
 
+// Nota de discussão: todos os campos podem ser criados com os valores iniciais.
+function isValidDiscussionNote(data) {
+  return data.keys().hasOnly(['monsterId', 'type', 'text', 'createdAt', 'updatedAt'])
+    && data.keys().hasAll(['monsterId', 'type', 'text', 'createdAt'])
+    && data.monsterId is string
+    && data.monsterId.size() >= 1 && data.monsterId.size() <= 64
+    && data.type is string
+    && data.type in ['insight', 'mitigation', 'agreement', 'action', 'observation']
+    && data.text is string
+    && data.text.size() >= 1 && data.text.size() <= 1000
+    && data.createdAt is string
+    && (data.get('updatedAt', null) == null || data.updatedAt is string);
+}
+
+// Nota de discussão: permite editar type e text; monsterId e createdAt imutáveis.
+function isDiscussionNoteUpdate(newData, oldData) {
+  return newData.get('monsterId', '') == oldData.get('monsterId', '')
+    && newData.get('createdAt', '')   == oldData.get('createdAt', '')
+    && newData.get('type', '') is string
+    && newData.get('type', '') in ['insight', 'mitigation', 'agreement', 'action', 'observation']
+    && newData.get('text', '') is string
+    && newData.get('text', '').size() >= 1
+    && newData.get('text', '').size() <= 1000
+    && newData.get('updatedAt', '') is string;
+}
+
+// Voto em monstro: { deviceId, monsterId, votedAt } — imutável após criação.
+function isValidMonsterVote(data) {
+  return data.keys().hasOnly(['deviceId', 'monsterId', 'votedAt'])
+    && data.keys().hasAll(['deviceId', 'monsterId', 'votedAt'])
+    && data.deviceId is string && data.deviceId.size() == 16
+    && data.monsterId is string && data.monsterId.size() >= 1
+    && data.votedAt is string;
+}
+
 // Missão: permite apenas atualizar o campo status (retomada de missões anteriores)
 function isMissionStatusUpdate(newData, oldData) {
   // Todos os campos imutáveis devem ser preservados
-  return newData.get('title', '')       == oldData.get('title', '')
-    && newData.get('description', '') == oldData.get('description', '')
-    && newData.get('strategy', '')    == oldData.get('strategy', '')
-    && newData.get('priority', '')    == oldData.get('priority', '')
-    && newData.get('owner', '')       == oldData.get('owner', '')
-    && newData.get('deadline', '')    == oldData.get('deadline', '')
+  return newData.get('title', '')           == oldData.get('title', '')
+    && newData.get('description', '')     == oldData.get('description', '')
+    && newData.get('strategy', '')        == oldData.get('strategy', '')
+    && newData.get('priority', '')        == oldData.get('priority', '')
+    && newData.get('owner', '')           == oldData.get('owner', '')
+    && newData.get('deadline', '')        == oldData.get('deadline', '')
+    && newData.get('monsterId', '')       == oldData.get('monsterId', '')
+    && newData.get('discussionId', '')    == oldData.get('discussionId', '')
+    && newData.get('successCriteria', '') == oldData.get('successCriteria', '')
     // status é o único campo que pode mudar
     && newData.get('status', '') is string
     && newData.get('status', '') in ['done', 'partial', 'pending', ''];
