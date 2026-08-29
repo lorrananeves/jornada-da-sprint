@@ -72,6 +72,7 @@ import {
   setLocalPhase,
   completePhase,
   addXP,
+  addCheckin,
   mergeMonsters,
   prioritizeMonsters,
   subscribe,
@@ -79,7 +80,7 @@ import {
 } from '../state/store.js';
 import { _setSessionId } from '../state/store/session.js';
 
-import { batchWrite, saveSession, incrementXP } from '../services/firebase.js';
+import { batchWrite, saveSession, incrementXP, saveItem } from '../services/firebase.js';
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -538,6 +539,46 @@ describe('prioritizeMonsters', () => {
 
     const ids = getState().monsters.map((m) => m.id);
     expect(ids).toEqual(['b', 'c', 'a']);
+  });
+});
+
+// ── addCheckin — vínculo deviceId ────────────────────────────────────────────
+//
+// Garante que o checkin enviado ao Firestore sempre carrega o campo deviceId
+// igual ao id do documento — requisito da Rule itemId == data.deviceId.
+
+describe('addCheckin — vínculo deviceId', () => {
+  beforeEach(() => {
+    saveItem.mockClear();
+  });
+
+  it('inclui deviceId no payload enviado ao Firestore', () => {
+    addCheckin({ id: DEVICE_SM, deviceId: DEVICE_SM, score: 4 });
+
+    expect(saveItem).toHaveBeenCalledTimes(1);
+    const [, , item] = saveItem.mock.calls[0];
+    expect(item).toMatchObject({ id: DEVICE_SM, deviceId: DEVICE_SM, score: 4 });
+  });
+
+  it('deviceId é igual ao id do documento', () => {
+    addCheckin({ id: DEVICE_SM, deviceId: DEVICE_SM, score: 3 });
+
+    const [, , item] = saveItem.mock.calls[0];
+    expect(item.deviceId).toBe(item.id);
+  });
+
+  it('inclui comment quando fornecido', () => {
+    addCheckin({ id: DEVICE_SM, deviceId: DEVICE_SM, score: 5, comment: 'Ótima sprint' });
+
+    const [, , item] = saveItem.mock.calls[0];
+    expect(item).toMatchObject({ deviceId: DEVICE_SM, score: 5, comment: 'Ótima sprint' });
+  });
+
+  it('não inclui comment quando ausente (payload mínimo válido para a Rule)', () => {
+    addCheckin({ id: DEVICE_SM, deviceId: DEVICE_SM, score: 2 });
+
+    const [, , item] = saveItem.mock.calls[0];
+    expect(item).not.toHaveProperty('comment');
   });
 });
 

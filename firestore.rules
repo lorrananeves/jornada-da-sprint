@@ -50,12 +50,18 @@ service cloud.firestore {
       // O ID do documento é o deviceId do participante (16 hex chars).
       // Um dispositivo só pode criar um único check-in: se o doc já existir,
       // um create falha automaticamente no Firestore (sem necessidade de update).
+      //
+      // Vínculo obrigatório: itemId == request.resource.data.deviceId.
+      // Impede que um cliente crie múltiplos checkins usando IDs hex fabricados.
+      // Sem esse vínculo, qualquer cliente poderia chamar setDoc com IDs
+      // arbitrários e acumular N respostas, corrompendo "X de Y responderam".
       match /checkins/{itemId} {
         allow read: if validSessionId(sessionId);
         allow create: if
           validSessionId(sessionId)
           && itemId.matches('^[0-9a-f]{16}$')
-          && isValidCheckin(request.resource.data);
+          && isValidCheckin(request.resource.data)
+          && itemId == request.resource.data.deviceId;
         // Checkins são imutáveis após criação
         allow update, delete: if false;
       }
@@ -301,9 +307,12 @@ function isScrumMaster(newData, oldData) {
 // ── Validadores de subcoleção ─────────────────────────────────────────────────
 
 function isValidCheckin(data) {
-  return data.keys().hasOnly(['score', 'comment'])
+  return data.keys().hasOnly(['score', 'comment', 'deviceId'])
+    && data.keys().hasAll(['score', 'deviceId'])
     && data.score is number
     && data.score >= 1 && data.score <= 5
+    && data.deviceId is string
+    && data.deviceId.size() == 16
     && (data.get('comment', null) == null
         || (data.comment is string && data.comment.size() <= 1000));
 }

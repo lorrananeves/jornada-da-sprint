@@ -223,13 +223,14 @@ export function renderCheckin(root) {
       regBtn.addEventListener('click', () => {
         if (!selectedScore) return;
         const commentText = root.querySelector('#checkin-comment').value.trim();
-        // Usa o deviceId como ID do documento — garante que cada dispositivo
-        // só consegue criar um único check-in (tentativa de create duplicado
-        // falha no Firestore porque o documento já existe).
+        // Usa o deviceId como ID do documento e como campo no payload.
+        // A Rule exige itemId == data.deviceId, vinculando o ID do documento
+        // ao dispositivo e impedindo que um cliente crie múltiplos checkins
+        // com IDs hex fabricados.
         const deviceId = getDeviceId();
         const checkin = commentText
-          ? { id: deviceId, score: selectedScore, comment: commentText }
-          : { id: deviceId, score: selectedScore };
+          ? { id: deviceId, deviceId, score: selectedScore, comment: commentText }
+          : { id: deviceId, deviceId, score: selectedScore };
         addCheckin(checkin);
         addXP(xpForCheckin());
         showXPToast(xpForCheckin(), 'Check-in registrado');
