@@ -34,7 +34,7 @@ function getAuthInstance() {
   _auth = getAuth(app);
   if (USE_EMULATOR && !_authInitialized) {
     _authInitialized = true;
-    connectAuthEmulator(_auth, 'http://localhost:9099', { disableWarnings: true });
+    connectAuthEmulator(_auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   }
   return _auth;
 }

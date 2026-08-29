@@ -317,14 +317,23 @@ async function initFirebase() {
       //   - 'home' sem role: bootstrap ainda em andamento; o initFirebase vai resolver
       //     a fase correta. Sem essa proteção, um snapshot remoto pode forçar o membro
       //     para 'setup' ou outra fase do SM antes que _guestAutoJoin seja setado.
+      //   - retro já iniciada localmente: se o estado local tem retroStarted=true mas o
+      //     snapshot remoto ainda tem retroStarted=false (write rejeitado ou atrasado),
+      //     não regredir para uma fase anterior — isso causaria um loop lobby→checkin.
       const localPhase = _state.currentPhase;
+      const localRetroStarted = _state.retroStarted;
       const keepPhase =
         localPhase === 'roleSelect' ||
         (localPhase === 'lobby' && !remoteScalars.retroStarted) ||
-        (localPhase === 'home' && !getRole());
+        (localPhase === 'home' && !getRole()) ||
+        (localRetroStarted && !remoteScalars.retroStarted);
 
       _state = { ..._state, ...remoteScalars };
-      if (keepPhase) _state.currentPhase = localPhase;
+      if (keepPhase) {
+        _state.currentPhase = localPhase;
+        // Se a retro estava iniciada localmente, não reverter retroStarted para false
+        if (localRetroStarted) _state.retroStarted = true;
+      }
       delete _state.role;
       saveToStorage(_state);
       notify();

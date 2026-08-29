@@ -72,7 +72,7 @@ const db  = getFirestore(app);
 // Conecta ao emulador local quando a variável está ativa.
 // connectFirestoreEmulator deve ser chamado antes de qualquer operação.
 if (USE_EMULATOR) {
-  connectFirestoreEmulator(db, 'localhost', 8080);
+  connectFirestoreEmulator(db, '127.0.0.1', 8080);
 }
 
 // ── ID helpers ────────────────────────────────────────────────────────────────

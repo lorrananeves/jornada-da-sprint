@@ -420,6 +420,26 @@ describe('subscribeSession — guard de fase local', () => {
     // Deve aceitar porque a fase mudou, mesmo com updatedAt igual
     expect(getState().currentPhase).toBe('treasures');
   });
+
+  it('não regride para fase anterior quando retroStarted já é true localmente mas snapshot remoto ainda tem false', () => {
+    // Simula o cenário: SM clicou "Iniciar Retro", estado local mudou para checkin+retroStarted=true,
+    // mas o write do Firestore foi rejeitado (ex: smUid=null). O snapshot remoto que chega
+    // ainda tem retroStarted=false — não deve forçar regressão para lobby.
+    setState({ smDeviceId: DEVICE_SM });
+    setState({ retroStarted: true });
+    setLocalPhase('checkin');
+
+    _mocks.sessionCallback?.({
+      currentPhase: 'lobby',
+      retroStarted: false,
+      updatedAt: new Date().toISOString(),
+      smDeviceId: DEVICE_SM,
+    });
+
+    // Deve manter checkin, não regredir para lobby
+    expect(getState().currentPhase).toBe('checkin');
+    expect(getState().retroStarted).toBe(true);
+  });
 });
 
 

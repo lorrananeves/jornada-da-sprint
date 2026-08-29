@@ -23,7 +23,17 @@ async function memberJoin(memberPage) {
 // Helper: SM inicia e ambas as páginas chegam ao check-in
 async function startRetro(smPage, memberPage) {
   await smPage.locator('#btn-start-retro').click();
-  await expect(smPage.getByText(/check-in da equipe/i)).toBeVisible({ timeout: 10_000 });
+  try {
+    await expect(smPage.getByText(/check-in da equipe/i)).toBeVisible({ timeout: 10_000 });
+  } catch (e) {
+    const smHtml = await smPage.locator('#screen-root').innerHTML().catch(() => '(sem #screen-root)');
+    const smState = await smPage.evaluate(() => {
+      try { return JSON.parse(localStorage.getItem('jornada_sprint_session') || 'null'); } catch { return null; }
+    }).catch(() => null);
+    console.log('[DIAG startRetro] smPage HTML:', smHtml.slice(0, 1500));
+    console.log('[DIAG startRetro] smPage state:', JSON.stringify({ currentPhase: smState?.currentPhase, retroStarted: smState?.retroStarted, smUid: smState?.smUid }));
+    throw e;
+  }
   await expect(memberPage.getByText(/check-in da equipe/i)).toBeVisible({ timeout: 10_000 });
 }
 
