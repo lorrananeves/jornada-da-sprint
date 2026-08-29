@@ -2,18 +2,22 @@
  * E2E helpers — fixtures e utilitários compartilhados entre os testes.
  *
  * Estratégia de sessão:
- *   1. smPage abre a home, clica "COMEÇAR JORNADA".
- *      O app chama startNewSession() → vai direto para a tela de setup
- *      (sem passar por roleSelect ou auth).
- *   2. Preenche o setup mínimo e chega ao Lobby — isso cria a sessão no Firestore.
- *   3. A fixture captura o ?s= da URL do smPage.
- *   4. memberPage abre /?s={id} — a sessão já existe, o store seta _guestAutoJoin=true
+ *   1. smPage abre a home. O app inicializa sem usuário autenticado.
+ *   2. smPage clica "COMEÇAR JORNADA".
+ *      startNewSession() chama signInAnon() internamente, garantindo smUid != null
+ *      antes de gravar a sessão no Firestore.
+ *   3. Preenche o setup mínimo e chega ao Lobby — isso cria a sessão no Firestore.
+ *   4. A fixture confirma via REST que o Firestore tem currentPhase='lobby',
+ *      garantindo que o membro não carregue um snapshot antigo.
+ *   5. memberPage abre /?s={id} — a sessão já existe, o store seta _guestAutoJoin=true
  *      e vai direto para o lobby de espera sem exibir roleSelect.
  *
  * Isso reflete o fluxo real: SM cria a sessão e compartilha o link.
  */
 
 import { test as base, expect } from '@playwright/test';
+
+const PROJECT_ID = 'demo-project';
 
 /**
  * Aguarda o app renderizar e garante que não estamos na tela de erro.
@@ -40,9 +44,20 @@ async function waitForApp(page) {
 export const test = base.extend({
   // eslint-disable-next-line no-empty-pattern
   twoParticipants: async ({ browser }, use) => {
-    // ── SM: cria a sessão ────────────────────────────────────────────────
+    // ── SM: abre o app e cria a sessão ────────────────────────────────────────
     const smContext = await browser.newContext();
     const smPage    = await smContext.newPage();
+
+    // Captura logs de erro do SM para diagnóstico
+    const smConsoleLogs = [];
+    smPage.on('console', (msg) => {
+      if (msg.type() === 'error' || msg.type() === 'warning') {
+        smConsoleLogs.push(`[${msg.type()}] ${msg.text()}`);
+      }
+    });
+    smPage.on('pageerror', (err) => {
+      smConsoleLogs.push(`[pageerror] ${err.message}`);
+    });
 
     await smPage.goto('/');
     await waitForApp(smPage);
@@ -78,17 +93,35 @@ export const test = base.extend({
     // o snapshot antigo (currentPhase = 'setup') do Firestore.
     //
     // Estratégia: polling na REST API do emulador até o documento confirmar lobby.
+    // Aguarda até 20s (40 × 500ms).
     const firestoreUrl =
-      `http://127.0.0.1:8080/v1/projects/demo-project/databases/(default)/documents/sessions/${sessionId}`;
-    for (let attempt = 0; attempt < 20; attempt++) {
+      `http://127.0.0.1:8080/v1/projects/${PROJECT_ID}/databases/(default)/documents/sessions/${sessionId}`;
+    let firestorePhase = null;
+    for (let attempt = 0; attempt < 40; attempt++) {
       const res  = await fetch(firestoreUrl).catch(() => null);
-      const body = res ? await res.json().catch(() => null) : null;
-      const phase = body?.fields?.currentPhase?.stringValue;
-      if (phase === 'lobby') break;
+      const body = res?.ok ? await res.json().catch(() => null) : null;
+      firestorePhase = body?.fields?.currentPhase?.stringValue ?? null;
+      if (firestorePhase === 'lobby') break;
       await new Promise((r) => setTimeout(r, 500));
     }
 
-    // ── Membro: entra na sessão já criada ─────────────────────────────────
+    if (firestorePhase !== 'lobby') {
+      // Diagnóstico: despeja o estado do SM para entender por que o write falhou
+      const smHtml = await smPage.locator('#screen-root').innerHTML().catch(() => '(sem #screen-root)');
+      const smState = await smPage.evaluate(() => {
+        try { return JSON.parse(localStorage.getItem('jornada_sprint_session') || 'null'); } catch { return null; }
+      }).catch(() => null);
+      console.log('[DIAG fixture] Firestore não confirmou lobby após 20s. fase atual:', firestorePhase);
+      console.log('[DIAG fixture] smPage HTML:', smHtml.slice(0, 1000));
+      console.log('[DIAG fixture] smPage state:', JSON.stringify({
+        currentPhase: smState?.currentPhase,
+        smDeviceId: smState?.smDeviceId,
+        smUid: smState?.smUid,
+      }));
+      console.log('[DIAG fixture] smPage logs:', smConsoleLogs.join('\n'));
+    }
+
+    // ── Membro: entra na sessão já criada ─────────────────────────────────────
     const memberContext = await browser.newContext();
     const memberPage    = await memberContext.newPage();
 

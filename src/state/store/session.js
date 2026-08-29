@@ -525,9 +525,12 @@ onAuthChange((user) => {
       notify();
     }
   } else {
-    // Só redireciona para home se o dispositivo atual é o SM (ou quer ser SM).
+    // Só redireciona para home se o dispositivo atual é o SM (ou quer ser SM)
+    // E ainda não há uma sessão ativa em andamento.
     // Membros do time nunca fazem login e não devem ser afetados pelo logout.
-    const smPhases = new Set(['auth', 'smDashboard', 'setup', 'lobby']);
+    // Com signInAnon, o onAuthStateChanged pode disparar user=null se o token
+    // anônimo for invalidado — não devemos interromper a retro por isso.
+    const smPhases = new Set(['auth', 'smDashboard']);
     if (smPhases.has(phase) && isSM()) {
       _state = { ..._state, currentPhase: 'home' };
       notify();

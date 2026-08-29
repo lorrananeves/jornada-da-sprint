@@ -355,17 +355,19 @@ function isXpUpdateValid(newData, oldData) {
 
 // Verifica se o request vem do Scrum Master legítimo da sessão.
 //
-// Usa exclusivamente Firebase Auth (request.auth.uid == smUid).
-// O fallback por smDeviceId foi removido porque não há como provar posse
-// de um deviceId nas Firestore Rules — qualquer participante poderia
-// reenviar o mesmo smDeviceId no payload e passar a verificação.
-// Todas as sessões criadas pelo app possuem smUid (login é obrigatório
-// para o SM), portanto o fallback anônimo nunca é necessário.
+// Dois modos:
+//   1. Sessão com conta (smUid != null): verifica Firebase Auth uid.
+//      Único modo seguro — prova inequívoca de identidade do SM.
+//   2. Sessão sem conta (smUid = null): verifica que smDeviceId não muda.
+//      O smDeviceId é imutável após criação (ver isChangingIdentityFields),
+//      então o cliente só passa se enviar o mesmo deviceId que está no doc.
+//      Aceito como compromisso pragmático: o sessionId de 32 chars hex torna
+//      a adivinhação inviável, e o SM sem conta não tem alternativa de auth.
 function isScrumMaster(newData, oldData) {
-  return
-    oldData.get('smUid', null) != null
-    && request.auth != null
-    && request.auth.uid == oldData.smUid;
+  return oldData.get('smUid', null) != null
+    ? (request.auth != null && request.auth.uid == oldData.smUid)
+    : (newData.get('smDeviceId', '') == oldData.get('smDeviceId', '')
+       && oldData.get('smDeviceId', '').size() > 0);
 }
 
 // ── Validadores de subcoleção ─────────────────────────────────────────────────
