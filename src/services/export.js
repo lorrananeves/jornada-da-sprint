@@ -371,7 +371,9 @@ export async function exportAsPDF(state, filename = 'jornada-sprint-relatorio.pd
     for (const m of monsters) {
       const sols = solutions.filter((s) => s.monsterId === m.id);
       const tag  = m.selected ? ' [selecionado]' : '';
-      const reactions = `  fire:${m.reactions.fire||0} eyes:${m.reactions.eyes||0} bulb:${m.reactions.bulb||0}`;
+      // Optional chaining: monstros de dados legados ou malformados podem não
+      // ter o objeto reactions — sem o guard o PDF inteiro travaria com TypeError.
+      const reactions = `  fire:${m.reactions?.fire||0} eyes:${m.reactions?.eyes||0} bulb:${m.reactions?.bulb||0}`;
       bullet(pdf, cur, '!', `${m.text}${tag}${reactions}`, { color: C.danger, fontStyle: 'bold' });
       if (sols.length === 0) {
         paragraph(pdf, cur, 'Sem solucoes registradas.', { color: C.muted, indent: 20, fontSize: 8.5 });

@@ -176,16 +176,21 @@ async function _enterAsTeamMember() {
 
 // ── Extrai o sessionId de uma URL ou string bruta ────────────────────────────
 
+// Regex idêntica à SESSION_ID_RE de firebase.js — 32 chars hex minúsculos.
+// Garante que o ID aceito aqui é exatamente o formato que o Firestore usa
+// como ID de documento; IDs mais curtos causariam INVALID_ARGUMENT no SDK.
+const SESSION_ID_RE = /^[0-9a-f]{32}$/;
+
 function _extractSessionId(raw) {
   // Tenta interpretar como URL e pegar o parâmetro ?s=
   try {
     const url = new URL(raw.includes('://') ? raw : `https://placeholder.com/?s=${raw}`);
     const s = url.searchParams.get('s');
-    if (s && s.length >= 8) return s;
+    if (s && SESSION_ID_RE.test(s)) return s;
   } catch {
     // não é URL
   }
-  // Último recurso: string pura sem espaços (pode ser o ID direto)
-  if (/^[a-f0-9]{8,}$/i.test(raw)) return raw;
+  // Último recurso: string pura (pode ser o ID direto)
+  if (SESSION_ID_RE.test(raw)) return raw;
   return null;
 }

@@ -239,10 +239,13 @@ async function renderTrends(container, sessions) {
 
   // Linha 1: humor médio (escala 1–5 normalizada)
   const moodVals = results.map((r) => r.average);
+  // Guard contra array com 1 elemento: denominator mínimo de 1 evita xStep=Infinity
+  // que produziria SVG corrompido. Na prática o guard em completed.length < 2 acima
+  // já previne isso, mas a defesa aqui protege contra futuros caminhos de código.
   const minV = Math.min(...moodVals, 1);
   const maxV = Math.max(...moodVals, 5);
   const range = maxV - minV || 1;
-  const xStep = (W - PAD * 2) / (moodVals.length - 1);
+  const xStep = (W - PAD * 2) / Math.max(1, moodVals.length - 1);
 
   const toX = (i) => PAD + i * xStep;
   // Reserva a faixa superior (PAD → H - PAD - 20) para humor

@@ -205,10 +205,16 @@ export function createPhaseTimer(containerEl, phase) {
       const dur       = (state.phaseDurations || {})[phase] || 0;
       const startedAt = (state.phaseStartedAt  || {})[phase] || null;
       if (dur !== _prevDur || startedAt !== _prevStartedAt) {
+        // Captura se startedAt mudou ANTES de atualizar _prevStartedAt,
+        // pois após a atribuição a comparação retornaria sempre false.
+        const startedAtChanged = startedAt !== _prevStartedAt;
         _prevDur       = dur;
         _prevStartedAt = startedAt;
         clearTimeout(_tickTimer);
-        _beeped = false;
+        // Reseta _beeped apenas quando o startedAt muda (novo timer iniciado ou
+        // parado) — não quando só a duração muda com o timer já estourado, o
+        // que causava o bip ser tocado novamente a cada update remoto.
+        if (startedAtChanged) _beeped = false;
         renderTimerEl();
       }
     });
