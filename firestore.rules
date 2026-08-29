@@ -284,47 +284,52 @@ function isChangingSmOnlyFields(newData, oldData) {
     || newData.get('combatStrategy',  null) != oldData.get('combatStrategy',    null);
 }
 
+// Retorna a lista de chaves adicionadas a readySignals neste write.
+// Função auxiliar para evitar repetição em isReadySignalsSafe.
+function readySignalsAddedKeys(newData, oldData) {
+  return newData.get('readySignals', {}).keys().removeAll(oldData.get('readySignals', {}).keys());
+}
+
 // readySignals: permite apenas que o dispositivo que está fazendo o request
 // escreva na chave correspondente ao seu próprio deviceId.
 //
 // Regra: nenhuma chave existente pode ser removida ou alterada. Apenas uma
-// chave nova pode ser adicionada por write, e essa chave deve ser igual ao
-// deviceId do request (16 hex chars).
+// chave nova pode ser adicionada por write, e essa chave deve ser um hex de
+// 16 chars com valor string de até 32 chars.
 //
 // Isso impede que um participante:
 //   - sinalize "Terminei" em nome de outro dispositivo
 //   - apague sinais de outros participantes
 //   - faça múltiplas chaves crescerem numa única escrita
+//
+// Escrita como expressão CEL pura (sem let/if/return) para compatibilidade
+// com o emulador Firestore em modo standard edition.
 function isReadySignalsSafe(newData, oldData) {
-  let newSignals = newData.get('readySignals', {});
-  let oldSignals = oldData.get('readySignals', {});
-  // Se readySignals não mudou, não há nada para validar.
-  if (newSignals == oldSignals) return true;
-  // Chaves novas adicionadas neste write
-  let addedKeys = newSignals.keys().removeAll(oldSignals.keys());
-  // Chaves removidas neste write (não permitido)
-  let removedKeys = oldSignals.keys().removeAll(newSignals.keys());
-  if (removedKeys.size() > 0) return false;
-  // Valores de chaves existentes não podem mudar
-  let changedExisting = oldSignals.keys().hasAny(
-    newSignals.keys().toList().filter(k, oldSignals.keys().hasAll([k]) && newSignals[k] != oldSignals[k])
-  );
-  if (changedExisting) return false;
-  // Só uma chave nova por write, e ela deve ser o deviceId do requisitante
-  if (addedKeys.size() > 1) return false;
-  if (addedKeys.size() == 1) {
-    let addedKey = addedKeys.toList()[0];
-    // A chave deve ser um deviceId hex de 16 chars e pertencer ao requisitante.
-    // Como as Rules não têm acesso ao deviceId do cliente (não é um token Auth),
-    // a verificação de posse é estrutural: o valor deve ser uma fase válida.
-    // A constraint de "só pode escrever seu próprio" é reforçada pela lógica
-    // do app (signalReady usa getDeviceId()) e pelo fato de o documento raiz
-    // ser um setDoc merge — nenhum outro campo precisa do deviceId.
-    if (!addedKey.matches('^[0-9a-f]{16}$')) return false;
-    if (!(newSignals[addedKey] is string)) return false;
-    if (newSignals[addedKey].size() > 32) return false;
-  }
-  return true;
+  return
+    // ── Sem remoções: todas as chaves anteriores ainda existem ───────────────
+    newData.get('readySignals', {}).keys().hasAll(oldData.get('readySignals', {}).keys())
+
+    // ── Sem alterações de valor: chaves preservadas mantêm o mesmo valor ─────
+    // Verifica que nenhuma chave já existente em oldSignals aparece na lista
+    // de chaves cujo valor mudou entre old e new.
+    && !oldData.get('readySignals', {}).keys().hasAny(
+         oldData.get('readySignals', {}).keys().toList()
+           .filter(k, newData.get('readySignals', {}).keys().hasAll([k])
+                      && newData.get('readySignals', {})[k] != oldData.get('readySignals', {})[k])
+       )
+
+    // ── No máximo 1 chave nova por write ──────────────────────────────────────
+    && readySignalsAddedKeys(newData, oldData).size() <= 1
+
+    // ── Se há exatamente 1 chave nova: hex 16 chars, valor string ≤ 32 chars ─
+    && (
+         readySignalsAddedKeys(newData, oldData).size() == 0
+         || (
+              readySignalsAddedKeys(newData, oldData).toList()[0].matches('^[0-9a-f]{16}$')
+              && newData.get('readySignals', {})[readySignalsAddedKeys(newData, oldData).toList()[0]] is string
+              && newData.get('readySignals', {})[readySignalsAddedKeys(newData, oldData).toList()[0]].size() <= 32
+            )
+       );
 }
 
 function isChangingIdentityFields(newData, oldData) {
