@@ -818,6 +818,96 @@ describe('missões', () => {
   });
 });
 
+// ── Notas de discussão ────────────────────────────────────────────────────────
+
+describe('discussões', () => {
+  const NOTE_ID = 'note' + '1'.repeat(28);
+  const validNote = {
+    monsterId: 'monster-abc',
+    type:      'insight',
+    text:      'Precisamos melhorar a comunicação',
+    createdAt: '2025-01-01T12:00:00.000Z',
+  };
+
+  beforeEach(async () => {
+    await seedSession();
+  });
+
+  it('✅ SM autenticado pode criar uma nota de discussão', async () => {
+    await assertSucceeds(
+      setDoc(subDoc(smDb(), 'discussions', NOTE_ID), validNote)
+    );
+  });
+
+  it('❌ participante anônimo NÃO pode criar uma nota de discussão', async () => {
+    await assertFails(
+      setDoc(subDoc(anonDb(), 'discussions', NOTE_ID), validNote)
+    );
+  });
+
+  it('✅ SM autenticado pode editar uma nota de discussão existente', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'discussions', NOTE_ID), validNote);
+    });
+    await assertSucceeds(
+      setDoc(subDoc(smDb(), 'discussions', NOTE_ID), {
+        ...validNote,
+        text:      'Texto atualizado pelo SM',
+        updatedAt: '2025-01-01T13:00:00.000Z',
+      })
+    );
+  });
+
+  it('❌ participante anônimo NÃO pode editar uma nota de discussão existente', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'discussions', NOTE_ID), validNote);
+    });
+    await assertFails(
+      setDoc(subDoc(anonDb(), 'discussions', NOTE_ID), {
+        ...validNote,
+        text:      'Texto adulterado por participante',
+        updatedAt: '2025-01-01T13:00:00.000Z',
+      })
+    );
+  });
+
+  it('✅ SM autenticado pode excluir uma nota de discussão', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'discussions', NOTE_ID), validNote);
+    });
+    await assertSucceeds(
+      deleteDoc(subDoc(smDb(), 'discussions', NOTE_ID))
+    );
+  });
+
+  it('❌ participante anônimo NÃO pode excluir uma nota de discussão', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'discussions', NOTE_ID), validNote);
+    });
+    await assertFails(
+      deleteDoc(subDoc(anonDb(), 'discussions', NOTE_ID))
+    );
+  });
+
+  it('✅ participante anônimo PODE ler notas de discussão', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'discussions', NOTE_ID), validNote);
+    });
+    await assertSucceeds(
+      getDoc(subDoc(anonDb(), 'discussions', NOTE_ID))
+    );
+  });
+
+  it('❌ nota com type inválido é rejeitada (SM)', async () => {
+    await assertFails(
+      setDoc(subDoc(smDb(), 'discussions', NOTE_ID), {
+        ...validNote,
+        type: 'invalid-type',
+      })
+    );
+  });
+});
+
 // ── sessionId inválido bloqueia acesso ────────────────────────────────────────
 
 describe('sessionId inválido', () => {

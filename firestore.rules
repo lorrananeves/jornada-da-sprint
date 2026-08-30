@@ -117,17 +117,22 @@ service cloud.firestore {
       }
 
       // ── Notas de discussão ────────────────────────────────────────────────
-      // Somente criação e remoção (SM controla no cliente).
-      // Edição é permitida para que o SM possa refinar o texto durante a retro.
+      // Somente o SM pode criar, editar ou excluir notas.
+      // Participantes têm acesso de leitura — a interface não exibe botões,
+      // mas a rule é a barreira real contra escritas diretas via API.
       match /discussions/{itemId} {
         allow read: if validSessionId(sessionId);
         allow create: if
           validSessionId(sessionId)
+          && isSessionScrumMaster(sessionId)
           && isValidDiscussionNote(request.resource.data);
         allow update: if
           validSessionId(sessionId)
+          && isSessionScrumMaster(sessionId)
           && isDiscussionNoteUpdate(request.resource.data, resource.data);
-        allow delete: if validSessionId(sessionId);
+        allow delete: if
+          validSessionId(sessionId)
+          && isSessionScrumMaster(sessionId);
       }
 
       // ── Votos em monstros ─────────────────────────────────────────────────
@@ -377,6 +382,28 @@ function isScrumMaster(newData, oldData) {
     ? (request.auth != null && request.auth.uid == oldData.smUid)
     : (newData.get('smDeviceId', '') == oldData.get('smDeviceId', '')
        && oldData.get('smDeviceId', '').size() > 0);
+}
+
+// Verifica se o request vem do Scrum Master a partir de uma subcoleção.
+//
+// Lê o documento raiz da sessão via get() e delega para isScrumMaster.
+// Usada nas subcoleções (ex: discussions) onde o doc pai não está disponível
+// diretamente como resource.data.
+//
+// Nota sobre o modo sem conta: assim como isScrumMaster, aceita o smDeviceId
+// presente no header x-sm-device (request.resource.data não tem smDeviceId).
+// Como a subcoleção não carrega smDeviceId, o único modo seguro é smUid.
+// Para sessões sem smUid, usamos o mesmo padrão de isScrumMaster: o request.auth
+// não existe, portanto a verificação cai no ramo do smDeviceId. Contudo, nas
+// subcoleções não há como confrontar o smDeviceId do request com o do doc pai
+// via request.resource.data — portanto apenas o ramo com smUid é enforcement real.
+// Sessões sem smUid ficam protegidas pelo sessionId de 32 hex chars (obscuridade),
+// que é o compromisso documentado no restante do código.
+function isSessionScrumMaster(sessionId) {
+  let session = get(/databases/$(database)/documents/sessions/$(sessionId)).data;
+  return session.get('smUid', null) != null
+    ? (request.auth != null && request.auth.uid == session.get('smUid', ''))
+    : session.get('smDeviceId', '').size() > 0;
 }
 
 // ── Validadores de subcoleção ─────────────────────────────────────────────────
