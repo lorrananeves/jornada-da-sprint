@@ -119,3 +119,35 @@ export function getDiscussionTypeEmoji(type) {
 export function getDiscussionTypeLabel(type) {
   return DISCUSSION_TYPES.find((t) => t.id === type)?.label ?? type;
 }
+
+// ── Resultados de discussão ───────────────────────────────────────────────────
+
+/**
+ * Os cinco possíveis resultados que o SM pode atribuir a um monstro ao encerrar
+ * a discussão. Os IDs coincidem intencionalmente com os tipos de nota para
+ * facilitar a leitura do código — mas representam conceitos diferentes:
+ *   notas  = o que surgiu durante a conversa
+ *   resultado = como o time encerrou aquela conversa
+ */
+export const DISCUSSION_RESULTS = [
+  { id: 'mitigation',  emoji: '🛡️', label: 'Já sabemos lidar' },
+  { id: 'agreement',   emoji: '🤝', label: 'Fizemos um acordo' },
+  { id: 'action',      emoji: '🚀', label: 'Criamos uma ação' },
+  { id: 'insight',     emoji: '💡', label: 'Apenas aprendizado' },
+  { id: 'observation', emoji: '📌', label: 'Apenas registrado' },
+];
+
+/**
+ * Retorna o emoji do resultado de discussão.
+ * Retorna '🎯' para resultado nulo/desconhecido.
+ */
+export function getDiscussionResultEmoji(result) {
+  return DISCUSSION_RESULTS.find((r) => r.id === result)?.emoji ?? '🎯';
+}
+
+/**
+ * Retorna o label do resultado de discussão.
+ */
+export function getDiscussionResultLabel(result) {
+  return DISCUSSION_RESULTS.find((r) => r.id === result)?.label ?? result;
+}

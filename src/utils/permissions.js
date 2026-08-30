@@ -63,6 +63,12 @@ export const canManageDiscussionNotes = () => isSM();
  */
 export const canSetDiscussionFocus = () => isSM();
 
+/**
+ * Somente o SM pode definir, editar ou remover o resultado de uma discussão.
+ * Participantes veem o resultado em modo somente-leitura.
+ */
+export const canSetDiscussionResult = () => isSM();
+
 // ── Votação de monstros ───────────────────────────────────────────────────────
 
 /**
