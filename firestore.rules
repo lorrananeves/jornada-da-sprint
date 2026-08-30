@@ -103,9 +103,8 @@ service cloud.firestore {
         allow update: if
           validSessionId(sessionId)
           && (
-            isSessionScrumMaster(sessionId)
-              ? isSmMonsterUpdate(request.resource.data, resource.data)
-              : isParticipantMonsterUpdate(request.resource.data, resource.data)
+            (isSessionScrumMaster(sessionId) && isSmMonsterUpdate(request.resource.data, resource.data))
+            || (!isSessionScrumMaster(sessionId) && isParticipantMonsterUpdate(request.resource.data, resource.data))
           );
         allow delete: if false;
 
