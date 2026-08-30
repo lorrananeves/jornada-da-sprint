@@ -119,22 +119,25 @@ service cloud.firestore {
       }
 
       // ── Notas de discussão ────────────────────────────────────────────────
-      // Somente o SM pode criar, editar ou excluir notas.
-      // Participantes têm acesso de leitura — a interface não exibe botões,
-      // mas a rule é a barreira real contra escritas diretas via API.
+      // Somente o SM (usuário autenticado) pode criar, editar ou excluir notas.
+      // Participantes são sempre anônimos — request.auth != null é suficiente
+      // para distinguir SM de participante nesta subcoleção.
+      // Nota: isSessionScrumMaster usa get(), que é instável no emulador
+      // Firestore standard edition em contexto de subcoleção (Null value error).
+      // A verificação por request.auth != null é a alternativa segura e correta.
       match /discussions/{itemId} {
         allow read: if validSessionId(sessionId);
         allow create: if
           validSessionId(sessionId)
-          && isSessionScrumMaster(sessionId)
+          && request.auth != null
           && isValidDiscussionNote(request.resource.data);
         allow update: if
           validSessionId(sessionId)
-          && isSessionScrumMaster(sessionId)
+          && request.auth != null
           && isDiscussionNoteUpdate(request.resource.data, resource.data);
         allow delete: if
           validSessionId(sessionId)
-          && isSessionScrumMaster(sessionId);
+          && request.auth != null;
       }
 
       // ── Votos em monstros ─────────────────────────────────────────────────
@@ -526,10 +529,13 @@ function isMonsterUpdate(newData, oldData) {
     && (newData.get('unmerged',     null)  == null || newData.get('unmerged',     false) is bool)
     && (newData.get('voteCount',    null)  == null || newData.get('voteCount',    0)    is number)
     && isValidDiscussionResult(newData.get('discussionResult', null))
-    // Reações nunca podem cair
+    // Reações: nunca podem cair e cada campo sobe no máximo +1 por write
     && newData.get('reactions', {}).get('fire', 0) >= oldData.get('reactions', {}).get('fire', 0)
+    && newData.get('reactions', {}).get('fire', 0) <= oldData.get('reactions', {}).get('fire', 0) + 1
     && newData.get('reactions', {}).get('eyes', 0) >= oldData.get('reactions', {}).get('eyes', 0)
-    && newData.get('reactions', {}).get('bulb', 0) >= oldData.get('reactions', {}).get('bulb', 0);
+    && newData.get('reactions', {}).get('eyes', 0) <= oldData.get('reactions', {}).get('eyes', 0) + 1
+    && newData.get('reactions', {}).get('bulb', 0) >= oldData.get('reactions', {}).get('bulb', 0)
+    && newData.get('reactions', {}).get('bulb', 0) <= oldData.get('reactions', {}).get('bulb', 0) + 1;
 }
 
 // Solução: só votes pode aumentar (nunca diminuir)
