@@ -188,9 +188,9 @@ test('SM define Resultado da Discussão; monstro exibe o resultado em tempo real
   await smPage.locator('#btn-confirm-result').click();
 
   // Após confirmar, SM deve ver "Resultado atual" com o label correto
-  await expect(smPage.getByText(/fizemos um acordo/i)).toBeVisible({ timeout: 10_000 });
+  await expect(smPage.locator('.discussion-result-confirmed')).toContainText(/fizemos um acordo/i, { timeout: 10_000 });
 
   // Membro vê o resultado no painel somente-leitura (sincronização em tempo real)
-  await expect(memberPage.getByText(/resultado da discussão/i)).toBeVisible({ timeout: 20_000 });
-  await expect(memberPage.getByText(/fizemos um acordo/i)).toBeVisible({ timeout: 10_000 });
+  await expect(memberPage.locator('.discussion-result-panel--readonly')).toBeVisible({ timeout: 20_000 });
+  await expect(memberPage.locator('.discussion-result-confirmed')).toContainText(/fizemos um acordo/i, { timeout: 10_000 });
 });
