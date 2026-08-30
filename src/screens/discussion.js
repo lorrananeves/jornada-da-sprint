@@ -191,7 +191,10 @@ export function renderDiscussion(root) {
 
   function render() {
     const currentState = getState();
-    const monster = monsters[currentIdx];
+    // Lê os monstros do estado atual para capturar mudanças remotas (ex: discussionResult)
+    const currentMonsters = currentState.monsters;
+    const monster = currentMonsters[currentIdx] ?? currentMonsters[0];
+    if (!monster) return;
     const notes = currentState.discussions.filter((n) => n.monsterId === monster.id);
     const canManage = canManageDiscussionNotes();
     const userSM = isSM();
@@ -221,12 +224,12 @@ export function renderDiscussion(root) {
               ${monster.mergedFrom?.length ? `<span class="badge" style="background:var(--purple-dim);color:var(--purple)">🔗 ${monster.mergedFrom.length + 1} relatos</span>` : ''}
             </div>
           </div>
-          ${monsters.length > 1 ? `
+          ${currentMonsters.length > 1 ? `
             <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-shrink:0">
               ${!userSM ? '<span class="combat-focus-badge">📡 foco do SM</span>' : ''}
               ${userSM ? `
                 <button class="btn btn-ghost btn-sm" id="btn-prev-monster" ${currentIdx === 0 ? 'disabled' : ''}>← Anterior</button>
-                <button class="btn btn-ghost btn-sm" id="btn-next-monster" ${currentIdx === monsters.length - 1 ? 'disabled' : ''}>Próximo →</button>
+                <button class="btn btn-ghost btn-sm" id="btn-next-monster" ${currentIdx === currentMonsters.length - 1 ? 'disabled' : ''}>Próximo →</button>
               ` : ''}
             </div>
           ` : (!userSM ? '<span class="combat-focus-badge" style="margin-left:auto">📡 foco do SM</span>' : '')}
@@ -288,7 +291,7 @@ export function renderDiscussion(root) {
     });
 
     root.querySelector('#btn-next-monster')?.addEventListener('click', () => {
-      if (!canSetDiscussionFocus() || currentIdx >= monsters.length - 1) return;
+      if (!canSetDiscussionFocus() || currentIdx >= getState().monsters.length - 1) return;
       currentIdx++;
       setDiscussionFocus(currentIdx);
       render();
@@ -310,7 +313,7 @@ export function renderDiscussion(root) {
 
       const note = {
         id: uid(),
-        monsterId: monsters[currentIdx].id,
+        monsterId: getState().monsters[currentIdx]?.id ?? monsters[currentIdx].id,
         type: typeEl?.value || 'insight',
         text,
         createdAt: new Date().toISOString(),
@@ -413,7 +416,7 @@ export function renderDiscussion(root) {
       const btn = root.querySelector('#btn-confirm-result');
       if (btn) btn.disabled = true;
       try {
-        await setMonsterDiscussionResult(monsters[currentIdx].id, selected);
+        await setMonsterDiscussionResult(getState().monsters[currentIdx]?.id ?? monsters[currentIdx].id, selected);
         render();
       } catch (e) {
         console.warn('Firestore setMonsterDiscussionResult failed:', e);
@@ -428,7 +431,7 @@ export function renderDiscussion(root) {
       const btn = root.querySelector('#btn-clear-result');
       if (btn) btn.disabled = true;
       try {
-        await setMonsterDiscussionResult(monsters[currentIdx].id, null);
+        await setMonsterDiscussionResult(getState().monsters[currentIdx]?.id ?? monsters[currentIdx].id, null);
         render();
       } catch (e) {
         console.warn('Firestore setMonsterDiscussionResult (clear) failed:', e);
@@ -470,7 +473,7 @@ export function renderDiscussion(root) {
       _lastFp = fp;
       // Membros seguem o foco do SM automaticamente
       if (!isSM()) {
-        currentIdx = Math.min(state.discussionFocus ?? 0, Math.max(0, monsters.length - 1));
+        currentIdx = Math.min(state.discussionFocus ?? 0, Math.max(0, state.monsters.length - 1));
       }
       render();
     }
