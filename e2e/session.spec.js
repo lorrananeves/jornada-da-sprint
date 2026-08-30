@@ -13,6 +13,7 @@
  *   5. Membro não vê o botão de avançar fase
  *   6. SM avança para Monstros; membro segue automaticamente (novo fluxo)
  *   7. SM avança para Discussão (sem exigir seleção de monstros)
+ *   8. Resultado da Discussão por Monstro
  */
 
 import { test, expect } from './fixtures.js';
@@ -149,4 +150,44 @@ test('SM avança para Discussão a partir de Monstros (botão sempre habilitado)
 
   // Verifica que o texto do botão indica "Discussão"
   await expect(nextBtn).toContainText(/discussão/i);
+});
+
+// ── 8. Resultado da Discussão por Monstro ─────────────────────────────────────
+
+test('SM define Resultado da Discussão; monstro exibe o resultado em tempo real', async ({ twoParticipants }) => {
+  const { smPage, memberPage } = twoParticipants;
+
+  await memberJoin(memberPage);
+  await startRetro(smPage, memberPage);
+
+  // Navega até a fase de Monstros e avança para Discussão
+  await smPage.locator('#btn-next').click(); // → tesouros
+  await smPage.locator('#btn-next').click(); // → monstros
+  await expect(smPage.getByText(/monstros da sprint/i)).toBeVisible({ timeout: 10_000 });
+
+  // SM adiciona um monstro para garantir que haverá algo em discussão
+  await smPage.locator('#monster-input').fill('Problema de comunicação');
+  await smPage.locator('#btn-add-monster').click();
+  await expect(smPage.getByText(/Problema de comunicação/i)).toBeVisible({ timeout: 5_000 });
+
+  // Avança para Discussão
+  await smPage.locator('#btn-next').click(); // → discussão
+  await expect(smPage.getByText(/discussão/i)).toBeVisible({ timeout: 10_000 });
+
+  // SM vê o painel "COMO TERMINAMOS ESSA DISCUSSÃO?"
+  await expect(smPage.getByText(/como terminamos essa discussão/i)).toBeVisible({ timeout: 5_000 });
+
+  // Membro não deve ver o painel de seleção (somente SM gerencia)
+  await expect(memberPage.getByText(/como terminamos essa discussão/i)).not.toBeVisible();
+
+  // SM seleciona "Fizemos um acordo" e confirma
+  await smPage.locator('input[name="discussion-result"][value="agreement"]').check();
+  await smPage.locator('#btn-confirm-result').click();
+
+  // Após confirmar, SM deve ver "Resultado atual" com o label correto
+  await expect(smPage.getByText(/fizemos um acordo/i)).toBeVisible({ timeout: 10_000 });
+
+  // Membro vê o resultado no painel somente-leitura (sincronização em tempo real)
+  await expect(memberPage.getByText(/resultado da discussão/i)).toBeVisible({ timeout: 20_000 });
+  await expect(memberPage.getByText(/fizemos um acordo/i)).toBeVisible({ timeout: 10_000 });
 });
