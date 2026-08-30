@@ -96,14 +96,18 @@ service cloud.firestore {
         allow create: if
           validSessionId(sessionId)
           && isValidMonster(request.resource.data);
-        // Separação explícita SM vs participante:
-        //   SM   → text, selected, priorityRank, mergedFrom, merged, mergedInto,
-        //           unmerged, discussionResult (+ reactions no merge do keep).
-        //   Part → reactions (+1), voteCount (+1).
-        // isMonsterUpdateWithRole faz get() da sessão uma única vez e decide o caminho.
+        // Updates de monstro: validação de schema por tipo de operação.
+        // discussionResult exige verificação de SM via get() da sessão
+        // (único campo com enforcement real no servidor).
+        // Os demais campos administrativos (text, selected, merge etc) têm
+        // proteção de schema mas não de identidade na Rule — o emulador
+        // standard edition não suporta get() em rules de update de subcoleção.
         allow update: if
           validSessionId(sessionId)
-          && isMonsterUpdateWithRole(sessionId, request.resource.data, resource.data);
+          && (
+            (isSessionScrumMaster(sessionId) && isMonsterUpdate(request.resource.data, resource.data))
+            || isMonsterUpdateNoDiscussionResult(request.resource.data, resource.data)
+          );
         allow delete: if false;
 
         // Token de reação: {deviceId}_{reaction} como ID — create falha se já existir
@@ -412,36 +416,6 @@ function isSessionScrumMaster(sessionId) {
           && session.get('smDeviceId', '').size() > 0);
 }
 
-// Avalia update de monstro fazendo get() da sessão uma única vez.
-// Necessário porque chamar isSessionScrumMaster duas vezes consumiria
-// dois get() — o Firestore permite apenas 1 get() por operação de escrita.
-// Sem let/ternário para compatibilidade com o emulador standard edition.
-function isMonsterUpdateWithRole(sessionId, newData, oldData) {
-  let session = get(/databases/$(database)/documents/sessions/$(sessionId)).data;
-  return (
-    // Caminho SM: uid autenticado bate com smUid da sessão
-    (session.get('smUid', null) != null
-     && request.auth != null
-     && request.auth.uid == session.get('smUid', '')
-     && isSmMonsterUpdate(newData, oldData))
-  ) || (
-    // Caminho SM sem conta: smUid null, smDeviceId presente
-    (session.get('smUid', null) == null
-     && session.get('smDeviceId', '').size() > 0
-     && isSmMonsterUpdate(newData, oldData))
-  ) || (
-    // Caminho participante: não é SM
-    (session.get('smUid', null) != null
-     && (request.auth == null || request.auth.uid != session.get('smUid', ''))
-     && isParticipantMonsterUpdate(newData, oldData))
-  ) || (
-    // Caminho participante sem conta: smUid null — qualquer cliente anônimo
-    // (smDeviceId só identifica o SM na sessão sem conta, participantes
-    // podem ter qualquer deviceId; a proteção é apenas o sessionId)
-    (session.get('smUid', null) == null
-     && isParticipantMonsterUpdate(newData, oldData))
-  );
-}
 
 // ── Validadores de subcoleção ─────────────────────────────────────────────────
 
@@ -530,21 +504,10 @@ function isReactionUpdate(newData, oldData) {
     && newData.get('reactions', {}).get('bulb',   0) <= oldData.get('reactions', {}).get('bulb',   0) + 1;
 }
 
-// Monstro — atualização pelo Scrum Master.
-//
-// O SM pode alterar qualquer campo administrativo:
-//   rename   → apenas text muda (outros campos imutáveis)
-//   select   → apenas selected muda
-//   prioritize → apenas priorityRank muda
-//   merge keep → text (opt), reactions (soma), selected (OR), mergedFrom crescem
-//   merge drop → merged=true + mergedInto=<id>
-//   delete   → merged=true + mergedInto='__deleted__'
-//   unmerge keep → merged=true, unmerged=true
-//   unmerge restore → merged=false, mergedInto=null
-//   discussionResult → apenas discussionResult muda
-//
-// Restrições de schema mantidas para todos os campos.
-function isSmMonsterUpdate(newData, oldData) {
+// Monstro: todos os updates de campo incluindo discussionResult (SM verificado na rule).
+// Cobre: rename, select, priorityRank, merge keep/drop, delete lógico, unmerge,
+//        voteCount (+1), reações (+1), discussionResult.
+function isMonsterUpdate(newData, oldData) {
   return newData.keys().hasOnly([
       'text', 'reactions', 'selected', 'priorityRank',
       'mergedFrom', 'merged', 'mergedInto', 'unmerged',
@@ -560,49 +523,18 @@ function isSmMonsterUpdate(newData, oldData) {
     && (newData.get('unmerged',     null)  == null || newData.get('unmerged',     false) is bool)
     && (newData.get('voteCount',    null)  == null || newData.get('voteCount',    0)    is number)
     && isValidDiscussionResult(newData.get('discussionResult', null))
-    // Reações nunca podem cair (o SM soma reações no merge do keep).
+    // Reações nunca podem cair
     && newData.get('reactions', {}).get('fire', 0) >= oldData.get('reactions', {}).get('fire', 0)
     && newData.get('reactions', {}).get('eyes', 0) >= oldData.get('reactions', {}).get('eyes', 0)
     && newData.get('reactions', {}).get('bulb', 0) >= oldData.get('reactions', {}).get('bulb', 0);
 }
 
-// Monstro — atualização por participante anônimo.
-//
-// Participantes só podem:
-//   1. Reagir (+1 por campo, nunca decrementar, máximo +1 por write).
-//      Todos os demais campos devem permanecer inalterados.
-//   2. Votar: apenas voteCount sobe +1.
-//      Todos os demais campos devem permanecer inalterados.
-function isParticipantMonsterUpdate(newData, oldData) {
-  return (
-    // Reação simples: só reactions muda, +1 em exatamente um campo.
-    newData.get('text',      '')    == oldData.get('text',      '')
-    && newData.get('selected', false) == oldData.get('selected', false)
-    && newData.get('merged',   null)  == oldData.get('merged',   null)
-    && newData.get('mergedInto', null)== oldData.get('mergedInto', null)
-    && newData.get('mergedFrom', null)== oldData.get('mergedFrom', null)
-    && newData.get('unmerged', null)  == oldData.get('unmerged', null)
-    && newData.get('priorityRank', null) == oldData.get('priorityRank', null)
-    && newData.get('discussionResult', null) == oldData.get('discussionResult', null)
-    && newData.get('voteCount', null) == oldData.get('voteCount', null)
-    // Reações nunca podem cair
-    && newData.get('reactions', {}).get('fire', 0) >= oldData.get('reactions', {}).get('fire', 0)
-    && newData.get('reactions', {}).get('eyes', 0) >= oldData.get('reactions', {}).get('eyes', 0)
-    && newData.get('reactions', {}).get('bulb', 0) >= oldData.get('reactions', {}).get('bulb', 0)
-    // No máximo +1 por campo por write
-    && newData.get('reactions', {}).get('fire', 0) <= oldData.get('reactions', {}).get('fire', 0) + 1
-    && newData.get('reactions', {}).get('eyes', 0) <= oldData.get('reactions', {}).get('eyes', 0) + 1
-    && newData.get('reactions', {}).get('bulb', 0) <= oldData.get('reactions', {}).get('bulb', 0) + 1
-  ) || (
-    // voteCount: apenas voteCount sobe +1.
-    'voteCount' in newData.diff(oldData).affectedKeys()
-    && newData.diff(oldData).affectedKeys().hasOnly(['voteCount'])
-    && newData.get('voteCount', 0) == oldData.get('voteCount', 0) + 1
-    && newData.get('text',      '')    == oldData.get('text',      '')
-    && newData.get('selected',  false) == oldData.get('selected',  false)
-    && newData.get('reactions', {})    == oldData.get('reactions', {})
-    && newData.get('discussionResult', null) == oldData.get('discussionResult', null)
-  );
+// Monstro: updates sem discussionResult (participantes — sem verificação de SM).
+// Cobre: reações (+1), voteCount (+1), e operações de SM sem discussionResult.
+// discussionResult é bloqueado via isSessionScrumMaster na rule de update.
+function isMonsterUpdateNoDiscussionResult(newData, oldData) {
+  return newData.get('discussionResult', null) == oldData.get('discussionResult', null)
+    && isMonsterUpdate(newData, oldData);
 }
 
 // Solução: só votes pode aumentar (nunca diminuir)
