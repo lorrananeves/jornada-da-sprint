@@ -97,10 +97,8 @@ service cloud.firestore {
           validSessionId(sessionId)
           && isValidMonster(request.resource.data);
         // Updates de monstro: schema validado para todos os campos permitidos.
-        // discussionResult na subcoleção está deprecado — o resultado de discussão
-        // agora vive em discussionResults no doc raiz (protegido por isScrumMaster).
-        // Sem isSessionScrumMaster aqui: get() em regra de subcoleção é instável no
-        // emulador Firestore standard edition e causava Null value error em testes.
+        // O resultado de discussão vive em discussionResults no doc raiz da sessão
+        // (protegido por isScrumMaster) — não existe na subcoleção monsters.
         allow update: if
           validSessionId(sessionId)
           && isMonsterUpdate(request.resource.data, resource.data);
@@ -448,8 +446,7 @@ function isValidTreasure(data) {
 function isValidMonster(data) {
   return data.keys().hasOnly([
       'text', 'reactions', 'selected', 'priorityRank',
-      'mergedFrom', 'merged', 'mergedInto', 'unmerged', 'voteCount',
-      'discussionResult'
+      'mergedFrom', 'merged', 'mergedInto', 'unmerged', 'voteCount'
     ])
     && data.text is string
     && data.text.size() >= 1 && data.text.size() <= 1000
@@ -460,8 +457,7 @@ function isValidMonster(data) {
     && (data.get('merged',       null) == null || data.get('merged',       false) is bool)
     && (data.get('mergedInto',   null) == null || data.get('mergedInto',   '') is string)
     && (data.get('unmerged',     null) == null || data.get('unmerged',     false) is bool)
-    && (data.get('voteCount',    null) == null || data.get('voteCount',    0) is number)
-    && isValidDiscussionResult(data.get('discussionResult', null));
+    && (data.get('voteCount',    null) == null || data.get('voteCount',    0) is number);
 }
 
 function isValidSolution(data) {
@@ -510,14 +506,14 @@ function isReactionUpdate(newData, oldData) {
     && newData.get('reactions', {}).get('bulb',   0) <= oldData.get('reactions', {}).get('bulb',   0) + 1;
 }
 
-// Monstro: todos os updates de campo incluindo discussionResult (SM verificado na rule).
+// Monstro: todos os updates de campo permitidos.
 // Cobre: rename, select, priorityRank, merge keep/drop, delete lógico, unmerge,
-//        voteCount (+1), reações (+1), discussionResult.
+//        voteCount (+1), reações (+1).
+// O resultado de discussão NÃO vive aqui — está em discussionResults no doc raiz.
 function isMonsterUpdate(newData, oldData) {
   return newData.keys().hasOnly([
       'text', 'reactions', 'selected', 'priorityRank',
-      'mergedFrom', 'merged', 'mergedInto', 'unmerged',
-      'voteCount', 'discussionResult'
+      'mergedFrom', 'merged', 'mergedInto', 'unmerged', 'voteCount'
     ])
     && newData.get('text', '') is string
     && newData.get('text', '').size() >= 1
@@ -528,7 +524,6 @@ function isMonsterUpdate(newData, oldData) {
     && (newData.get('mergedInto',   null)  == null || newData.get('mergedInto',   '')   is string)
     && (newData.get('unmerged',     null)  == null || newData.get('unmerged',     false) is bool)
     && (newData.get('voteCount',    null)  == null || newData.get('voteCount',    0)    is number)
-    && isValidDiscussionResult(newData.get('discussionResult', null))
     // Reações: nunca podem cair e cada campo sobe no máximo +1 por write
     && newData.get('reactions', {}).get('fire', 0) >= oldData.get('reactions', {}).get('fire', 0)
     && newData.get('reactions', {}).get('fire', 0) <= oldData.get('reactions', {}).get('fire', 0) + 1
@@ -597,11 +592,5 @@ function isMissionStatusUpdate(newData, oldData) {
     // status é o único campo que pode mudar
     && newData.get('status', '') is string
     && newData.get('status', '') in ['done', 'partial', 'pending', ''];
-}
-
-// discussionResult: valor nulo ou um dos cinco resultados possíveis.
-function isValidDiscussionResult(result) {
-  return result == null
-    || result in ['mitigation', 'agreement', 'action', 'insight', 'observation'];
 }
 
