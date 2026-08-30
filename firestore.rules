@@ -96,12 +96,21 @@ service cloud.firestore {
         allow create: if
           validSessionId(sessionId)
           && isValidMonster(request.resource.data);
-        // Updates de monstro: schema validado para todos os campos permitidos.
-        // O resultado de discussão vive em discussionResults no doc raiz da sessão
-        // (protegido por isScrumMaster) — não existe na subcoleção monsters.
+        // Updates de monstro: dois caminhos distintos por ator.
+        //
+        // Participante anônimo: somente reações (+1 por campo) e voteCount (+1).
+        // Cobre castReaction e castMonsterVote — as únicas ops de update abertas
+        // a todos.
+        //
+        // SM (autenticado): campos administrativos — rename, select, merge,
+        // unmerge, delete lógico, priorityRank. No merge o SM soma as reações dos
+        // dois monstros, então reactions pode subir mais que +1 nesse caminho.
         allow update: if
           validSessionId(sessionId)
-          && isMonsterUpdate(request.resource.data, resource.data);
+          && (
+            isMonsterParticipantUpdate(request.resource.data, resource.data)
+            || (request.auth != null && isMonsterSmUpdate(request.resource.data, resource.data))
+          );
         allow delete: if false;
 
         // Token de reação: {deviceId}_{reaction} como ID — create falha se já existir
@@ -514,11 +523,38 @@ function isReactionUpdate(newData, oldData) {
     && newData.get('reactions', {}).get('bulb',   0) <= oldData.get('reactions', {}).get('bulb',   0) + 1;
 }
 
-// Monstro: todos os updates de campo permitidos.
-// Cobre: rename, select, priorityRank, merge keep/drop, delete lógico, unmerge,
-//        voteCount (+1), reações (+1).
-// O resultado de discussão NÃO vive aqui — está em discussionResults no doc raiz.
-function isMonsterUpdate(newData, oldData) {
+// Monstro — participante anônimo: somente reactions (+1 por campo) ou voteCount (+1).
+// Todos os demais campos devem permanecer idênticos ao documento existente.
+// Cobre castReaction (reactions.X += 1) e castMonsterVote (voteCount += 1).
+function isMonsterParticipantUpdate(newData, oldData) {
+  return newData.keys().hasOnly([
+      'text', 'reactions', 'selected', 'priorityRank',
+      'mergedFrom', 'merged', 'mergedInto', 'unmerged', 'voteCount'
+    ])
+    // Campos administrativos imutáveis para participante
+    && newData.get('text',        '') == oldData.get('text',        '')
+    && newData.get('selected',  false) == oldData.get('selected',  false)
+    && newData.get('priorityRank', null) == oldData.get('priorityRank', null)
+    && newData.get('mergedFrom',   null) == oldData.get('mergedFrom',   null)
+    && newData.get('merged',      false) == oldData.get('merged',      false)
+    && newData.get('mergedInto',   null) == oldData.get('mergedInto',   null)
+    && newData.get('unmerged',    false) == oldData.get('unmerged',    false)
+    // voteCount: só pode subir +1 (nunca cair, nunca pular)
+    && newData.get('voteCount', 0) >= oldData.get('voteCount', 0)
+    && newData.get('voteCount', 0) <= oldData.get('voteCount', 0) + 1
+    // Reações: cada campo sobe no máximo +1 (nunca cair)
+    && newData.get('reactions', {}).get('fire', 0) >= oldData.get('reactions', {}).get('fire', 0)
+    && newData.get('reactions', {}).get('fire', 0) <= oldData.get('reactions', {}).get('fire', 0) + 1
+    && newData.get('reactions', {}).get('eyes', 0) >= oldData.get('reactions', {}).get('eyes', 0)
+    && newData.get('reactions', {}).get('eyes', 0) <= oldData.get('reactions', {}).get('eyes', 0) + 1
+    && newData.get('reactions', {}).get('bulb', 0) >= oldData.get('reactions', {}).get('bulb', 0)
+    && newData.get('reactions', {}).get('bulb', 0) <= oldData.get('reactions', {}).get('bulb', 0) + 1;
+}
+
+// Monstro — SM autenticado: rename, select, merge, unmerge, delete lógico, priorityRank.
+// No merge o SM soma as reações dos dois monstros — reactions pode subir mais que +1.
+// Validação de schema apenas (sem restrição de delta): o SM é confiável por auth.
+function isMonsterSmUpdate(newData, oldData) {
   return newData.keys().hasOnly([
       'text', 'reactions', 'selected', 'priorityRank',
       'mergedFrom', 'merged', 'mergedInto', 'unmerged', 'voteCount'
@@ -526,19 +562,16 @@ function isMonsterUpdate(newData, oldData) {
     && newData.get('text', '') is string
     && newData.get('text', '').size() >= 1
     && newData.get('text', '').size() <= 1000
-    && (newData.get('priorityRank', null)  == null || newData.get('priorityRank', null) is number)
-    && (newData.get('mergedFrom',   null)  == null || newData.get('mergedFrom',   [])   is list)
-    && (newData.get('merged',       null)  == null || newData.get('merged',       false) is bool)
-    && (newData.get('mergedInto',   null)  == null || newData.get('mergedInto',   '')   is string)
-    && (newData.get('unmerged',     null)  == null || newData.get('unmerged',     false) is bool)
-    && (newData.get('voteCount',    null)  == null || newData.get('voteCount',    0)    is number)
-    // Reações: nunca podem cair e cada campo sobe no máximo +1 por write
+    && (newData.get('priorityRank', null) == null || newData.get('priorityRank', null) is number)
+    && (newData.get('mergedFrom',   null) == null || newData.get('mergedFrom',   [])   is list)
+    && (newData.get('merged',       null) == null || newData.get('merged',       false) is bool)
+    && (newData.get('mergedInto',   null) == null || newData.get('mergedInto',   '')   is string)
+    && (newData.get('unmerged',     null) == null || newData.get('unmerged',     false) is bool)
+    && (newData.get('voteCount',    null) == null || newData.get('voteCount',    0)    is number)
+    // Reações: não podem cair (o SM nunca subtrai reações, só soma no merge)
     && newData.get('reactions', {}).get('fire', 0) >= oldData.get('reactions', {}).get('fire', 0)
-    && newData.get('reactions', {}).get('fire', 0) <= oldData.get('reactions', {}).get('fire', 0) + 1
     && newData.get('reactions', {}).get('eyes', 0) >= oldData.get('reactions', {}).get('eyes', 0)
-    && newData.get('reactions', {}).get('eyes', 0) <= oldData.get('reactions', {}).get('eyes', 0) + 1
-    && newData.get('reactions', {}).get('bulb', 0) >= oldData.get('reactions', {}).get('bulb', 0)
-    && newData.get('reactions', {}).get('bulb', 0) <= oldData.get('reactions', {}).get('bulb', 0) + 1;
+    && newData.get('reactions', {}).get('bulb', 0) >= oldData.get('reactions', {}).get('bulb', 0);
 }
 
 // Solução: só votes pode aumentar (nunca diminuir)

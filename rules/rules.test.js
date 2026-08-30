@@ -28,9 +28,9 @@
  *     ❌ alterar texto após criar
  *
  *   Monstros
- *     ✅ create + reação + merge (drop mark) válidos
- *     ❌ drop mark alterando reações
- *     ❌ reações decrescendo
+ *     ✅ create + reação (+1) + ops SM (rename, merge, priorityRank) válidas
+ *     ❌ participante tenta rename, drop mark ou priorityRank (ops SM-only)
+ *     ❌ reação decrescendo ou pulando mais de +1
  *
  *   Soluções
  *     ✅ create + voto válido
@@ -614,16 +614,18 @@ describe('tesouros', () => {
 
 describe('monstros', () => {
   const MONSTER_ID = 'c'.repeat(32);
+  const OTHER_ID   = 'd'.repeat(32);
   const validMonster = {
     text: 'Falta de alinhamento',
     reactions: { fire: 0, eyes: 0, bulb: 0 },
     selected: false,
   };
 
-  // Garante que o doc de sessão existe (necessário para isSessionScrumMaster ao definir discussionResult)
   beforeEach(async () => {
     await seedSession();
   });
+
+  // ── create ────────────────────────────────────────────────────────────────
 
   it('✅ participante pode criar um monstro válido', async () => {
     await assertSucceeds(
@@ -631,7 +633,9 @@ describe('monstros', () => {
     );
   });
 
-  it('✅ participante pode reagir a um monstro (+1)', async () => {
+  // ── reações (participante anônimo) ────────────────────────────────────────
+
+  it('✅ participante pode incrementar reação em +1', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
     });
@@ -643,7 +647,7 @@ describe('monstros', () => {
     );
   });
 
-  it('❌ participante não pode decrementar reações de monstro', async () => {
+  it('❌ participante não pode decrementar reação de monstro', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), {
         ...validMonster, reactions: { fire: 4, eyes: 2, bulb: 1 },
@@ -657,29 +661,110 @@ describe('monstros', () => {
     );
   });
 
-  it('✅ drop mark válido: merged=true + mergedInto, demais campos inalterados', async () => {
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
-    });
-    await assertSucceeds(
-      setDoc(subDoc(anonDb(), 'monsters', MONSTER_ID), {
-        ...validMonster,
-        merged: true,
-        mergedInto: 'd'.repeat(32),
-      })
-    );
-  });
-
-  it('❌ monstro não pode ser deletado via deleteDoc', async () => {
+  it('❌ participante não pode pular reação em mais de +1', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
     });
     await assertFails(
-      deleteDoc(subDoc(anonDb(), 'monsters', MONSTER_ID))
+      setDoc(subDoc(anonDb(), 'monsters', MONSTER_ID), {
+        ...validMonster,
+        reactions: { fire: 5, eyes: 0, bulb: 0 },
+      })
     );
   });
 
-  it('❌ drop mark não pode inflar reações ao mesmo tempo', async () => {
+  // ── operações exclusivas do SM ────────────────────────────────────────────
+
+  it('✅ SM pode renomear um monstro', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
+    });
+    await assertSucceeds(
+      setDoc(subDoc(smDb(), 'monsters', MONSTER_ID), {
+        ...validMonster,
+        text: 'Novo nome do monstro',
+      })
+    );
+  });
+
+  it('❌ participante NÃO pode renomear um monstro', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
+    });
+    await assertFails(
+      setDoc(subDoc(anonDb(), 'monsters', MONSTER_ID), {
+        ...validMonster,
+        text: 'Tentativa de rename',
+      })
+    );
+  });
+
+  it('✅ SM pode fazer drop mark (merge): merged=true + mergedInto', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
+    });
+    await assertSucceeds(
+      setDoc(subDoc(smDb(), 'monsters', MONSTER_ID), {
+        ...validMonster,
+        merged: true,
+        mergedInto: OTHER_ID,
+      })
+    );
+  });
+
+  it('❌ participante NÃO pode fazer drop mark (merged=true)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
+    });
+    await assertFails(
+      setDoc(subDoc(anonDb(), 'monsters', MONSTER_ID), {
+        ...validMonster,
+        merged: true,
+        mergedInto: OTHER_ID,
+      })
+    );
+  });
+
+  it('✅ SM pode alterar priorityRank', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
+    });
+    await assertSucceeds(
+      setDoc(subDoc(smDb(), 'monsters', MONSTER_ID), {
+        ...validMonster,
+        priorityRank: 2,
+      })
+    );
+  });
+
+  it('❌ participante NÃO pode alterar priorityRank', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
+    });
+    await assertFails(
+      setDoc(subDoc(anonDb(), 'monsters', MONSTER_ID), {
+        ...validMonster,
+        priorityRank: 0,
+      })
+    );
+  });
+
+  it('✅ SM pode somar reações no merge (reactions sobe mais que +1)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), {
+        ...validMonster, reactions: { fire: 3, eyes: 1, bulb: 0 },
+      });
+    });
+    await assertSucceeds(
+      setDoc(subDoc(smDb(), 'monsters', MONSTER_ID), {
+        ...validMonster,
+        reactions: { fire: 7, eyes: 4, bulb: 0 },
+        mergedFrom: [MONSTER_ID, OTHER_ID],
+      })
+    );
+  });
+
+  it('❌ participante NÃO pode inflar reações com merge', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
     });
@@ -688,10 +773,22 @@ describe('monstros', () => {
         ...validMonster,
         reactions: { fire: 99, eyes: 0, bulb: 0 },
         merged: true,
-        mergedInto: 'd'.repeat(32),
+        mergedInto: OTHER_ID,
       })
     );
   });
+
+  // ── delete ────────────────────────────────────────────────────────────────
+
+  it('❌ monstro não pode ser deletado via deleteDoc (nem SM, nem participante)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
+    });
+    await assertFails(deleteDoc(subDoc(anonDb(), 'monsters', MONSTER_ID)));
+    await assertFails(deleteDoc(subDoc(smDb(),   'monsters', MONSTER_ID)));
+  });
+
+  // ── schema ────────────────────────────────────────────────────────────────
 
   // O resultado de discussão vive em discussionResults no doc raiz — não na subcoleção.
   it('❌ discussionResult não é um campo válido na subcoleção monsters', async () => {
