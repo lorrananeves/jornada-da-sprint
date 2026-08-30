@@ -404,7 +404,8 @@ function isValidTreasure(data) {
 function isValidMonster(data) {
   return data.keys().hasOnly([
       'text', 'reactions', 'selected', 'priorityRank',
-      'mergedFrom', 'merged', 'mergedInto', 'unmerged', 'voteCount'
+      'mergedFrom', 'merged', 'mergedInto', 'unmerged', 'voteCount',
+      'discussionResult'
     ])
     && data.text is string
     && data.text.size() >= 1 && data.text.size() <= 1000
@@ -415,7 +416,8 @@ function isValidMonster(data) {
     && (data.get('merged',       null) == null || data.get('merged',       false) is bool)
     && (data.get('mergedInto',   null) == null || data.get('mergedInto',   '') is string)
     && (data.get('unmerged',     null) == null || data.get('unmerged',     false) is bool)
-    && (data.get('voteCount',    null) == null || data.get('voteCount',    0) is number);
+    && (data.get('voteCount',    null) == null || data.get('voteCount',    0) is number)
+    && isValidDiscussionResult(data.get('discussionResult', null));
 }
 
 function isValidSolution(data) {
@@ -478,6 +480,16 @@ function isReactionUpdate(newData, oldData) {
 //   5. voteCount: incremento de +1 por write (via transação castMonsterVote)
 function isMonsterUpdate(newData, oldData) {
   return (
+    // Caso 6 — discussionResult: apenas discussionResult muda (SM define o resultado da discussão).
+    // Os demais campos imutáveis são preservados. Validação SM vs participante é feita no cliente.
+    'discussionResult' in newData.diff(oldData).affectedKeys()
+    && newData.diff(oldData).affectedKeys().hasOnly(['discussionResult'])
+    && isValidDiscussionResult(newData.get('discussionResult', null))
+    && newData.get('text', '')         == oldData.get('text', '')
+    && newData.get('selected', false)  == oldData.get('selected', false)
+    && newData.get('reactions', {})    == oldData.get('reactions', {})
+    && newData.get('mergedFrom', null) == oldData.get('mergedFrom', null)
+  ) || (
     // Caso 3 — drop mark ou delete: apenas merged e mergedInto mudam.
     // mergedInto pode ser '__deleted__' para deleção lógica.
     newData.get('merged', false) == true
@@ -602,3 +614,10 @@ function isMissionStatusUpdate(newData, oldData) {
     && newData.get('status', '') is string
     && newData.get('status', '') in ['done', 'partial', 'pending', ''];
 }
+
+// discussionResult: valor nulo ou um dos cinco resultados possíveis.
+function isValidDiscussionResult(result) {
+  return result == null
+    || result in ['mitigation', 'agreement', 'action', 'insight', 'observation'];
+}
+
