@@ -21,7 +21,9 @@ A aplicação é **multiplayer em tempo real**: o Scrum Master controla o fluxo 
 | ✅ **Check-in** | `checkin` | Cada pessoa registra como chegou na retro (humor de 1 a 5) |
 | 💎 **Tesouros** | `treasures` | O que foi bem — pontos positivos, reconhecimentos e aprendizados |
 | 👹 **Monstros** | `monsters` | O que atrapalhou ou pode melhorar — com reações e votação |
-| ⚔️ **Combate** | `combat` | Discussão e proposição de soluções para os monstros priorizados |
+| 🗳️ **Votação** | `voting` | O time prioriza os monstros com até 3 votos por pessoa |
+| 💬 **Discussão** | `discussion` | SM conduz a discussão por monstro e registra notas e resultado |
+| ⚔️ **Combate** | `combat` | Proposição de soluções para os monstros priorizados |
 | 🎯 **Missões** | `missions` | Definição dos action items para a próxima sprint |
 | 🏆 **Conclusão** | `complete` | Encerramento, celebração e resumo da jornada |
 | 📊 **Relatório** | `report` | Exportação do resumo completo em PDF ou PNG |
@@ -31,7 +33,7 @@ A aplicação é **multiplayer em tempo real**: o Scrum Master controla o fluxo 
 ### Colaboração em tempo real
 - **Multiplayer** — todos os participantes veem as atualizações instantaneamente via Firestore
 - **Controle de papéis** — apenas o Scrum Master avança as fases; o time participa sem controle sobre o fluxo
-- **Sincronização de foco no Combate** — o SM navega entre monstros e estratégias, e todos os membros seguem automaticamente com indicador "📡 foco do SM"
+- **Sincronização de foco** — o SM navega entre monstros na Discussão e no Combate, e todos os membros seguem automaticamente com indicador "📡 foco do SM"
 - **Indicador de conectividade** — badge 🟢/🔴 na navbar mostra o estado da conexão com o Firestore em tempo real
 
 ### Participação
@@ -42,6 +44,8 @@ A aplicação é **multiplayer em tempo real**: o Scrum Master controla o fluxo 
 
 ### Scrum Master
 - **Dashboard do SM** — histórico de todas as retrospectivas, com status (Setup / Em andamento / Concluída) e link de convite
+- **Notas de discussão** — o SM registra notas por tipo (💡 insight, 🛡️ mitigação, 🤝 acordo, 🚀 ação, 📌 observação) durante a fase de Discussão; participantes veem em modo somente-leitura
+- **Resultado de discussão** — ao final de cada monstro, o SM registra o desfecho; resultado sincronizado em tempo real para todos
 - **Retomada de missões** — a tela de Missões carrega as missões da última retro concluída do mesmo time, com dropdown de status (✅ Feito / 🔄 Em andamento / ⏳ Não feito) persistido no Firestore
 - **📊 Tendências** — painel no dashboard com gráfico SVG de humor médio por sprint e taxa de conclusão de missões, além de lista de monstros recorrentes (2+ retros)
 - **Timer de fase** — cronômetro controlável por fase, visível para todos os participantes
@@ -114,7 +118,7 @@ npm run preview
 ### Testes
 
 ```bash
-# Executa todos os testes uma vez
+# Testes unitários (uma vez)
 npm test
 
 # Modo watch (re-executa ao salvar)
@@ -123,9 +127,23 @@ npm run test:watch
 # Com relatório de cobertura
 npm run test:coverage
 
-# Testes E2E (requer emuladores Firebase rodando)
+# Testes das Firestore Rules (requer emulador — veja abaixo)
+npm run test:rules
+
+# Testes E2E com Playwright (requer emulador e app rodando)
 npm run test:e2e
 ```
+
+### Emulador Firebase (para testes locais)
+
+Os testes de Rules e E2E dependem do emulador Firestore local. Requer **Java** instalado.
+
+```bash
+# Inicia Firestore + Auth em localhost
+npm run emulator
+```
+
+Mantenha o emulador rodando em um terminal separado enquanto executa `test:rules` ou `test:e2e`.
 
 ### Lint
 
@@ -195,11 +213,13 @@ firebase deploy --only firestore:rules
 
 ```
 sessions/{sessionId}                 ← documento raiz (fases, sprint, time, XP,
-│                                       combatMonsterIdx, combatStrategy,
+│                                       discussionFocus, discussionResults,
 │                                       readySignals, parkingLot)
 ├── checkins/{itemId}                ← check-ins dos participantes
 ├── treasures/{itemId}               ← tesouros com reações
 ├── monsters/{itemId}                ← monstros com reações, prioridade e merges
+├── monsterVotes/{deviceId_monsterId}← tokens de voto (1 por dispositivo por monstro)
+├── discussions/{itemId}             ← notas de discussão por monstro (somente SM)
 ├── solutions/{itemId}               ← soluções propostas com votos
 ├── missions/{itemId}                ← action items (inclui campo status para retomada)
 ├── presence/{deviceId}              ← presença com heartbeat + TTL
@@ -211,12 +231,29 @@ smProfiles/{uid}                     ← perfil do Scrum Master autenticado
 
 ### Controle de Acesso (Firestore Rules)
 
-- Somente o **Scrum Master** (identificado por `smDeviceId`) pode avançar/alterar `currentPhase` e `completedPhases`
-- **Check-ins** são imutáveis após criação
-- **Tesouros** e **Monstros** permitem apenas atualização de reações/flags específicos
-- **Soluções** permitem apenas incremento de votos (nunca decremento)
-- **Missões** permitem criação, deleção e atualização restrita ao campo `status`
-- **Presença** usa TTL: documentos com `expiresAt` expirado são ignorados client-side
+O mecanismo de identidade do SM é o seguinte: o Scrum Master faz `signInAnonymously()` ao criar a sessão e seu `uid` é salvo como `smUid` no documento raiz. Participantes nunca se autenticam — `request.auth == null` para todos eles. As Rules usam `request.auth != null` para distinguir SM de participante nas subcoleções que exigem autenticação.
+
+| Coleção | Participante anônimo | SM autenticado |
+|---|---|---|
+| **Doc raiz** | `readySignals` e `parkingLot` (própria chave) | Todos os campos + `smDeviceId`/`smUid` imutáveis |
+| **checkins** | create (1 por dispositivo, imutável) | — |
+| **treasures** | create; reactions (+1, nunca decrementar) | — |
+| **monsters** | create; reactions (+1) e voteCount (+1) | rename, select, merge, unmerge, delete lógico, priorityRank |
+| **monsterVotes** | create (1 token por dispositivo por monstro) | — |
+| **discussions** | read | create, update, delete |
+| **solutions** | create; votes (+1, nunca decrementar) | — |
+| **missions** | update (somente campo `status`) | create, delete |
+| **presence** | create/update (heartbeat próprio), delete | — |
+| **typing** | create/update/delete (próprio deviceId) | — |
+
+Proteções adicionais aplicadas pelo Firestore:
+
+- **`smDeviceId` e `smUid` são imutáveis** — nenhum participante pode sobrescrevê-los após a criação da sessão
+- **XP só pode crescer** — incremento por operação limitado a 30 pts (maior recompensa do jogo); impede escrita de valor absoluto arbitrário
+- **`readySignals`** — cada dispositivo só pode escrever na chave igual ao seu próprio `deviceId`; remoções bloqueadas
+- **Reações de monstro** — participante: cada contador sobe no máximo +1 e nunca cai; SM no merge: pode somar as reações dos dois monstros (sem limite de +1), mas nunca pode cair
+- **Votos de solução** — `isVoteUpdate` exige `votes == oldVotes + 1`; votos nunca diminuem
+- **Check-ins** — imutáveis após criação; ID do documento é o `deviceId` (impede múltiplos check-ins por dispositivo)
 
 ### Estrutura do Store (`src/state/store/`)
 
@@ -235,8 +272,8 @@ O store centralizado é dividido em módulos por responsabilidade:
 
 O store gerencia dois fluxos paralelos:
 
-1. **Doc raiz** — subscription ao documento da sessão (fases, sprint, time, XP, estado de combate, sinais de ready, parking lot)
-2. **Subcoleções** — subscription individual a cada coleção (checkins, treasures, monsters, solutions, missions)
+1. **Doc raiz** — subscription ao documento da sessão (fases, sprint, time, XP, discussionFocus, discussionResults, sinais de ready, parking lot)
+2. **Subcoleções** — subscription individual a cada coleção (checkins, treasures, monsters, monsterVotes, solutions, missions, discussions)
 
 Writes seguem o padrão de **optimistic update**: o estado local é atualizado imediatamente e o Firestore confirma em segundo plano.
 
@@ -260,10 +297,10 @@ O serviço [`presence.js`](src/services/presence.js) usa **heartbeat com TTL**:
 | **Vanilla JavaScript** (ES Modules) | — | Sem frameworks — DOM puro |
 | **Vite** | 5.x | Bundler e servidor de desenvolvimento |
 | **Firebase / Firestore** | 12.x | Persistência e sincronização em tempo real |
-| **Firebase Auth** | 12.x | Autenticação do Scrum Master (Google + e-mail) |
+| **Firebase Auth** | 12.x | Autenticação do Scrum Master (anônima via `signInAnonymously`) |
 | **jsPDF** | 2.x | Exportação do relatório em PDF com texto nativo |
 | **html2canvas** | 1.x | Exportação do relatório como imagem PNG |
-| **Vitest** | 4.x | Testes unitários |
+| **Vitest** | 4.x | Testes unitários e testes das Firestore Rules |
 | **Playwright** | — | Testes E2E (fluxo completo SM + membro) |
 | **ESLint** | 9.x | Linting do código-fonte |
 
@@ -287,6 +324,8 @@ src/
 │   ├── checkin.js        # Check-in emocional (com trava de reenvio e proteção de resultado)
 │   ├── treasures.js      # Tesouros da sprint
 │   ├── monsters.js       # Monstros da sprint (drag-and-drop + fallback mobile)
+│   ├── voting.js         # Votação e priorização de monstros
+│   ├── discussion.js     # Discussão conduzida pelo SM com notas e resultado
 │   ├── combat.js         # Combate — soluções, votação e foco sincronizado
 │   ├── missions.js       # Missões (action items + retomada da retro anterior)
 │   ├── complete.js       # Conclusão e celebração
@@ -296,7 +335,9 @@ src/
 │   ├── auth.js           # Firebase Authentication
 │   ├── firebase.js       # Inicialização e operações do Firestore
 │   ├── presence.js       # Presença com heartbeat + TTL
+│   ├── reactions.js      # Controle de reações únicas por dispositivo (client-side)
 │   ├── stats.js          # Cálculo de estatísticas da sessão
+│   ├── typing.js         # Indicador de digitação em tempo real
 │   ├── xp.js             # Regras de XP por ação
 │   └── export.js         # Exportação em PDF e PNG
 ├── state/
@@ -312,19 +353,25 @@ src/
 │   ├── screens.css       # Estilos por tela
 │   └── animations.css    # Animações
 ├── tests/                # Testes unitários (Vitest)
-│   ├── xp.test.js
+│   ├── dom.test.js
+│   ├── format.test.js
+│   ├── lobby.test.js
+│   ├── reactions.test.js
 │   ├── stats.test.js
 │   ├── store.test.js
-│   ├── dom.test.js
-│   └── format.test.js
+│   └── xp.test.js
 ├── utils/
 │   ├── dom.js            # Utilitários de DOM (escapeHTML, buildReadySignalHTML…)
-│   └── format.js         # Formatação de datas, XP, labels
+│   ├── format.js         # Formatação de datas, XP, labels
+│   └── permissions.js    # Funções de permissão centralizadas (canX → isSM())
 └── main.js               # Entry point — router entre as telas
 
 e2e/                      # Testes E2E (Playwright)
 ├── fixtures.js           # Fixture twoParticipants (SM + membro)
-└── session.spec.js       # Cenários: lobby, check-in, avanço de fase, permissões
+└── session.spec.js       # Cenários: lobby, check-in, avanço de fase, discussão
+
+rules/                    # Testes das Firestore Rules
+└── rules.test.js         # Cenários adversariais contra o emulador Firestore
 ```
 
 ## 💾 Persistência
