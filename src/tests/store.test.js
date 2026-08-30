@@ -83,7 +83,7 @@ import {
 } from '../state/store.js';
 import { _setSessionId } from '../state/store/session.js';
 
-import { batchWrite, saveSession, incrementXP, saveItem, patchItem } from '../services/firebase.js';
+import { batchWrite, saveSession, incrementXP, saveItem } from '../services/firebase.js';
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -889,35 +889,35 @@ describe('setMonsterDiscussionResult', () => {
     ]);
   });
 
-  it('chama patchItem com o resultado correto', async () => {
-    patchItem.mockClear();
+  it('chama saveItem com o monstro completo e o resultado correto', async () => {
+    saveItem.mockClear();
     await setMonsterDiscussionResult('mon1', 'action');
-    expect(patchItem).toHaveBeenCalledWith(
+    expect(saveItem).toHaveBeenCalledWith(
       'test-session-id',
       'monsters',
-      'mon1',
-      { discussionResult: 'action' }
+      { id: 'mon1', text: 'Problema X', reactions: {}, selected: false, discussionResult: 'action' }
     );
   });
 
-  it('chama patchItem com null ao remover resultado', async () => {
-    patchItem.mockClear();
+  it('chama saveItem com discussionResult null ao remover resultado', async () => {
+    saveItem.mockClear();
     await setMonsterDiscussionResult('mon1', null);
-    expect(patchItem).toHaveBeenCalledWith(
+    expect(saveItem).toHaveBeenCalledWith(
       'test-session-id',
       'monsters',
-      'mon1',
-      { discussionResult: null }
+      { id: 'mon1', text: 'Problema X', reactions: {}, selected: false, discussionResult: null }
     );
   });
 
   it('aceita todos os valores válidos de resultado', async () => {
-    patchItem.mockClear();
+    saveItem.mockClear();
     const valores = ['mitigation', 'agreement', 'action', 'insight', 'observation'];
     for (const v of valores) {
       await setMonsterDiscussionResult('mon1', v);
-      expect(patchItem).toHaveBeenLastCalledWith(
-        'test-session-id', 'monsters', 'mon1', { discussionResult: v }
+      expect(saveItem).toHaveBeenLastCalledWith(
+        'test-session-id',
+        'monsters',
+        { id: 'mon1', text: 'Problema X', reactions: {}, selected: false, discussionResult: v }
       );
     }
   });

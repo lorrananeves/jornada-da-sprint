@@ -223,13 +223,19 @@ export function removeDiscussionNote(sessionId, noteId) {
 /**
  * Define (ou remove) o resultado final da discussão de um monstro.
  * Somente o SM pode chamar (verificado no cliente via canSetDiscussionResult).
+ *
+ * Usa saveItem (setDoc) em vez de patchItem (updateDoc) porque o emulador
+ * Firestore standard edition não executa get() de forma confiável em regras
+ * de update via updateDoc. O setDoc dispara allow update (doc já existe) e o
+ * emulador avalia get() corretamente nesse caminho.
+ *
  * @param {string} sessionId
- * @param {string} monsterId
+ * @param {object} monster — objeto completo do monstro (com campo id)
  * @param {string|null} result — um dos valores de DISCUSSION_RESULTS ou null
  */
-export function setMonsterDiscussionResult(sessionId, monsterId, result) {
+export function setMonsterDiscussionResult(sessionId, monster, result) {
   if (!sessionId) return Promise.reject(new Error('sessionId ausente'));
-  return patchItem(sessionId, 'monsters', monsterId, { discussionResult: result ?? null });
+  return saveItem(sessionId, 'monsters', { ...monster, discussionResult: result ?? null });
 }
 
 // ── MonsterVotes ──────────────────────────────────────────────────────────────

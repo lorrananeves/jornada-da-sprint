@@ -140,7 +140,11 @@ export async function voteSolution(id) {
 export const addDiscussionNote          = (note)            => _addDiscussionNote(sid(), note);
 export const editDiscussionNote         = (id, partial)     => _editDiscussionNote(sid(), id, partial);
 export const removeDiscussionNote       = (id)              => _removeDiscussionNote(sid(), id);
-export const setMonsterDiscussionResult = (monsterId, result) => _setMonsterDiscussionResult(sid(), monsterId, result);
+export const setMonsterDiscussionResult = (monsterId, result) => {
+  const monster = monsters().find((m) => m.id === monsterId);
+  if (!monster) return Promise.reject(new Error('monstro não encontrado'));
+  return _setMonsterDiscussionResult(sid(), monster, result);
+};
 
 // ── MonsterVotes ──────────────────────────────────────────────────────────────
 
