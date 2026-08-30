@@ -100,12 +100,10 @@ service cloud.firestore {
         //   SM   → text, selected, priorityRank, mergedFrom, merged, mergedInto,
         //           unmerged, discussionResult (+ reactions no merge do keep).
         //   Part → reactions (+1), voteCount (+1).
+        // isMonsterUpdateWithRole faz get() da sessão uma única vez e decide o caminho.
         allow update: if
           validSessionId(sessionId)
-          && (
-            (isSessionScrumMaster(sessionId) && isSmMonsterUpdate(request.resource.data, resource.data))
-            || (!isSessionScrumMaster(sessionId) && isParticipantMonsterUpdate(request.resource.data, resource.data))
-          );
+          && isMonsterUpdateWithRole(sessionId, request.resource.data, resource.data);
         allow delete: if false;
 
         // Token de reação: {deviceId}_{reaction} como ID — create falha se já existir
@@ -408,6 +406,19 @@ function isSessionScrumMaster(sessionId) {
   return session.get('smUid', null) != null
     ? (request.auth != null && request.auth.uid == session.get('smUid', ''))
     : session.get('smDeviceId', '').size() > 0;
+}
+
+// Avalia update de monstro fazendo get() da sessão uma única vez.
+// Necessário porque chamar isSessionScrumMaster duas vezes (para SM e para !SM)
+// consumiria dois get() por operação — o Firestore permite apenas 1 get()
+// por operação de escrita em Security Rules.
+function isMonsterUpdateWithRole(sessionId, newData, oldData) {
+  let session = get(/databases/$(database)/documents/sessions/$(sessionId)).data;
+  let isSM = (session.get('smUid', null) != null)
+    ? (request.auth != null && request.auth.uid == session.get('smUid', ''))
+    : (session.get('smDeviceId', '').size() > 0);
+  return (isSM && isSmMonsterUpdate(newData, oldData))
+      || (!isSM && isParticipantMonsterUpdate(newData, oldData));
 }
 
 // ── Validadores de subcoleção ─────────────────────────────────────────────────
