@@ -155,7 +155,7 @@ test('SM avança para Discussão a partir de Monstros (botão sempre habilitado)
 // ── 8. Resultado da Discussão por Monstro ─────────────────────────────────────
 
 test('SM define Resultado da Discussão; monstro exibe o resultado em tempo real', async ({ twoParticipants }) => {
-  const { smPage, memberPage } = twoParticipants;
+  const { smPage, memberPage, sessionId } = twoParticipants;
 
   await memberJoin(memberPage);
   await startRetro(smPage, memberPage);
@@ -189,6 +189,32 @@ test('SM define Resultado da Discussão; monstro exibe o resultado em tempo real
 
   // Após confirmar, SM deve ver "Resultado atual" com o label correto
   await expect(smPage.getByText(/fizemos um acordo/i)).toBeVisible({ timeout: 10_000 });
+
+  // ── Diagnóstico: captura estado do Firestore e do membro antes de aguardar ──
+  const smState = await smPage.evaluate(() => {
+    try { return JSON.parse(localStorage.getItem('jornada_sprint_session') || 'null'); } catch { return null; }
+  }).catch(() => null);
+  const monsterId = smState?.monsters?.[0]?.id ?? null;
+
+  // Consulta o monstro diretamente no emulador para ver se discussionResult chegou
+  let firestoreMonster = null;
+  if (monsterId) {
+    const url = `http://127.0.0.1:8080/v1/projects/demo-project/databases/(default)/documents/sessions/${sessionId}/monsters/${monsterId}`;
+    const res = await fetch(url).catch(() => null);
+    firestoreMonster = res?.ok ? await res.json().catch(() => null) : null;
+  }
+
+  const memberHtml = await memberPage.locator('#screen-root').innerHTML().catch(() => '(sem #screen-root)');
+  const memberState = await memberPage.evaluate(() => {
+    try { return JSON.parse(localStorage.getItem('jornada_sprint_session') || 'null'); } catch { return null; }
+  }).catch(() => null);
+
+  console.log('[DIAG] SM monsters[0]:', JSON.stringify(smState?.monsters?.[0]));
+  console.log('[DIAG] Firestore monster doc:', JSON.stringify(firestoreMonster?.fields));
+  console.log('[DIAG] member monsters[0]:', JSON.stringify(memberState?.monsters?.[0]));
+  console.log('[DIAG] member currentPhase:', memberState?.currentPhase);
+  console.log('[DIAG] member HTML (500 chars):', memberHtml.slice(0, 500));
+  // ────────────────────────────────────────────────────────────────────────────
 
   // Membro vê o resultado no painel somente-leitura (sincronização em tempo real)
   await expect(memberPage.getByText(/resultado da discussão/i)).toBeVisible({ timeout: 20_000 });
