@@ -507,35 +507,29 @@ describe('prioritizeMonsters', () => {
     expect(batchWrite).not.toHaveBeenCalled();
   });
 
-  it('persiste priorityRank no Firestore via batch write usando pontuação ponderada', () => {
-    // Pontuação: 🔥×3 + 👀×2 + 💡×1
-    // a: fire=1 → 3pts  b: fire=5 → 15pts  c: fire=0,eyes=5 → 10pts
+  it('persiste priorityRank no Firestore via batch write ordenando por voteCount DESC', () => {
     seedMonsters([
-      { id: 'a', text: 'A', reactions: { fire: 1, eyes: 0, bulb: 0 }, selected: false },
-      { id: 'b', text: 'B', reactions: { fire: 5, eyes: 0, bulb: 0 }, selected: false },
-      { id: 'c', text: 'C', reactions: { fire: 0, eyes: 5, bulb: 0 }, selected: false },
+      { id: 'a', text: 'A', reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false, voteCount: 1 },
+      { id: 'b', text: 'B', reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false, voteCount: 5 },
+      { id: 'c', text: 'C', reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false, voteCount: 3 },
     ]);
     batchWrite.mockClear();
 
     prioritizeMonsters();
 
-    // Deve ter chamado batchWrite uma única vez com todos os ops
     expect(batchWrite).toHaveBeenCalledTimes(1);
     expect(batchWrite).toHaveBeenCalledWith('test-session-id', [
-      { type: 'update', colName: 'monsters', itemId: 'b', data: { priorityRank: 0 } }, // 15pts
-      { type: 'update', colName: 'monsters', itemId: 'c', data: { priorityRank: 1 } }, // 10pts
-      { type: 'update', colName: 'monsters', itemId: 'a', data: { priorityRank: 2 } }, // 3pts
+      { type: 'update', colName: 'monsters', itemId: 'b', data: { priorityRank: 0 } }, // 5 votos
+      { type: 'update', colName: 'monsters', itemId: 'c', data: { priorityRank: 1 } }, // 3 votos
+      { type: 'update', colName: 'monsters', itemId: 'a', data: { priorityRank: 2 } }, // 1 voto
     ]);
   });
 
-  it('reordena o estado local usando pontuação ponderada', () => {
-    // a: fire=1,eyes=0,bulb=0 → 3pts
-    // b: fire=5,eyes=0,bulb=0 → 15pts
-    // c: fire=0,eyes=5,bulb=0 → 10pts
+  it('reordena o estado local por voteCount DESC', () => {
     seedMonsters([
-      { id: 'a', text: 'A', reactions: { fire: 1, eyes: 0, bulb: 0 }, selected: false },
-      { id: 'b', text: 'B', reactions: { fire: 5, eyes: 0, bulb: 0 }, selected: false },
-      { id: 'c', text: 'C', reactions: { fire: 0, eyes: 5, bulb: 0 }, selected: false },
+      { id: 'a', text: 'A', reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false, voteCount: 1 },
+      { id: 'b', text: 'B', reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false, voteCount: 5 },
+      { id: 'c', text: 'C', reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false, voteCount: 3 },
     ]);
 
     prioritizeMonsters();
@@ -544,18 +538,17 @@ describe('prioritizeMonsters', () => {
     expect(ids).toEqual(['b', 'c', 'a']);
   });
 
-  it('atribui priorityRank ao estado local usando pontuação ponderada', () => {
-    // x: fire=0,eyes=0,bulb=4 → 4pts   y: fire=0,eyes=3,bulb=0 → 6pts
+  it('atribui priorityRank ao estado local por voteCount DESC', () => {
     seedMonsters([
-      { id: 'x', text: 'X', reactions: { fire: 0, eyes: 0, bulb: 4 }, selected: false },
-      { id: 'y', text: 'Y', reactions: { fire: 0, eyes: 3, bulb: 0 }, selected: false },
+      { id: 'x', text: 'X', reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false, voteCount: 2 },
+      { id: 'y', text: 'Y', reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false, voteCount: 7 },
     ]);
 
     prioritizeMonsters();
 
     const { monsters } = getState();
-    expect(monsters.find((m) => m.id === 'y').priorityRank).toBe(0); // 6pts
-    expect(monsters.find((m) => m.id === 'x').priorityRank).toBe(1); // 4pts
+    expect(monsters.find((m) => m.id === 'y').priorityRank).toBe(0); // 7 votos
+    expect(monsters.find((m) => m.id === 'x').priorityRank).toBe(1); // 2 votos
   });
 
   it('ordena por priorityRank ao receber snapshot remoto do Firestore', () => {

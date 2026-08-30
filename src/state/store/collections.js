@@ -148,14 +148,11 @@ export function unmergeMonster(sessionId, monsters, keepId, notifyFn) {
 }
 
 /**
- * Pontuação composta: 🔥 tem peso 3 (alto impacto), 👀 peso 2 (precisa discutir),
- * 💡 peso 1 (ideia). Usa a soma de todas as reações do time para ordenar os monstros
- * — o botão apenas organiza, não decide quais serão combatidos.
+ * Critério de ordenação do botão "ORDENAR POR VOTOS":
+ * usa voteCount — o número de votos explícitos da fase de votação.
  */
 function monsterScore(m) {
-  return (m.reactions?.fire || 0) * 3
-       + (m.reactions?.eyes || 0) * 2
-       + (m.reactions?.bulb || 0) * 1;
+  return m.voteCount || 0;
 }
 
 export function prioritizeMonsters(sessionId, monsters, notifyFn) {
