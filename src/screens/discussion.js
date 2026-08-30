@@ -159,40 +159,44 @@ function buildEditNoteForm(note) {
 
 export function renderDiscussion(root) {
   let _timer = null;
-  const state = getState();
-
-  // Monstros ativos (não merged)
-  const monsters = state.monsters;
-
-  if (!monsters.length) {
-    root.innerHTML = `
-      <div class="screen-discussion screen-enter">
-        <div class="phase-header">
-          <div class="phase-header-top">
-            <span class="phase-icon">🗣️</span>
-            <h2 class="phase-title">Discussão</h2>
-          </div>
-          <p class="phase-description text-muted">Nenhum monstro identificado. Volte e adicione problemas.</p>
-        </div>
-        <div class="phase-nav">
-          <button class="btn btn-ghost" id="btn-back">← Voltar</button>
-        </div>
-      </div>
-    `;
-    root.querySelector('#btn-back').addEventListener('click', () => {
-      if (isSM()) setPhase('monsters');
-      else setLocalPhase('roleSelect');
-    });
-    return;
-  }
 
   // Índice do monstro em foco (SM controla, participantes seguem)
-  let currentIdx = Math.min(state.discussionFocus ?? 0, Math.max(0, monsters.length - 1));
+  let currentIdx = 0;
 
   function render() {
     const currentState = getState();
     // Lê os monstros do estado atual para capturar mudanças remotas (ex: discussionResult)
     const currentMonsters = currentState.monsters;
+
+    // Monstros ainda não chegaram via subscription (race condition no mount).
+    // Renderiza estado de espera e aguarda o subscribe disparar render() novamente.
+    if (!currentMonsters.length) {
+      root.innerHTML = `
+        <div class="screen-discussion screen-enter">
+          <div class="phase-header">
+            <div class="phase-header-top">
+              <span class="phase-icon">🗣️</span>
+              <h2 class="phase-title">Discussão</h2>
+            </div>
+            <p class="phase-description text-muted">Nenhum monstro identificado. Volte e adicione problemas.</p>
+          </div>
+          <div class="phase-nav">
+            <button class="btn btn-ghost" id="btn-back">← Voltar</button>
+          </div>
+        </div>
+      `;
+      root.querySelector('#btn-back').addEventListener('click', () => {
+        if (isSM()) setPhase('monsters');
+        else setLocalPhase('roleSelect');
+      });
+      return;
+    }
+
+    // Inicializa currentIdx na primeira vez que os monstros chegam
+    if (currentIdx === 0) {
+      currentIdx = Math.min(currentState.discussionFocus ?? 0, Math.max(0, currentMonsters.length - 1));
+    }
+
     const monster = currentMonsters[currentIdx] ?? currentMonsters[0];
     if (!monster) return;
     const notes = currentState.discussions.filter((n) => n.monsterId === monster.id);
@@ -208,7 +212,7 @@ export function renderDiscussion(root) {
           </div>
           <p class="phase-description">
             Conduza a conversa sobre cada problema. Registre insights, mitigações, acordos e ações.
-            (${currentIdx + 1}/${monsters.length})
+            (${currentIdx + 1}/${currentMonsters.length})
           </p>
         </div>
 
@@ -313,7 +317,7 @@ export function renderDiscussion(root) {
 
       const note = {
         id: uid(),
-        monsterId: getState().monsters[currentIdx]?.id ?? monsters[currentIdx].id,
+        monsterId: getState().monsters[currentIdx]?.id ?? getState().monsters[0]?.id,
         type: typeEl?.value || 'insight',
         text,
         createdAt: new Date().toISOString(),
@@ -416,7 +420,7 @@ export function renderDiscussion(root) {
       const btn = root.querySelector('#btn-confirm-result');
       if (btn) btn.disabled = true;
       try {
-        await setMonsterDiscussionResult(getState().monsters[currentIdx]?.id ?? monsters[currentIdx].id, selected);
+        await setMonsterDiscussionResult(getState().monsters[currentIdx]?.id ?? getState().monsters[0]?.id, selected);
         render();
       } catch (e) {
         console.warn('Firestore setMonsterDiscussionResult failed:', e);
@@ -431,7 +435,7 @@ export function renderDiscussion(root) {
       const btn = root.querySelector('#btn-clear-result');
       if (btn) btn.disabled = true;
       try {
-        await setMonsterDiscussionResult(getState().monsters[currentIdx]?.id ?? monsters[currentIdx].id, null);
+        await setMonsterDiscussionResult(getState().monsters[currentIdx]?.id ?? getState().monsters[0]?.id, null);
         render();
       } catch (e) {
         console.warn('Firestore setMonsterDiscussionResult (clear) failed:', e);
