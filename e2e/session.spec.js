@@ -177,6 +177,9 @@ test('SM define Resultado da Discussão; monstro exibe o resultado em tempo real
   // SM vê o painel "COMO TERMINAMOS ESSA DISCUSSÃO?"
   await expect(smPage.getByText(/como terminamos essa discussão/i)).toBeVisible({ timeout: 5_000 });
 
+  // Aguarda o membro chegar à fase de Discussão (segue o SM via Firestore em tempo real)
+  await expect(memberPage.locator('h2.phase-title').getByText(/discussão/i)).toBeVisible({ timeout: 20_000 });
+
   // Membro não deve ver o painel de seleção (somente SM gerencia)
   await expect(memberPage.getByText(/como terminamos essa discussão/i)).not.toBeVisible();
 
