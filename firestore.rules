@@ -406,20 +406,17 @@ function isScrumMaster(newData, oldData) {
 // Sessões sem smUid ficam protegidas pelo sessionId de 32 hex chars (obscuridade),
 // que é o compromisso documentado no restante do código.
 function isSessionScrumMaster(sessionId) {
-  // get() pode retornar null no emulador standard edition quando o documento
-  // não existe ainda — usamos exists() para evitar Null value error.
-  let sessionRef = get(/databases/$(database)/documents/sessions/$(sessionId));
-  if !sessionRef.exists {
-    return false;
-  }
-  let session = sessionRef.data;
+  // get() retorna um objeto com .exists e .data — usamos .exists para evitar
+  // Null value error quando o documento ainda não foi criado.
+  let doc = get(/databases/$(database)/documents/sessions/$(sessionId));
+  let session = doc.data;
   // Sessão com conta: valida uid. Sem conta: qualquer deviceId não-vazio.
-  // Sem ternário para compatibilidade com o emulador Firestore standard edition.
-  return (session.get('smUid', null) != null
-          && request.auth != null
-          && request.auth.uid == session.get('smUid', ''))
-      || (session.get('smUid', null) == null
-          && session.get('smDeviceId', '').size() > 0);
+  return doc.exists
+      && ((session.get('smUid', null) != null
+           && request.auth != null
+           && request.auth.uid == session.get('smUid', ''))
+       || (session.get('smUid', null) == null
+           && session.get('smDeviceId', '').size() > 0));
 }
 
 
