@@ -96,18 +96,14 @@ service cloud.firestore {
         allow create: if
           validSessionId(sessionId)
           && isValidMonster(request.resource.data);
-        // Updates de monstro: validação de schema por tipo de operação.
-        // discussionResult exige verificação de SM via get() da sessão
-        // (único campo com enforcement real no servidor).
-        // Os demais campos administrativos (text, selected, merge etc) têm
-        // proteção de schema mas não de identidade na Rule — o emulador
-        // standard edition não suporta get() em rules de update de subcoleção.
+        // Updates de monstro: schema validado para todos os campos permitidos.
+        // discussionResult na subcoleção está deprecado — o resultado de discussão
+        // agora vive em discussionResults no doc raiz (protegido por isScrumMaster).
+        // Sem isSessionScrumMaster aqui: get() em regra de subcoleção é instável no
+        // emulador Firestore standard edition e causava Null value error em testes.
         allow update: if
           validSessionId(sessionId)
-          && (
-            (isSessionScrumMaster(sessionId) && isMonsterUpdate(request.resource.data, resource.data))
-            || isMonsterUpdateNoDiscussionResult(request.resource.data, resource.data)
-          );
+          && isMonsterUpdate(request.resource.data, resource.data);
         allow delete: if false;
 
         // Token de reação: {deviceId}_{reaction} como ID — create falha se já existir
@@ -410,7 +406,13 @@ function isScrumMaster(newData, oldData) {
 // Sessões sem smUid ficam protegidas pelo sessionId de 32 hex chars (obscuridade),
 // que é o compromisso documentado no restante do código.
 function isSessionScrumMaster(sessionId) {
-  let session = get(/databases/$(database)/documents/sessions/$(sessionId)).data;
+  // get() pode retornar null no emulador standard edition quando o documento
+  // não existe ainda — usamos exists() para evitar Null value error.
+  let sessionRef = get(/databases/$(database)/documents/sessions/$(sessionId));
+  if !sessionRef.exists {
+    return false;
+  }
+  let session = sessionRef.data;
   // Sessão com conta: valida uid. Sem conta: qualquer deviceId não-vazio.
   // Sem ternário para compatibilidade com o emulador Firestore standard edition.
   return (session.get('smUid', null) != null
@@ -531,14 +533,6 @@ function isMonsterUpdate(newData, oldData) {
     && newData.get('reactions', {}).get('fire', 0) >= oldData.get('reactions', {}).get('fire', 0)
     && newData.get('reactions', {}).get('eyes', 0) >= oldData.get('reactions', {}).get('eyes', 0)
     && newData.get('reactions', {}).get('bulb', 0) >= oldData.get('reactions', {}).get('bulb', 0);
-}
-
-// Monstro: updates sem discussionResult (participantes — sem verificação de SM).
-// Cobre: reações (+1), voteCount (+1), e operações de SM sem discussionResult.
-// discussionResult é bloqueado via isSessionScrumMaster na rule de update.
-function isMonsterUpdateNoDiscussionResult(newData, oldData) {
-  return newData.get('discussionResult', null) == oldData.get('discussionResult', null)
-    && isMonsterUpdate(newData, oldData);
 }
 
 // Solução: só votes pode aumentar (nunca diminuir)

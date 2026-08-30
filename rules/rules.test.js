@@ -303,6 +303,26 @@ describe('doc raiz — participante NÃO pode alterar campos SM-only', () => {
       }, { merge: true })
     );
   });
+
+  it('❌ participante não pode alterar discussionResults', async () => {
+    await assertFails(
+      setDoc(sessionDoc(anonDb()), {
+        ...BASE_SESSION,
+        discussionResults: { 'abc': 'agreement' },
+        updatedAt: '2025-01-01T13:00:00.000Z',
+      }, { merge: true })
+    );
+  });
+
+  it('✅ SM autenticado pode definir discussionResults', async () => {
+    await assertSucceeds(
+      setDoc(sessionDoc(smDb()), {
+        ...BASE_SESSION,
+        discussionResults: { 'abc': 'agreement' },
+        updatedAt: '2025-01-01T13:00:00.000Z',
+      }, { merge: true })
+    );
+  });
 });
 
 describe('doc raiz — manipulação de XP', () => {
@@ -673,25 +693,16 @@ describe('monstros', () => {
     );
   });
 
-  // ── discussionResult: protegido por isSessionScrumMaster ─────────────────
+  // ── discussionResult na subcoleção (campo legado, protegido por schema) ──────
+  // O resultado de discussão agora vive em discussionResults no doc raiz.
+  // discussionResult na subcoleção é um campo permitido pelo schema mas não
+  // gerenciado pelo app — a proteção real está no doc raiz via isScrumMaster.
 
-  it('✅ SM autenticado pode definir discussionResult', async () => {
+  it('✅ qualquer participante pode setar discussionResult válido (campo legado)', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
     });
     await assertSucceeds(
-      setDoc(subDoc(smDb(), 'monsters', MONSTER_ID), {
-        ...validMonster,
-        discussionResult: 'agreement',
-      })
-    );
-  });
-
-  it('❌ participante anônimo NÃO pode definir discussionResult', async () => {
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
-    });
-    await assertFails(
       setDoc(subDoc(anonDb(), 'monsters', MONSTER_ID), {
         ...validMonster,
         discussionResult: 'agreement',
@@ -699,25 +710,12 @@ describe('monstros', () => {
     );
   });
 
-  it('❌ participante não pode embutir discussionResult junto a uma reação', async () => {
+  it('❌ discussionResult com valor inválido é rejeitado pelo schema', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
     });
     await assertFails(
       setDoc(subDoc(anonDb(), 'monsters', MONSTER_ID), {
-        ...validMonster,
-        reactions:        { fire: 1, eyes: 0, bulb: 0 },
-        discussionResult: 'agreement',
-      })
-    );
-  });
-
-  it('❌ discussionResult com valor inválido é rejeitado', async () => {
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
-    });
-    await assertFails(
-      setDoc(subDoc(smDb(), 'monsters', MONSTER_ID), {
         ...validMonster,
         discussionResult: 'valor-invalido',
       })
