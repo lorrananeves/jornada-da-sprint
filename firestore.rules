@@ -175,17 +175,25 @@ service cloud.firestore {
       }
 
       // ── Missões ──────────────────────────────────────────────────────────
+      // Somente o SM (usuário autenticado) pode criar ou remover missões.
+      // request.auth != null é suficiente: o SM é o único usuário que faz
+      // signInAnon() no app; participantes são sempre anônimos.
+      // Atualização de status é permitida a todos — usada na retomada de
+      // missões de sprints anteriores, sem exigir autenticação.
       match /missions/{itemId} {
         allow read: if validSessionId(sessionId);
         allow create: if
           validSessionId(sessionId)
+          && request.auth != null
           && isValidMission(request.resource.data);
         // Permite atualizar apenas o campo status (retomada de missões anteriores)
         allow update: if
           validSessionId(sessionId)
           && isMissionStatusUpdate(request.resource.data, resource.data);
-        // Remoção permitida (o SM pode remover missões)
-        allow delete: if validSessionId(sessionId);
+        // Remoção: somente o SM pode remover missões
+        allow delete: if
+          validSessionId(sessionId)
+          && request.auth != null;
       }
 
       // ── Presença (lobby) ─────────────────────────────────────────────────

@@ -38,9 +38,9 @@
  *     ❌ alterar texto da solução
  *
  *   Missões
- *     ✅ create + atualização de status válida
- *     ❌ alterar título de missão de outra sessão
- *     ❌ delete sem sessionId válido
+ *     ✅ SM cria missão / atualiza status (qualquer participante)
+ *     ❌ participante anônimo cria ou deleta missão
+ *     ❌ alterar título ou priority de missão existente
  *
  *   Sessões não previstas
  *     ❌ coleção fora do schema bloqueada
@@ -798,13 +798,19 @@ describe('missões', () => {
     deadline:    '',
   };
 
-  it('✅ participante pode criar uma missão válida', async () => {
+  it('✅ SM autenticado pode criar uma missão válida', async () => {
     await assertSucceeds(
+      setDoc(subDoc(smDb(), 'missions', MISSION_ID), validMission)
+    );
+  });
+
+  it('❌ participante anônimo NÃO pode criar missão', async () => {
+    await assertFails(
       setDoc(subDoc(anonDb(), 'missions', MISSION_ID), validMission)
     );
   });
 
-  it('✅ atualização de status é permitida (retomada de missões anteriores)', async () => {
+  it('✅ atualização de status é permitida a qualquer participante (retomada de missões anteriores)', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'missions', MISSION_ID), validMission);
     });
@@ -851,18 +857,27 @@ describe('missões', () => {
 
   it('❌ missão com title acima de 200 chars é rejeitada', async () => {
     await assertFails(
-      setDoc(subDoc(anonDb(), 'missions', MISSION_ID), {
+      setDoc(subDoc(smDb(), 'missions', MISSION_ID), {
         ...validMission,
         title: 'x'.repeat(201),
       })
     );
   });
 
-  it('✅ missão pode ser deletada (SM remove action items)', async () => {
+  it('✅ SM pode deletar uma missão', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'missions', MISSION_ID), validMission);
     });
     await assertSucceeds(
+      deleteDoc(subDoc(smDb(), 'missions', MISSION_ID))
+    );
+  });
+
+  it('❌ participante anônimo NÃO pode deletar missão', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'missions', MISSION_ID), validMission);
+    });
+    await assertFails(
       deleteDoc(subDoc(anonDb(), 'missions', MISSION_ID))
     );
   });
