@@ -889,49 +889,47 @@ describe('setMonsterDiscussionResult', () => {
     ]);
   });
 
-  it('chama saveItem com o monstro completo e o resultado correto', async () => {
-    saveItem.mockClear();
+  it('atualiza discussionResults no estado com o resultado correto', async () => {
+    saveSession.mockClear();
     await setMonsterDiscussionResult('mon1', 'action');
-    expect(saveItem).toHaveBeenCalledWith(
-      'test-session-id',
-      'monsters',
-      { id: 'mon1', text: 'Problema X', reactions: {}, selected: false, discussionResult: 'action' }
-    );
+    expect(getState().discussionResults).toEqual({ mon1: 'action' });
+    // Persiste no Firestore via saveSession (setState → setScalarState → saveSession)
+    expect(saveSession).toHaveBeenCalled();
   });
 
-  it('chama saveItem com discussionResult null ao remover resultado', async () => {
-    saveItem.mockClear();
+  it('atualiza discussionResults com null ao remover resultado', async () => {
+    // Define um resultado primeiro
+    await setMonsterDiscussionResult('mon1', 'agreement');
+    saveSession.mockClear();
     await setMonsterDiscussionResult('mon1', null);
-    expect(saveItem).toHaveBeenCalledWith(
-      'test-session-id',
-      'monsters',
-      { id: 'mon1', text: 'Problema X', reactions: {}, selected: false, discussionResult: null }
-    );
+    expect(getState().discussionResults).toEqual({ mon1: null });
+    expect(saveSession).toHaveBeenCalled();
   });
 
   it('aceita todos os valores válidos de resultado', async () => {
-    saveItem.mockClear();
     const valores = ['mitigation', 'agreement', 'action', 'insight', 'observation'];
     for (const v of valores) {
       await setMonsterDiscussionResult('mon1', v);
-      expect(saveItem).toHaveBeenLastCalledWith(
-        'test-session-id',
-        'monsters',
-        { id: 'mon1', text: 'Problema X', reactions: {}, selected: false, discussionResult: v }
-      );
+      expect(getState().discussionResults).toMatchObject({ mon1: v });
     }
   });
 
-  it('snapshot remoto com discussionResult atualizado provoca re-render', () => {
+  it('preserva resultados de outros monstros ao atualizar um específico', async () => {
+    await setMonsterDiscussionResult('mon1', 'agreement');
+    await setMonsterDiscussionResult('mon2', 'action');
+    expect(getState().discussionResults).toEqual({ mon1: 'agreement', mon2: 'action' });
+  });
+
+  it('atualização de discussionResults via setState provoca notify nos subscribers', () => {
     const listener = vi.fn();
     const unsub = subscribe(listener);
     listener.mockClear();
 
-    _mocks.colCallbacks.monsters?.([
-      { id: 'mon1', text: 'Problema X', reactions: {}, selected: false, discussionResult: 'agreement' },
-    ]);
+    setMonsterDiscussionResult('mon1', 'insight');
 
     expect(listener).toHaveBeenCalled();
+    const called = listener.mock.calls[0][0];
+    expect(called.discussionResults).toMatchObject({ mon1: 'insight' });
     unsub();
   });
 });

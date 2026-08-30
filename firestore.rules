@@ -246,6 +246,8 @@ function isValidSessionRoot(data) {
       'combatMonsterIdx', 'combatStrategy',
       // foco da discussão — SM controla, participantes seguem em tempo real
       'discussionFocus',
+      // resultados da discussão por monstro — SM controla, todos veem via subscribeSession
+      'discussionResults',
       'readySignals', 'parkingLot'
     ])
     && data.currentPhase is string
@@ -299,16 +301,17 @@ function isValidTeam(team) {
 // Campos que somente o SM pode alterar.
 //
 // Lista completa de campos SM-only:
-//   sprint           — nome e datas da Sprint
-//   team             — nome da equipe e participantCount
-//   retroStarted     — flag que inicia a retro para todos os participantes
-//   phaseDurations   — durações registradas de cada fase
-//   phaseStartedAt   — timestamps de início de fase
-//   currentPhase     — fase atual (avançar retro)
-//   completedPhases  — lista de fases já concluídas
-//   combatMonsterIdx — foco do combate legado (sincronizado pelo SM para todos)
-//   combatStrategy   — estratégia de combate legada (sincronizada pelo SM)
-//   discussionFocus  — índice do monstro em foco na discussão (SM → participantes)
+//   sprint             — nome e datas da Sprint
+//   team               — nome da equipe e participantCount
+//   retroStarted       — flag que inicia a retro para todos os participantes
+//   phaseDurations     — durações registradas de cada fase
+//   phaseStartedAt     — timestamps de início de fase
+//   currentPhase       — fase atual (avançar retro)
+//   completedPhases    — lista de fases já concluídas
+//   combatMonsterIdx   — foco do combate legado (sincronizado pelo SM para todos)
+//   combatStrategy     — estratégia de combate legada (sincronizada pelo SM)
+//   discussionFocus    — índice do monstro em foco na discussão (SM → participantes)
+//   discussionResults  — resultados da discussão por monstro { monsterId: resultId }
 //
 // parkingLot e readySignals são deliberadamente excluídos: qualquer
 // participante precisa escrever neles (notas e sinalização "Terminei").
@@ -323,7 +326,8 @@ function isChangingSmOnlyFields(newData, oldData) {
     || newData.get('completedPhases',[])  != oldData.get('completedPhases',  [])
     || newData.get('combatMonsterIdx', null) != oldData.get('combatMonsterIdx', null)
     || newData.get('combatStrategy',  null) != oldData.get('combatStrategy',    null)
-    || newData.get('discussionFocus', null) != oldData.get('discussionFocus',   null);
+    || newData.get('discussionFocus', null) != oldData.get('discussionFocus',   null)
+    || newData.get('discussionResults', null) != oldData.get('discussionResults', null);
 }
 
 // readySignals: permite apenas que o dispositivo que está fazendo o request

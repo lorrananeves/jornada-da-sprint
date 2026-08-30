@@ -16,7 +16,7 @@ export function renderReport(root) {
   const stats = calcSummaryStats(state);
   const mood = getMoodLabel(stats.checkinStats.average);
 
-  const { sprint, team, treasures, monsters, solutions, missions, checkins, discussions } = state;
+  const { sprint, team, treasures, monsters, solutions, missions, checkins, discussions, discussionResults } = state;
 
   const treasureItems = treasures.filter((t) => t.category === 'treasure');
   const recognitionItems = treasures.filter((t) => t.category === 'recognition');
@@ -99,7 +99,8 @@ export function renderReport(root) {
 
   /** Distribuição dos resultados por tipo (somente monstros com resultado) */
   function renderResultsSummary() {
-    const withResult = monsters.filter((m) => m.discussionResult);
+    const results = discussionResults ?? {};
+    const withResult = monsters.filter((m) => results[m.id]);
     if (!withResult.length) return '';
 
     return `
@@ -107,7 +108,7 @@ export function renderReport(root) {
         <div class="report-section-title">🎯 Resultados da Retrospectiva</div>
         <div class="report-discussion-summary">
           ${DISCUSSION_RESULTS.map((r) => {
-            const count = withResult.filter((m) => m.discussionResult === r.id).length;
+            const count = withResult.filter((m) => results[m.id] === r.id).length;
             if (!count) return '';
             return `
               <div class="report-discussion-type-block">
@@ -236,10 +237,10 @@ export function renderReport(root) {
                     ${m.voteCount ? ` · 🗳️${m.voteCount}` : ''}
                   </span>
                 </div>
-                ${m.discussionResult ? `
+                ${(discussionResults ?? {})[m.id] ? `
                   <div class="report-discussion-result">
                     🎯 <strong>Resultado:</strong>
-                    ${getDiscussionResultEmoji(m.discussionResult)} ${escapeHTML(getDiscussionResultLabel(m.discussionResult))}
+                    ${getDiscussionResultEmoji((discussionResults ?? {})[m.id])} ${escapeHTML(getDiscussionResultLabel((discussionResults ?? {})[m.id]))}
                   </div>
                 ` : ''}
                 ${renderDiscussionNotesForMonster(m.id)}

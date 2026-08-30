@@ -37,7 +37,7 @@ export {
   removeParkingItem,
 } from './session.js';
 
-import { getState, getSessionId, setCollection } from './session.js';
+import { getState, getSessionId, setCollection, setState as _setStateFn } from './session.js';
 import { getDeviceId } from '../../services/presence.js';
 import { hasReacted, markReacted } from '../../services/reactions.js';
 import {
@@ -57,7 +57,6 @@ import {
   addDiscussionNote          as _addDiscussionNote,
   editDiscussionNote         as _editDiscussionNote,
   removeDiscussionNote       as _removeDiscussionNote,
-  setMonsterDiscussionResult as _setMonsterDiscussionResult,
   castMonsterVoteOp   as _castMonsterVoteOp,
   addMission    as _addMission,
   removeMission  as _removeMission,
@@ -141,9 +140,15 @@ export const addDiscussionNote          = (note)            => _addDiscussionNot
 export const editDiscussionNote         = (id, partial)     => _editDiscussionNote(sid(), id, partial);
 export const removeDiscussionNote       = (id)              => _removeDiscussionNote(sid(), id);
 export const setMonsterDiscussionResult = (monsterId, result) => {
-  const monster = monsters().find((m) => m.id === monsterId);
-  if (!monster) return Promise.reject(new Error('monstro não encontrado'));
-  return _setMonsterDiscussionResult(sid(), monster, result);
+  // Persiste o resultado no doc raiz da sessão via discussionResults map.
+  // Essa abordagem é mais confiável que atualizar a subcoleção monsters, pois
+  // a sincronização em tempo real usa subscribeSession (sem depender de
+  // get() nas Firestore Rules — que tem comportamento instável no emulador
+  // standard edition em regras de update de subcoleção).
+  const currentResults = getState().discussionResults ?? {};
+  const updated = { ...currentResults, [monsterId]: result ?? null };
+  _setStateFn({ discussionResults: updated });
+  return Promise.resolve();
 };
 
 // ── MonsterVotes ──────────────────────────────────────────────────────────────

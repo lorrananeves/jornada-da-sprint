@@ -73,6 +73,10 @@ const DEFAULT_STATE = () => ({
   combatStrategy:      'prevent',
   // ── foco da Discussão (índice do monstro em discussão — SM → participantes) ──
   discussionFocus:     0,
+  // ── resultados da Discussão por monstro { [monsterId]: resultId | null } ──
+  // Armazenado no doc raiz (não na subcoleção monsters) para sincronização
+  // confiável em tempo real sem depender de get() nas Firestore Rules.
+  discussionResults:   {},
   // ── sinais "Terminei" por fase { [deviceId]: phaseId } ──
   readySignals:        {},
   // ── parking lot (notas "para depois", acessíveis em qualquer fase) ──

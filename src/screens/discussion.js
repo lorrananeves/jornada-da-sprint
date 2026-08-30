@@ -64,8 +64,8 @@ function buildNoteCard(note, canManage) {
 }
 
 /** Painel de resultado da discussão (SM: seletor; participante: somente-leitura) */
-function buildDiscussionResultPanel(monster, canSet) {
-  const current = monster.discussionResult ?? null;
+function buildDiscussionResultPanel(monster, canSet, discussionResults) {
+  const current = (discussionResults ?? {})[monster.id] ?? null;
 
   if (!canSet) {
     // Participantes só veem se já houver resultado confirmado
@@ -165,8 +165,9 @@ export function renderDiscussion(root) {
 
   function render() {
     const currentState = getState();
-    // Lê os monstros do estado atual para capturar mudanças remotas (ex: discussionResult)
+    // Lê os monstros e resultados do estado atual para capturar mudanças remotas
     const currentMonsters = currentState.monsters;
+    const discussionResults = currentState.discussionResults ?? {};
 
     // Monstros ainda não chegaram via subscription (race condition no mount).
     // Renderiza estado de espera e aguarda o subscribe disparar render() novamente.
@@ -265,7 +266,7 @@ export function renderDiscussion(root) {
         </div>
 
         <!-- Resultado da discussão -->
-        ${buildDiscussionResultPanel(monster, canSetDiscussionResult())}
+        ${buildDiscussionResultPanel(monster, canSetDiscussionResult(), discussionResults)}
 
         <div class="phase-nav">
           <button class="btn btn-ghost" id="btn-back">← Voltar</button>
@@ -410,38 +411,24 @@ export function renderDiscussion(root) {
     });
 
     // Confirmar resultado da discussão (somente SM)
-    root.querySelector('#btn-confirm-result')?.addEventListener('click', async () => {
+    root.querySelector('#btn-confirm-result')?.addEventListener('click', () => {
       if (!canSetDiscussionResult()) return;
       const selected = root.querySelector('input[name="discussion-result"]:checked')?.value;
       if (!selected) {
         showErrorToast('Selecione um resultado antes de confirmar.');
         return;
       }
-      const btn = root.querySelector('#btn-confirm-result');
-      if (btn) btn.disabled = true;
-      try {
-        await setMonsterDiscussionResult(getState().monsters[currentIdx]?.id ?? getState().monsters[0]?.id, selected);
-        render();
-      } catch (e) {
-        console.warn('Firestore setMonsterDiscussionResult failed:', e);
-        showErrorToast('Falha ao salvar resultado — verifique sua conexão.');
-        if (btn) btn.disabled = false;
-      }
+      const monsterId = getState().monsters[currentIdx]?.id ?? getState().monsters[0]?.id;
+      setMonsterDiscussionResult(monsterId, selected);
+      render();
     });
 
     // Remover resultado (somente SM)
-    root.querySelector('#btn-clear-result')?.addEventListener('click', async () => {
+    root.querySelector('#btn-clear-result')?.addEventListener('click', () => {
       if (!canSetDiscussionResult()) return;
-      const btn = root.querySelector('#btn-clear-result');
-      if (btn) btn.disabled = true;
-      try {
-        await setMonsterDiscussionResult(getState().monsters[currentIdx]?.id ?? getState().monsters[0]?.id, null);
-        render();
-      } catch (e) {
-        console.warn('Firestore setMonsterDiscussionResult (clear) failed:', e);
-        showErrorToast('Falha ao remover resultado — verifique sua conexão.');
-        if (btn) btn.disabled = false;
-      }
+      const monsterId = getState().monsters[currentIdx]?.id ?? getState().monsters[0]?.id;
+      setMonsterDiscussionResult(monsterId, null);
+      render();
     });
 
     root.querySelector('#btn-back').addEventListener('click', () => {
@@ -460,8 +447,8 @@ export function renderDiscussion(root) {
     const notes = state.discussions.map((n) => `${n.id}:${n.type}:${n.text}:${n.updatedAt || ''}`).join('|');
     const focus = state.discussionFocus ?? 0;
     const count = parseInt(state.team?.participantCount, 10) || 0;
-    // Inclui discussionResult de cada monstro para disparar re-render quando o SM define o resultado
-    const results = state.monsters.map((m) => `${m.id}:${m.discussionResult ?? ''}`).join('|');
+    // Inclui discussionResults (do doc raiz) para disparar re-render quando o SM define o resultado
+    const results = JSON.stringify(state.discussionResults ?? {});
     return `${notes}|${focus}|${count}|${results}`;
   }
 
