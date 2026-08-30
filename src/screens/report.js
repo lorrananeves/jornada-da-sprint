@@ -8,7 +8,7 @@
 import { getState, setPhase, setLocalPhase, isSM } from '../state/store.js';
 import { calcSummaryStats, getMoodLabel } from '../services/stats.js';
 import { exportAsPDF, exportAsPNG } from '../services/export.js';
-import { formatDate, formatISO, formatXP, getScoreEmoji, getPriorityLabel, getStrategyLabel, DISCUSSION_TYPES, getDiscussionTypeEmoji, getDiscussionTypeLabel } from '../utils/format.js';
+import { formatDate, formatISO, formatXP, getScoreEmoji, getPriorityLabel, getStrategyLabel, DISCUSSION_TYPES, getDiscussionTypeEmoji, getDiscussionTypeLabel, DISCUSSION_RESULTS, getDiscussionResultEmoji, getDiscussionResultLabel } from '../utils/format.js';
 import { escapeHTML } from '../utils/dom.js';
 
 export function renderReport(root) {
@@ -77,7 +77,7 @@ export function renderReport(root) {
 
     return `
       <div class="report-section">
-        <div class="report-section-title">📝 Resultados da Discussão</div>
+        <div class="report-section-title">📝 Notas da Discussão</div>
         <div class="report-discussion-summary">
           ${DISCUSSION_TYPES.map((t) => {
             const items = byType[t.id];
@@ -89,6 +89,32 @@ export function renderReport(root) {
                   <span class="badge badge-info">${items.length}</span>
                 </div>
                 ${items.map((n) => `<div class="report-discussion-note-text" style="margin:4px 0 4px 16px">• ${escapeHTML(n.text)}</div>`).join('')}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  /** Distribuição dos resultados por tipo (somente monstros com resultado) */
+  function renderResultsSummary() {
+    const withResult = monsters.filter((m) => m.discussionResult);
+    if (!withResult.length) return '';
+
+    return `
+      <div class="report-section">
+        <div class="report-section-title">🎯 Resultados da Retrospectiva</div>
+        <div class="report-discussion-summary">
+          ${DISCUSSION_RESULTS.map((r) => {
+            const count = withResult.filter((m) => m.discussionResult === r.id).length;
+            if (!count) return '';
+            return `
+              <div class="report-discussion-type-block">
+                <div class="report-discussion-type-header">
+                  <span>${r.emoji} ${r.label}</span>
+                  <span class="badge badge-info">${count}</span>
+                </div>
               </div>
             `;
           }).join('')}
@@ -210,6 +236,12 @@ export function renderReport(root) {
                     ${m.voteCount ? ` · 🗳️${m.voteCount}` : ''}
                   </span>
                 </div>
+                ${m.discussionResult ? `
+                  <div class="report-discussion-result">
+                    🎯 <strong>Resultado:</strong>
+                    ${getDiscussionResultEmoji(m.discussionResult)} ${escapeHTML(getDiscussionResultLabel(m.discussionResult))}
+                  </div>
+                ` : ''}
                 ${renderDiscussionNotesForMonster(m.id)}
                 ${renderSolutionsForMonster(m.id)}
                 ${renderMissionsForMonster(m.id)}
@@ -218,6 +250,7 @@ export function renderReport(root) {
           }
         </div>
 
+        ${renderResultsSummary()}
         ${renderDiscussionSummary()}
 
         <!-- Missions -->
