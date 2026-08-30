@@ -16,14 +16,14 @@
 
 import {
   getState, subscribe, setState, setPhase, setLocalPhase, completePhase, isSM, signalReady,
-  addDiscussionNote, editDiscussionNote, removeDiscussionNote,
+  addDiscussionNote, editDiscussionNote, removeDiscussionNote, setMonsterDiscussionResult,
 } from '../state/store.js';
 import { showErrorToast } from '../components/xpToast.js';
 import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
-import { canManageDiscussionNotes, canSetDiscussionFocus, canConvertToMission } from '../utils/permissions.js';
+import { canManageDiscussionNotes, canSetDiscussionFocus, canConvertToMission, canSetDiscussionResult } from '../utils/permissions.js';
 import { getDeviceId } from '../services/presence.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
-import { DISCUSSION_TYPES, getDiscussionTypeEmoji, getDiscussionTypeLabel } from '../utils/format.js';
+import { DISCUSSION_TYPES, getDiscussionTypeEmoji, getDiscussionTypeLabel, DISCUSSION_RESULTS, getDiscussionResultEmoji, getDiscussionResultLabel } from '../utils/format.js';
 
 /** Persiste o foco do SM no store (sincroniza para todos via Firestore). */
 function setDiscussionFocus(monsterIdx) {
@@ -58,6 +58,52 @@ function buildNoteCard(note, canManage) {
       <p class="discussion-note-text">${escapeHTML(note.text)}</p>
       ${canManage && note.type === 'action' ? `
         <button class="btn btn-ghost btn-sm" style="margin-top:8px" data-to-mission-note="${escapeHTML(note.id)}">🚀 Transformar em Missão</button>
+      ` : ''}
+    </div>
+  `;
+}
+
+/** Painel de resultado da discussão (SM: seletor; participante: somente-leitura) */
+function buildDiscussionResultPanel(monster, canSet) {
+  const current = monster.discussionResult ?? null;
+
+  if (!canSet) {
+    // Participantes só veem se já houver resultado confirmado
+    if (!current) return '';
+    return `
+      <div class="discussion-result-panel discussion-result-panel--readonly">
+        <div class="discussion-result-title">🎯 RESULTADO DA DISCUSSÃO</div>
+        <div class="discussion-result-confirmed">
+          ${getDiscussionResultEmoji(current)} ${escapeHTML(getDiscussionResultLabel(current))}
+        </div>
+      </div>
+    `;
+  }
+
+  // SM: seletor de resultado + botão de confirmação (e limpeza se já confirmado)
+  const optionsHTML = DISCUSSION_RESULTS.map((r) => `
+    <label class="discussion-result-option ${current === r.id ? 'discussion-result-option--selected' : ''}">
+      <input type="radio" name="discussion-result" value="${r.id}" ${current === r.id ? 'checked' : ''}>
+      ${r.emoji} ${r.label}
+    </label>
+  `).join('');
+
+  return `
+    <div class="discussion-result-panel" id="discussion-result-panel">
+      <div class="discussion-result-title">🎯 COMO TERMINAMOS ESSA DISCUSSÃO?</div>
+      <div class="discussion-result-options" id="discussion-result-options">
+        ${optionsHTML}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" id="btn-confirm-result">
+          ${current ? '✓ Atualizar resultado' : '✓ Confirmar resultado'}
+        </button>
+        ${current ? `<button class="btn btn-ghost btn-sm" id="btn-clear-result">✕ Remover resultado</button>` : ''}
+      </div>
+      ${current ? `
+        <div class="discussion-result-confirmed" style="margin-top:8px">
+          Resultado atual: ${getDiscussionResultEmoji(current)} ${escapeHTML(getDiscussionResultLabel(current))}
+        </div>
       ` : ''}
     </div>
   `;
@@ -211,6 +257,9 @@ export function renderDiscussion(root) {
           ${canManage ? buildAddNoteForm() : ''}
         </div>
 
+        <!-- Resultado da discussão -->
+        ${buildDiscussionResultPanel(monster, canSetDiscussionResult())}
+
         <div class="phase-nav">
           <button class="btn btn-ghost" id="btn-back">← Voltar</button>
           ${buildReadySignalHTML('discussion', currentState, userSM, getDeviceId())}
@@ -353,6 +402,41 @@ export function renderDiscussion(root) {
       });
     });
 
+    // Confirmar resultado da discussão (somente SM)
+    root.querySelector('#btn-confirm-result')?.addEventListener('click', async () => {
+      if (!canSetDiscussionResult()) return;
+      const selected = root.querySelector('input[name="discussion-result"]:checked')?.value;
+      if (!selected) {
+        showErrorToast('Selecione um resultado antes de confirmar.');
+        return;
+      }
+      const btn = root.querySelector('#btn-confirm-result');
+      if (btn) btn.disabled = true;
+      try {
+        await setMonsterDiscussionResult(monsters[currentIdx].id, selected);
+        render();
+      } catch (e) {
+        console.warn('Firestore setMonsterDiscussionResult failed:', e);
+        showErrorToast('Falha ao salvar resultado — verifique sua conexão.');
+        if (btn) btn.disabled = false;
+      }
+    });
+
+    // Remover resultado (somente SM)
+    root.querySelector('#btn-clear-result')?.addEventListener('click', async () => {
+      if (!canSetDiscussionResult()) return;
+      const btn = root.querySelector('#btn-clear-result');
+      if (btn) btn.disabled = true;
+      try {
+        await setMonsterDiscussionResult(monsters[currentIdx].id, null);
+        render();
+      } catch (e) {
+        console.warn('Firestore setMonsterDiscussionResult (clear) failed:', e);
+        showErrorToast('Falha ao remover resultado — verifique sua conexão.');
+        if (btn) btn.disabled = false;
+      }
+    });
+
     root.querySelector('#btn-back').addEventListener('click', () => {
       if (isSM()) setPhase('monsters');
       else setLocalPhase('roleSelect');
@@ -369,7 +453,9 @@ export function renderDiscussion(root) {
     const notes = state.discussions.map((n) => `${n.id}:${n.type}:${n.text}:${n.updatedAt || ''}`).join('|');
     const focus = state.discussionFocus ?? 0;
     const count = parseInt(state.team?.participantCount, 10) || 0;
-    return `${notes}|${focus}|${count}`;
+    // Inclui discussionResult de cada monstro para disparar re-render quando o SM define o resultado
+    const results = state.monsters.map((m) => `${m.id}:${m.discussionResult ?? ''}`).join('|');
+    return `${notes}|${focus}|${count}|${results}`;
   }
 
   let _lastFp = _fingerprint(getState());
