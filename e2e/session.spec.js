@@ -172,7 +172,7 @@ test('SM define Resultado da Discussão; monstro exibe o resultado em tempo real
 
   // Avança para Discussão
   await smPage.locator('#btn-next').click(); // → discussão
-  await expect(smPage.getByText(/discussão/i)).toBeVisible({ timeout: 10_000 });
+  await expect(smPage.locator('h2.phase-title').getByText(/discussão/i)).toBeVisible({ timeout: 10_000 });
 
   // SM vê o painel "COMO TERMINAMOS ESSA DISCUSSÃO?"
   await expect(smPage.getByText(/como terminamos essa discussão/i)).toBeVisible({ timeout: 5_000 });
