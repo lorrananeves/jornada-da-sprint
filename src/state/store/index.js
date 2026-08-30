@@ -54,9 +54,10 @@ import {
   prioritizeMonsters as _prioritizeMonsters,
   addSolution   as _addSolution,
   voteSolution  as _voteSolution,
-  addDiscussionNote   as _addDiscussionNote,
-  editDiscussionNote  as _editDiscussionNote,
-  removeDiscussionNote as _removeDiscussionNote,
+  addDiscussionNote          as _addDiscussionNote,
+  editDiscussionNote         as _editDiscussionNote,
+  removeDiscussionNote       as _removeDiscussionNote,
+  setMonsterDiscussionResult as _setMonsterDiscussionResult,
   castMonsterVoteOp   as _castMonsterVoteOp,
   addMission    as _addMission,
   removeMission  as _removeMission,
@@ -136,9 +137,10 @@ export async function voteSolution(id) {
 
 // ── Discussions ───────────────────────────────────────────────────────────────
 
-export const addDiscussionNote    = (note)           => _addDiscussionNote(sid(), note);
-export const editDiscussionNote   = (id, partial)    => _editDiscussionNote(sid(), id, partial);
-export const removeDiscussionNote = (id)             => _removeDiscussionNote(sid(), id);
+export const addDiscussionNote          = (note)            => _addDiscussionNote(sid(), note);
+export const editDiscussionNote         = (id, partial)     => _editDiscussionNote(sid(), id, partial);
+export const removeDiscussionNote       = (id)              => _removeDiscussionNote(sid(), id);
+export const setMonsterDiscussionResult = (monsterId, result) => _setMonsterDiscussionResult(sid(), monsterId, result);
 
 // ── MonsterVotes ──────────────────────────────────────────────────────────────
 

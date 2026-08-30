@@ -223,6 +223,18 @@ export function removeDiscussionNote(sessionId, noteId) {
   return removeItem(sessionId, 'discussions', noteId);
 }
 
+/**
+ * Define (ou remove) o resultado final da discussão de um monstro.
+ * Somente o SM pode chamar (verificado no cliente via canSetDiscussionResult).
+ * @param {string} sessionId
+ * @param {string} monsterId
+ * @param {string|null} result — um dos valores de DISCUSSION_RESULTS ou null
+ */
+export function setMonsterDiscussionResult(sessionId, monsterId, result) {
+  if (!sessionId) return Promise.reject(new Error('sessionId ausente'));
+  return patchItem(sessionId, 'monsters', monsterId, { discussionResult: result ?? null });
+}
+
 // ── MonsterVotes ──────────────────────────────────────────────────────────────
 
 /**
