@@ -82,7 +82,7 @@ export function renderMissions(root) {
             <h2 class="phase-title">Missões da Próxima Sprint</h2>
           </div>
           <p class="phase-description">
-            Transforme soluções em compromissos concretos para a próxima Sprint.
+            Transforme as ações definidas na retrospectiva em compromissos concretos para a próxima Sprint.
           </p>
         </div>
 
