@@ -7,6 +7,9 @@ import {
   getScoreLabel,
   getPriorityLabel,
   getStrategyLabel,
+  DISCUSSION_RESULTS,
+  getDiscussionResultEmoji,
+  getDiscussionResultLabel,
 } from '../utils/format.js';
 
 describe('formatDate', () => {
@@ -108,5 +111,57 @@ describe('getStrategyLabel', () => {
 
   it('retorna o valor original para estratégia desconhecida', () => {
     expect(getStrategyLabel('custom')).toBe('custom');
+  });
+});
+
+describe('DISCUSSION_RESULTS', () => {
+  it('possui exatamente 5 resultados', () => {
+    expect(DISCUSSION_RESULTS).toHaveLength(5);
+  });
+
+  it('contém os IDs esperados', () => {
+    const ids = DISCUSSION_RESULTS.map((r) => r.id);
+    expect(ids).toContain('mitigation');
+    expect(ids).toContain('agreement');
+    expect(ids).toContain('action');
+    expect(ids).toContain('insight');
+    expect(ids).toContain('observation');
+  });
+
+  it('cada resultado tem emoji e label', () => {
+    for (const r of DISCUSSION_RESULTS) {
+      expect(r.emoji).toBeTruthy();
+      expect(r.label).toBeTruthy();
+    }
+  });
+});
+
+describe('getDiscussionResultEmoji', () => {
+  it('retorna emoji correto para cada resultado', () => {
+    expect(getDiscussionResultEmoji('mitigation')).toBe('🛡️');
+    expect(getDiscussionResultEmoji('agreement')).toBe('🤝');
+    expect(getDiscussionResultEmoji('action')).toBe('🚀');
+    expect(getDiscussionResultEmoji('insight')).toBe('💡');
+    expect(getDiscussionResultEmoji('observation')).toBe('📌');
+  });
+
+  it('retorna "🎯" para resultado nulo ou desconhecido', () => {
+    expect(getDiscussionResultEmoji(null)).toBe('🎯');
+    expect(getDiscussionResultEmoji(undefined)).toBe('🎯');
+    expect(getDiscussionResultEmoji('unknown')).toBe('🎯');
+  });
+});
+
+describe('getDiscussionResultLabel', () => {
+  it('retorna label correto para cada resultado', () => {
+    expect(getDiscussionResultLabel('mitigation')).toBe('Já sabemos lidar');
+    expect(getDiscussionResultLabel('agreement')).toBe('Fizemos um acordo');
+    expect(getDiscussionResultLabel('action')).toBe('Criamos uma ação');
+    expect(getDiscussionResultLabel('insight')).toBe('Apenas aprendizado');
+    expect(getDiscussionResultLabel('observation')).toBe('Apenas registrado');
+  });
+
+  it('retorna o valor original para resultado desconhecido', () => {
+    expect(getDiscussionResultLabel('custom')).toBe('custom');
   });
 });

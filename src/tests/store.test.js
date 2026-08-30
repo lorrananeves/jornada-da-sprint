@@ -79,10 +79,11 @@ import {
   prioritizeMonsters,
   subscribe,
   resetState,
+  setMonsterDiscussionResult,
 } from '../state/store.js';
 import { _setSessionId } from '../state/store/session.js';
 
-import { batchWrite, saveSession, incrementXP, saveItem } from '../services/firebase.js';
+import { batchWrite, saveSession, incrementXP, saveItem, patchItem } from '../services/firebase.js';
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -880,5 +881,64 @@ describe('discussions e monsterVotes nas coleções subscritas', () => {
     ];
     _mocks.colCallbacks.monsterVotes?.(votes);
     expect(getState().monsterVotes).toEqual(votes);
+  });
+});
+
+// ── setMonsterDiscussionResult ────────────────────────────────────────────────
+
+describe('setMonsterDiscussionResult', () => {
+  beforeEach(() => {
+    setState({ smDeviceId: DEVICE_SM });
+    _mocks.currentDeviceId = DEVICE_SM;
+    // Seed de monstro no estado via subscribeCollection
+    _mocks.colCallbacks.monsters?.([
+      { id: 'mon1', text: 'Problema X', reactions: {}, selected: false },
+    ]);
+  });
+
+  it('chama patchItem com o resultado correto', async () => {
+    patchItem.mockClear();
+    await setMonsterDiscussionResult('mon1', 'action');
+    expect(patchItem).toHaveBeenCalledWith(
+      'test-session-id',
+      'monsters',
+      'mon1',
+      { discussionResult: 'action' }
+    );
+  });
+
+  it('chama patchItem com null ao remover resultado', async () => {
+    patchItem.mockClear();
+    await setMonsterDiscussionResult('mon1', null);
+    expect(patchItem).toHaveBeenCalledWith(
+      'test-session-id',
+      'monsters',
+      'mon1',
+      { discussionResult: null }
+    );
+  });
+
+  it('aceita todos os valores válidos de resultado', async () => {
+    patchItem.mockClear();
+    const valores = ['mitigation', 'agreement', 'action', 'insight', 'observation'];
+    for (const v of valores) {
+      await setMonsterDiscussionResult('mon1', v);
+      expect(patchItem).toHaveBeenLastCalledWith(
+        'test-session-id', 'monsters', 'mon1', { discussionResult: v }
+      );
+    }
+  });
+
+  it('snapshot remoto com discussionResult atualizado provoca re-render', () => {
+    const listener = vi.fn();
+    const unsub = subscribe(listener);
+    listener.mockClear();
+
+    _mocks.colCallbacks.monsters?.([
+      { id: 'mon1', text: 'Problema X', reactions: {}, selected: false, discussionResult: 'agreement' },
+    ]);
+
+    expect(listener).toHaveBeenCalled();
+    unsub();
   });
 });
