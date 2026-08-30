@@ -99,9 +99,18 @@ service cloud.firestore {
         // Permite atualizar: reações, selected, priorityRank, text, mergedFrom,
         // merged (flag de monstro absorvido), mergedInto (id do monstro keeper),
         // unmerged (flag de merge desfeito), voteCount (incremento atômico).
+        // discussionResult é tratado separadamente: exige que o request seja do SM.
         allow update: if
           validSessionId(sessionId)
-          && isMonsterUpdate(request.resource.data, resource.data);
+          && (
+            // Caso 6 — discussionResult: apenas o SM pode definir o resultado.
+            (
+              isSessionScrumMaster(sessionId)
+              && isDiscussionResultUpdate(request.resource.data, resource.data)
+            )
+            // Demais casos — reações, merge, voteCount, etc. (sem discussionResult).
+            || isMonsterUpdate(request.resource.data, resource.data)
+          );
         allow delete: if false;
 
         // Token de reação: {deviceId}_{reaction} como ID — create falha se já existir
@@ -493,11 +502,25 @@ function isReactionUpdate(newData, oldData) {
     && newData.get('reactions', {}).get('bulb',   0) <= oldData.get('reactions', {}).get('bulb',   0) + 1;
 }
 
+// Monstro: resultado da discussão — apenas discussionResult muda.
+// Chamada exclusivamente quando isSessionScrumMaster já foi verificado.
+function isDiscussionResultUpdate(newData, oldData) {
+  return 'discussionResult' in newData.diff(oldData).affectedKeys()
+    && newData.diff(oldData).affectedKeys().hasOnly(['discussionResult'])
+    && isValidDiscussionResult(newData.get('discussionResult', null))
+    && newData.get('text', '')         == oldData.get('text', '')
+    && newData.get('selected', false)  == oldData.get('selected', false)
+    && newData.get('reactions', {})    == oldData.get('reactions', {})
+    && newData.get('mergedFrom', null) == oldData.get('mergedFrom', null);
+}
+
 // Monstro: permite mudar reactions.*, selected, priorityRank, text, mergedFrom,
 // merged (flag de monstro absorvido), mergedInto (id do keeper),
 // unmerged (flag de merge desfeito), voteCount (incremento atômico).
+// discussionResult NÃO é coberto aqui — é tratado separadamente na rule de update,
+// com verificação explícita de isSessionScrumMaster.
 //
-// Há quatro tipos de update válidos:
+// Tipos de update válidos:
 //   1. Reação simples: apenas reactions.* sobe +1 (nunca decrementa)
 //   2. Merge — atualização do keep: mergedFrom cresce e reações sobem o valor
 //      combinado (não pode cair; o cliente calcula a soma exata via batchWrite)
@@ -507,16 +530,6 @@ function isReactionUpdate(newData, oldData) {
 //   5. voteCount: incremento de +1 por write (via transação castMonsterVote)
 function isMonsterUpdate(newData, oldData) {
   return (
-    // Caso 6 — discussionResult: apenas discussionResult muda (SM define o resultado da discussão).
-    // Os demais campos imutáveis são preservados. Validação SM vs participante é feita no cliente.
-    'discussionResult' in newData.diff(oldData).affectedKeys()
-    && newData.diff(oldData).affectedKeys().hasOnly(['discussionResult'])
-    && isValidDiscussionResult(newData.get('discussionResult', null))
-    && newData.get('text', '')         == oldData.get('text', '')
-    && newData.get('selected', false)  == oldData.get('selected', false)
-    && newData.get('reactions', {})    == oldData.get('reactions', {})
-    && newData.get('mergedFrom', null) == oldData.get('mergedFrom', null)
-  ) || (
     // Caso 3 — drop mark ou delete: apenas merged e mergedInto mudam.
     // mergedInto pode ser '__deleted__' para deleção lógica.
     newData.get('merged', false) == true

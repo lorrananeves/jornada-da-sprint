@@ -655,6 +655,62 @@ describe('monstros', () => {
       deleteDoc(subDoc(anonDb(), 'monsters', MONSTER_ID))
     );
   });
+
+  it('✅ SM autenticado pode definir discussionResult em um monstro', async () => {
+    await seedSession();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
+    });
+    await assertSucceeds(
+      setDoc(subDoc(smDb(), 'monsters', MONSTER_ID), {
+        ...validMonster,
+        discussionResult: 'agreement',
+      })
+    );
+  });
+
+  it('❌ participante anônimo NÃO pode definir discussionResult em um monstro', async () => {
+    await seedSession();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
+    });
+    await assertFails(
+      setDoc(subDoc(anonDb(), 'monsters', MONSTER_ID), {
+        ...validMonster,
+        discussionResult: 'agreement',
+      })
+    );
+  });
+
+  it('❌ participante anônimo NÃO pode alterar discussionResult existente', async () => {
+    await seedSession();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), {
+        ...validMonster,
+        discussionResult: 'insight',
+      });
+    });
+    await assertFails(
+      setDoc(subDoc(anonDb(), 'monsters', MONSTER_ID), {
+        ...validMonster,
+        discussionResult: 'agreement',
+      })
+    );
+  });
+
+  it('❌ participante anônimo não pode embutir discussionResult numa reação', async () => {
+    await seedSession();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
+    });
+    await assertFails(
+      setDoc(subDoc(anonDb(), 'monsters', MONSTER_ID), {
+        ...validMonster,
+        reactions:        { fire: 1, eyes: 0, bulb: 0 },
+        discussionResult: 'agreement',
+      })
+    );
+  });
 });
 
 // ── Soluções ──────────────────────────────────────────────────────────────────
