@@ -96,20 +96,16 @@ service cloud.firestore {
         allow create: if
           validSessionId(sessionId)
           && isValidMonster(request.resource.data);
-        // Permite atualizar: reações, selected, priorityRank, text, mergedFrom,
-        // merged (flag de monstro absorvido), mergedInto (id do monstro keeper),
-        // unmerged (flag de merge desfeito), voteCount (incremento atômico).
-        // discussionResult é tratado separadamente: exige que o request seja do SM.
+        // Separação explícita SM vs participante:
+        //   SM   → text, selected, priorityRank, mergedFrom, merged, mergedInto,
+        //           unmerged, discussionResult (+ reactions no merge do keep).
+        //   Part → reactions (+1), voteCount (+1).
         allow update: if
           validSessionId(sessionId)
           && (
-            // Caso 6 — discussionResult: apenas o SM pode definir o resultado.
-            (
-              isSessionScrumMaster(sessionId)
-              && isDiscussionResultUpdate(request.resource.data, resource.data)
-            )
-            // Demais casos — reações, merge, voteCount, etc. (sem discussionResult).
-            || isMonsterUpdate(request.resource.data, resource.data)
+            isSessionScrumMaster(sessionId)
+              ? isSmMonsterUpdate(request.resource.data, resource.data)
+              : isParticipantMonsterUpdate(request.resource.data, resource.data)
           );
         allow delete: if false;
 
@@ -502,95 +498,78 @@ function isReactionUpdate(newData, oldData) {
     && newData.get('reactions', {}).get('bulb',   0) <= oldData.get('reactions', {}).get('bulb',   0) + 1;
 }
 
-// Monstro: resultado da discussão — apenas discussionResult muda.
-// Chamada exclusivamente quando isSessionScrumMaster já foi verificado.
-function isDiscussionResultUpdate(newData, oldData) {
-  return 'discussionResult' in newData.diff(oldData).affectedKeys()
-    && newData.diff(oldData).affectedKeys().hasOnly(['discussionResult'])
-    && isValidDiscussionResult(newData.get('discussionResult', null))
-    && newData.get('text', '')         == oldData.get('text', '')
-    && newData.get('selected', false)  == oldData.get('selected', false)
-    && newData.get('reactions', {})    == oldData.get('reactions', {})
-    && newData.get('mergedFrom', null) == oldData.get('mergedFrom', null);
-}
-
-// Monstro: permite mudar reactions.*, selected, priorityRank, text, mergedFrom,
-// merged (flag de monstro absorvido), mergedInto (id do keeper),
-// unmerged (flag de merge desfeito), voteCount (incremento atômico).
-// discussionResult NÃO é coberto aqui — é tratado separadamente na rule de update,
-// com verificação explícita de isSessionScrumMaster.
+// Monstro — atualização pelo Scrum Master.
 //
-// Tipos de update válidos:
-//   1. Reação simples: apenas reactions.* sobe +1 (nunca decrementa)
-//   2. Merge — atualização do keep: mergedFrom cresce e reações sobem o valor
-//      combinado (não pode cair; o cliente calcula a soma exata via batchWrite)
-//   3. Marcação de drop/deleted: só merged=true e mergedInto=<id> mudam
-//   4. Unmerge / restore: merged vira false e mergedInto vira null (originais voltam)
-//      ou merged/unmerged viram true (monstro agrupado é desativado)
-//   5. voteCount: incremento de +1 por write (via transação castMonsterVote)
-function isMonsterUpdate(newData, oldData) {
-  return (
-    // Caso 3 — drop mark ou delete: apenas merged e mergedInto mudam.
-    // mergedInto pode ser '__deleted__' para deleção lógica.
-    newData.get('merged', false) == true
-    && newData.get('mergedInto', '') is string
-    && newData.get('mergedInto', '').size() > 0
-    && newData.get('mergedInto', '').size() <= 64
-    && newData.get('text', '')               == oldData.get('text', '')
-    && newData.get('selected', false)        == oldData.get('selected', false)
-    && newData.get('reactions', {})          == oldData.get('reactions', {})
-    && newData.get('mergedFrom', null)       == oldData.get('mergedFrom', null)
-  ) || (
-    // Caso 4a — unmerge do keep: marca como desfeito (unmerged=true, merged=true)
-    newData.get('merged', false)   == true
-    && newData.get('unmerged', false) == true
-    && newData.get('mergedInto', null) == oldData.get('mergedInto', null)
-    && newData.get('text', '')         == oldData.get('text', '')
-    && newData.get('reactions', {})    == oldData.get('reactions', {})
-    && newData.get('mergedFrom', null) == oldData.get('mergedFrom', null)
-  ) || (
-    // Caso 4b — restore dos originais: merged=false, mergedInto=null
-    newData.get('merged', true) == false
-    && newData.get('mergedInto', '') == null
-    && newData.get('text', '')         == oldData.get('text', '')
-    && newData.get('reactions', {})    == oldData.get('reactions', {})
-    && newData.get('mergedFrom', null) == oldData.get('mergedFrom', null)
-  ) || (
-    // Caso 5 — voteCount: apenas voteCount sobe +1 (nunca decrementar)
-    'voteCount' in newData.diff(oldData).affectedKeys()
-    && newData.get('voteCount', 0) == oldData.get('voteCount', 0) + 1
-    && newData.get('text', '')       == oldData.get('text', '')
-    && newData.get('selected', false)== oldData.get('selected', false)
-    && newData.get('reactions', {})  == oldData.get('reactions', {})
-  ) || (
-    // Casos 1 e 2 — reação simples ou merge do keep.
-    // merged e mergedInto são permitidos no schema mas não podem virar true/set
-    // neste path (o keep nunca é marcado como merged).
-    newData.keys().hasOnly([
-        'text', 'reactions', 'selected', 'priorityRank',
-        'mergedFrom', 'merged', 'mergedInto', 'unmerged', 'voteCount'
-      ])
+// O SM pode alterar qualquer campo administrativo:
+//   rename   → apenas text muda (outros campos imutáveis)
+//   select   → apenas selected muda
+//   prioritize → apenas priorityRank muda
+//   merge keep → text (opt), reactions (soma), selected (OR), mergedFrom crescem
+//   merge drop → merged=true + mergedInto=<id>
+//   delete   → merged=true + mergedInto='__deleted__'
+//   unmerge keep → merged=true, unmerged=true
+//   unmerge restore → merged=false, mergedInto=null
+//   discussionResult → apenas discussionResult muda
+//
+// Restrições de schema mantidas para todos os campos.
+function isSmMonsterUpdate(newData, oldData) {
+  return newData.keys().hasOnly([
+      'text', 'reactions', 'selected', 'priorityRank',
+      'mergedFrom', 'merged', 'mergedInto', 'unmerged',
+      'voteCount', 'discussionResult'
+    ])
     && newData.get('text', '') is string
     && newData.get('text', '').size() >= 1
     && newData.get('text', '').size() <= 1000
-    && (!('priorityRank' in newData.diff(oldData).affectedKeys())
-        || newData.get('priorityRank', null) is number)
-    && (newData.get('mergedFrom', null) == null || newData.get('mergedFrom', []) is list)
-    && (newData.get('merged', null) == null || newData.get('merged', false) is bool)
-    && (newData.get('mergedInto', null) == null || newData.get('mergedInto', '') is string)
-    && (newData.get('unmerged', null) == null || newData.get('unmerged', false) is bool)
+    && (newData.get('priorityRank', null)  == null || newData.get('priorityRank', null) is number)
+    && (newData.get('mergedFrom',   null)  == null || newData.get('mergedFrom',   [])   is list)
+    && (newData.get('merged',       null)  == null || newData.get('merged',       false) is bool)
+    && (newData.get('mergedInto',   null)  == null || newData.get('mergedInto',   '')   is string)
+    && (newData.get('unmerged',     null)  == null || newData.get('unmerged',     false) is bool)
+    && (newData.get('voteCount',    null)  == null || newData.get('voteCount',    0)    is number)
+    && isValidDiscussionResult(newData.get('discussionResult', null))
+    // Reações nunca podem cair (o SM soma reações no merge do keep).
+    && newData.get('reactions', {}).get('fire', 0) >= oldData.get('reactions', {}).get('fire', 0)
+    && newData.get('reactions', {}).get('eyes', 0) >= oldData.get('reactions', {}).get('eyes', 0)
+    && newData.get('reactions', {}).get('bulb', 0) >= oldData.get('reactions', {}).get('bulb', 0);
+}
+
+// Monstro — atualização por participante anônimo.
+//
+// Participantes só podem:
+//   1. Reagir (+1 por campo, nunca decrementar, máximo +1 por write).
+//      Todos os demais campos devem permanecer inalterados.
+//   2. Votar: apenas voteCount sobe +1.
+//      Todos os demais campos devem permanecer inalterados.
+function isParticipantMonsterUpdate(newData, oldData) {
+  return (
+    // Reação simples: só reactions muda, +1 em exatamente um campo.
+    newData.get('text',      '')    == oldData.get('text',      '')
+    && newData.get('selected', false) == oldData.get('selected', false)
+    && newData.get('merged',   null)  == oldData.get('merged',   null)
+    && newData.get('mergedInto', null)== oldData.get('mergedInto', null)
+    && newData.get('mergedFrom', null)== oldData.get('mergedFrom', null)
+    && newData.get('unmerged', null)  == oldData.get('unmerged', null)
+    && newData.get('priorityRank', null) == oldData.get('priorityRank', null)
+    && newData.get('discussionResult', null) == oldData.get('discussionResult', null)
+    && newData.get('voteCount', null) == oldData.get('voteCount', null)
     // Reações nunca podem cair
     && newData.get('reactions', {}).get('fire', 0) >= oldData.get('reactions', {}).get('fire', 0)
     && newData.get('reactions', {}).get('eyes', 0) >= oldData.get('reactions', {}).get('eyes', 0)
     && newData.get('reactions', {}).get('bulb', 0) >= oldData.get('reactions', {}).get('bulb', 0)
-    // Reação simples (+1 máx por campo) ou merge do keep (mergedFrom cresceu)
-    && (
-      (
-        newData.get('reactions', {}).get('fire', 0) <= oldData.get('reactions', {}).get('fire', 0) + 1
-        && newData.get('reactions', {}).get('eyes', 0) <= oldData.get('reactions', {}).get('eyes', 0) + 1
-        && newData.get('reactions', {}).get('bulb', 0) <= oldData.get('reactions', {}).get('bulb', 0) + 1
-      ) || newData.get('mergedFrom', []).size() > oldData.get('mergedFrom', []).size()
-    )
+    // No máximo +1 por campo por write
+    && newData.get('reactions', {}).get('fire', 0) <= oldData.get('reactions', {}).get('fire', 0) + 1
+    && newData.get('reactions', {}).get('eyes', 0) <= oldData.get('reactions', {}).get('eyes', 0) + 1
+    && newData.get('reactions', {}).get('bulb', 0) <= oldData.get('reactions', {}).get('bulb', 0) + 1
+  ) || (
+    // voteCount: apenas voteCount sobe +1.
+    'voteCount' in newData.diff(oldData).affectedKeys()
+    && newData.diff(oldData).affectedKeys().hasOnly(['voteCount'])
+    && newData.get('voteCount', 0) == oldData.get('voteCount', 0) + 1
+    && newData.get('text',      '')    == oldData.get('text',      '')
+    && newData.get('selected',  false) == oldData.get('selected',  false)
+    && newData.get('reactions', {})    == oldData.get('reactions', {})
+    && newData.get('discussionResult', null) == oldData.get('discussionResult', null)
   );
 }
 
