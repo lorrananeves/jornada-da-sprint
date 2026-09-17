@@ -18,6 +18,24 @@
 import { test as base, expect } from '@playwright/test';
 
 const PROJECT_ID = 'demo-project';
+const AUTH_EMULATOR_URL = 'http://127.0.0.1:9099';
+
+/**
+ * Aguarda o emulador de Auth estar totalmente pronto (responde com 200).
+ * Necessário porque o emulador pode demorar para inicializar no CI,
+ * especialmente quando há download do JAR na primeira execução.
+ */
+async function waitForAuthEmulator(maxWaitMs = 30_000) {
+  const deadline = Date.now() + maxWaitMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${AUTH_EMULATOR_URL}/`).catch(() => null);
+      if (res && res.ok) return;
+    } catch { /* continua tentando */ }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`Auth emulator not ready after ${maxWaitMs}ms`);
+}
 
 /**
  * Aguarda o app renderizar e garante que não estamos na tela de erro.
@@ -42,7 +60,6 @@ async function waitForApp(page) {
  * Os testes podem começar a partir desse estado.
  */
 export const test = base.extend({
-  // eslint-disable-next-line no-empty-pattern
   twoParticipants: async ({ browser }, use) => {
     // ── SM: abre o app e cria a sessão ────────────────────────────────────────
     const smContext = await browser.newContext();
@@ -58,6 +75,11 @@ export const test = base.extend({
     smPage.on('pageerror', (err) => {
       smConsoleLogs.push(`[pageerror] ${err.message}`);
     });
+
+    // Garante que o emulador de Auth está respondendo antes de qualquer interação.
+    // Sem isso, signInAnon() pode travar indefinidamente se o emulador ainda
+    // estiver inicializando (especialmente com download do JAR na primeira execução do CI).
+    await waitForAuthEmulator(30_000);
 
     await smPage.goto('/');
     await waitForApp(smPage);
@@ -110,6 +132,7 @@ export const test = base.extend({
       // Diagnóstico: despeja o estado do SM para entender por que o write falhou
       const smHtml = await smPage.locator('#screen-root').innerHTML().catch(() => '(sem #screen-root)');
       const smState = await smPage.evaluate(() => {
+        // eslint-disable-next-line no-undef
         try { return JSON.parse(localStorage.getItem('jornada_sprint_session') || 'null'); } catch { return null; }
       }).catch(() => null);
       console.log('[DIAG fixture] Firestore não confirmou lobby após 20s. fase atual:', firestorePhase);
@@ -147,6 +170,7 @@ export const test = base.extend({
       // Dump diagnóstico: HTML visível + logs do console
       const html = await memberPage.locator('#screen-root').innerHTML().catch(() => '(sem #screen-root)');
       const storeState = await memberPage.evaluate(() => {
+        // eslint-disable-next-line no-undef
         try { return JSON.parse(localStorage.getItem('jornada_sprint_session') || 'null'); } catch { return null; }
       }).catch(() => null);
       console.log('[DIAG] memberPage HTML no timeout:\n', html.slice(0, 2000));

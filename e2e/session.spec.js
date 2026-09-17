@@ -34,6 +34,7 @@ async function startRetro(smPage, memberPage) {
   } catch (e) {
     const memberHtml = await memberPage.locator('#screen-root').innerHTML().catch(() => '(sem #screen-root)');
     const memberState = await memberPage.evaluate(() => {
+      // eslint-disable-next-line no-undef
       try { return JSON.parse(localStorage.getItem('jornada_sprint_session') || 'null'); } catch { return null; }
     }).catch(() => null);
     console.log('[DIAG startRetro] memberPage HTML:', memberHtml.slice(0, 1500));
@@ -157,7 +158,7 @@ test('SM avança para Discussão a partir de Monstros (botão sempre habilitado)
 // ── 8. Resultado da Discussão por Monstro ─────────────────────────────────────
 
 test('SM define Resultado da Discussão; monstro exibe o resultado em tempo real', async ({ twoParticipants }) => {
-  const { smPage, memberPage, sessionId } = twoParticipants;
+  const { smPage, memberPage } = twoParticipants;
 
   await memberJoin(memberPage);
   await startRetro(smPage, memberPage);
