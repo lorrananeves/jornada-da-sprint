@@ -72,8 +72,9 @@ export const test = base.extend({
       await confirmBtn.click();
     }
 
-    // startNewSession() vai direto para a tela de setup (sem roleSelect/auth)
-    await smPage.waitForSelector('#sprint-name', { timeout: 10_000 });
+    // startNewSession() vai direto para a tela de setup (sem roleSelect/auth).
+    // O signInAnon() pode demorar mais no CI (cold start do emulador de Auth).
+    await smPage.waitForSelector('#sprint-name', { timeout: 20_000 });
 
     // Preenche o mínimo e cria a sessão no Firestore
     await smPage.locator('#sprint-name').fill('Sprint E2E');

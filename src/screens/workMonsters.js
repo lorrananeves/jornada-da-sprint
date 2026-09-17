@@ -19,7 +19,7 @@
 
 import {
   getState, subscribe, addSolution, voteSolution, addMission, removeMission,
-  setState, setPhase, setLocalPhase, completePhase, isSM, signalReady,
+  setPhase, setLocalPhase, completePhase, isSM, signalReady,
 } from '../state/store.js';
 import { showErrorToast } from '../components/toast.js';
 import { showModal } from '../components/modal.js';
@@ -27,7 +27,7 @@ import { uid, escapeHTML, buildReadySignalHTML, attachReadySignal } from '../uti
 import { canCreateMission, canRemoveMission } from '../utils/permissions.js';
 import { getDeviceId } from '../services/presence.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
-import { getPriorityLabel, getStrategyLabel, formatDate } from '../utils/format.js';
+import { getPriorityLabel, formatDate } from '../utils/format.js';
 import { loadSmSessions, loadCollection, patchItem } from '../services/firebase.js';
 import { getCurrentUser } from '../services/auth.js';
 
@@ -70,7 +70,7 @@ async function loadPreviousMissions(currentSessionId, currentTeamName) {
 }
 
 /** Renderiza o badge de prioridade de um monstro */
-function priorityBadge(rank, totalMonsters) {
+function priorityBadge(rank) {
   if (rank === undefined || rank === null) return '';
   const isTop = rank === 0;
   return `<span class="badge ${isTop ? 'badge-danger' : 'badge-info'}" style="font-size:0.7rem">
@@ -117,7 +117,7 @@ export function renderWorkMonsters(root) {
     }
 
     // Constrói o HTML dos cards de monstros
-    const monstersHTML = monsters.map((m, idx) => {
+    const monstersHTML = monsters.map((m) => {
       const expanded = _expanded.has(m.id);
       const monsterSolutions = solutions.filter((s) => s.monsterId === m.id);
       const monsterMissions  = missions.filter((mis) => mis.monsterId === m.id);
@@ -139,7 +139,7 @@ export function renderWorkMonsters(root) {
                 <span class="badge badge-accent" style="font-size:0.7rem">💡 ${m.reactions?.bulb || 0}</span>
                 ${m.voteCount ? `<span class="badge badge-info" style="font-size:0.7rem">🗳️ ${m.voteCount} voto${m.voteCount !== 1 ? 's' : ''}</span>` : ''}
                 ${mergedCount > 0 ? `<span class="badge" style="background:var(--purple-dim);color:var(--purple);font-size:0.7rem">🔗 ${mergedCount + 1} relatos</span>` : ''}
-                ${priorityBadge(m.priorityRank, monsters.length)}
+                ${priorityBadge(m.priorityRank)}
                 ${monsterMissions.length > 0 ? `<span class="badge badge-success" style="font-size:0.7rem">✅ ${monsterMissions.length} ação${monsterMissions.length !== 1 ? 'ões' : ''}</span>` : ''}
               </div>
             </div>
@@ -359,7 +359,7 @@ export function renderWorkMonsters(root) {
     }
   }
 
-  function attachEvents(state) {
+  function attachEvents(_state) {
     attachReadySignal(root, signalReady);
 
     // ── Expandir / recolher card ────────────────────────────────────────────
