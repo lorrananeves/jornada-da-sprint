@@ -231,8 +231,8 @@ test('SM avança até WorkMonsters; card do monstro pode ser expandido', async (
   // O card do monstro está visível na lista
   await expect(smPage.getByText(/Deploy muito manual/i)).toBeVisible({ timeout: 5_000 });
 
-  // O botão para expandir o card está presente
-  await expect(smPage.getByText(/▼ Trabalhar/i)).toBeVisible({ timeout: 5_000 });
+  // O botão para expandir o card está presente (aria-label único)
+  await expect(smPage.locator('[aria-label="Expandir monstro"]').first()).toBeVisible({ timeout: 5_000 });
 });
 
 // ── 10. SM registra solução e ação dentro do card do monstro ──────────────────

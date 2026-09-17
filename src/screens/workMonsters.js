@@ -323,7 +323,7 @@ export function renderWorkMonsters(root) {
 
         <div class="warning-banner" style="margin-bottom:16px">
           <span>💡</span>
-          <span>Clique em <strong>▼ Trabalhar</strong> em cada monstro para expandir e registrar soluções e ações.</span>
+          <span>Clique no botão <strong>Trabalhar</strong> em cada monstro para expandir e registrar soluções e ações.</span>
         </div>
 
         ${prevMissionsHTML}
