@@ -47,17 +47,6 @@
 }
 
 /* ============================================================
-   XP Toast
-   ============================================================ */
-.xp-toast-enter {
-  animation: slideInRight 0.35s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
-}
-
-.xp-toast-exit {
-  animation: slideOutRight 0.3s ease forwards;
-}
-
-/* ============================================================
    Score Button Pulse
    ============================================================ */
 .score-btn.selected {

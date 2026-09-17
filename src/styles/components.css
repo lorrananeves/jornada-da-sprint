@@ -280,32 +280,6 @@
 }
 
 /* ============================================================
-   XP Toast
-   ============================================================ */
-.xp-toast {
-  position: fixed;
-  top: 80px;
-  right: 20px;
-  background: var(--surface);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-lg);
-  padding: 12px 20px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 700;
-  font-size: 1rem;
-  color: var(--accent);
-  box-shadow: var(--glow-accent), var(--shadow-lg);
-  z-index: 900;
-  pointer-events: none;
-}
-
-.xp-toast-icon {
-  font-size: 1.25rem;
-}
-
-/* ============================================================
    Error Toast
    ============================================================ */
 .error-toast {
@@ -328,8 +302,6 @@
   max-width: 360px;
 }
 
-/* Empurra para baixo se um XP toast estiver visível ao mesmo tempo */
-.xp-toast ~ .error-toast,
 .error-toast:not(:first-child) {
   top: 140px;
 }
@@ -341,6 +313,10 @@
 
 .error-toast-enter {
   animation: slideInRight 0.35s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+.error-toast-exit {
+  animation: slideOutRight 0.3s ease forwards;
 }
 
 /* ============================================================
@@ -377,21 +353,7 @@
   text-transform: uppercase;
 }
 
-.xp-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--accent-dim);
-  border: 1px solid var(--accent);
-  border-radius: 100px;
-  padding: 4px 14px;
-  font-weight: 700;
-  font-size: 0.875rem;
-  color: var(--accent);
-  box-shadow: var(--glow-accent);
-}
-
-/* Agrupa o pill de presença + badge de XP à direita da navbar */
+/* Agrupa o pill de presença + badge de conectividade à direita da navbar */
 .navbar-top-right {
   display: flex;
   align-items: center;
@@ -1147,12 +1109,6 @@
   .connectivity-badge {
     padding: 3px 6px;
     gap: 4px;
-  }
-
-  /* XP badge mais compacto */
-  .xp-badge {
-    padding: 3px 8px;
-    font-size: 0.8125rem;
   }
 
   /* Navbar brand menor para caber em telas < 480px */

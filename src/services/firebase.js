@@ -144,15 +144,6 @@ export async function saveSession(sessionId, scalarFields) {
 }
 
 /**
- * Incrementa xp atomicamente — sem risco de race condition.
- * Usa FieldValue.increment para que dois writes simultâneos se somem
- * em vez de um sobrescrever o outro.
- */
-export async function incrementXP(sessionId, amount) {
-  await updateDoc(sessionRef(sessionId), { xp: increment(amount) });
-}
-
-/**
  * Subscribe a mudanças nos campos escalares do documento raiz.
  */
 export function subscribeSession(sessionId, callback) {

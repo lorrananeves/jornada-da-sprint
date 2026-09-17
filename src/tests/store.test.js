@@ -5,7 +5,7 @@
  * - firebase.js → todas as funções retornam Promises/valores neutros
  * - presence.js → getDeviceId() retorna um ID fixo controlável por teste
  *
- * Isso permite testar a lógica de estado pura (fases, XP, controle de
+ * Isso permite testar a lógica de estado pura (fases, controle de
  * acesso SM, subscribers) sem nenhuma conexão com o Firestore.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -38,7 +38,6 @@ vi.mock('../services/firebase.js', () => ({
   loadSession:          vi.fn().mockResolvedValue({ currentPhase: 'home', updatedAt: '1970-01-01T00:00:00.000Z' }),
   loadCollection:       vi.fn().mockResolvedValue([]),
   saveSession:          vi.fn().mockResolvedValue(undefined),
-  incrementXP:          vi.fn().mockResolvedValue(undefined),
   saveItem:             vi.fn().mockResolvedValue(undefined),
   patchItem:            vi.fn().mockResolvedValue(undefined),
   removeItem:           vi.fn().mockResolvedValue(undefined),

@@ -3,7 +3,7 @@
  *
  * O store foi dividido em módulos menores em store/:
  *   store/role.js        — identidade e papel do dispositivo
- *   store/session.js     — estado central, fases, XP, bootstrap
+ *   store/session.js     — estado central, fases, bootstrap
  *   store/collections.js — operações de escrita nas subcoleções Firestore
  *   store/index.js       — re-exporta tudo com a API pública original
  *

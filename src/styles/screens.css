@@ -1245,13 +1245,6 @@
   margin-bottom: 24px;
 }
 
-.complete-xp-total {
-  font-size: 3.5rem;
-  font-weight: 800;
-  color: var(--accent);
-  text-shadow: var(--glow-accent);
-}
-
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -1622,10 +1615,6 @@
   /* Complete: padding reduzido no hero */
   .complete-hero {
     padding: 24px 16px;
-  }
-
-  .complete-xp-total {
-    font-size: 2.5rem;
   }
 
   /* Stats: garante no mínimo 2 colunas bem espaçadas */

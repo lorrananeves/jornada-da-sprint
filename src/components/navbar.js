@@ -8,14 +8,13 @@ import { subscribeConnectivity } from '../services/firebase.js';
 import { qs } from '../utils/dom.js';
 
 const PHASES = [
-  { id: 'setup',     label: 'Setup',      emoji: '⚙️' },
-  { id: 'checkin',   label: 'Check-in',   emoji: '🌡️' },
-  { id: 'treasures', label: 'Tesouros',   emoji: '💎' },
-  { id: 'monsters',  label: 'Monstros',   emoji: '👹' },
-  { id: 'combat',    label: 'Combate',    emoji: '🛡️' },
-  { id: 'missions',  label: 'Missões',    emoji: '🚀' },
-  { id: 'complete',  label: 'Conclusão',  emoji: '🏆' },
-  { id: 'report',    label: 'Relatório',  emoji: '📋' },
+  { id: 'setup',        label: 'Setup',      emoji: '⚙️' },
+  { id: 'checkin',      label: 'Check-in',   emoji: '🌡️' },
+  { id: 'treasures',    label: 'Tesouros',   emoji: '💎' },
+  { id: 'monsters',     label: 'Monstros',   emoji: '👹' },
+  { id: 'workMonsters', label: 'Soluções',   emoji: '🛠️' },
+  { id: 'complete',     label: 'Conclusão',  emoji: '🏆' },
+  { id: 'report',       label: 'Relatório',  emoji: '📋' },
 ];
 
 // Phases where navbar is hidden (no progress bar needed)
@@ -34,7 +33,7 @@ function renderNavbar() {
   if (!root) return;
 
   const state = getState();
-  const { currentPhase, xp, completedPhases } = state;
+  const { currentPhase, completedPhases } = state;
 
   // Oculta navbar nas telas pré-retro
   if (HIDDEN_PHASES.has(currentPhase)) {
@@ -43,12 +42,12 @@ function renderNavbar() {
   }
 
   // Atualização cirúrgica: se o skeleton da navbar já existe, atualiza apenas
-  // os elementos que podem mudar (XP, passos de fase) sem recriar o DOM todo.
+  // os passos de fase sem recriar o DOM todo.
   // Isso evita que as subscriptions de presença e conectividade precisem ser
   // recriadas a cada mudança de estado — elas são abertas uma única vez em
   // initNavbar() e ficam ativas durante toda a sessão.
   if (root.querySelector('nav.navbar')) {
-    _patchNavbar(root, state, currentPhase, xp, completedPhases);
+    _patchNavbar(root, currentPhase, completedPhases);
     return;
   }
 
@@ -67,7 +66,6 @@ function renderNavbar() {
               <span class="online-dot"></span>
               <span class="online-count">${_presenceCount || '–'}</span>
             </span>
-            <span class="xp-badge" id="xp-badge">⭐ ${xp.toLocaleString('pt-BR')} XP</span>
           </div>
         </div>
         <div class="progress-bar-track" id="progress-bar-track" role="progressbar">
@@ -80,11 +78,8 @@ function renderNavbar() {
   _attachPhaseStepClicks(root);
 }
 
-/** Atualiza apenas XP e passos de fase no DOM existente. */
-function _patchNavbar(root, state, currentPhase, xp, completedPhases) {
-  const xpBadge = qs('#xp-badge');
-  if (xpBadge) xpBadge.textContent = `⭐ ${xp.toLocaleString('pt-BR')} XP`;
-
+/** Atualiza apenas os passos de fase no DOM existente. */
+function _patchNavbar(root, currentPhase, completedPhases) {
   const track = qs('#progress-bar-track');
   if (track) {
     track.innerHTML = _buildPhaseSteps(currentPhase, completedPhases);

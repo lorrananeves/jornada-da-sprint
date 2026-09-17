@@ -34,7 +34,7 @@ export function showErrorToast(message) {
 
   _errTimer = setTimeout(() => {
     toast.classList.remove('error-toast-enter');
-    toast.classList.add('xp-toast-exit');
+    toast.classList.add('error-toast-exit');
     setTimeout(() => {
       if (root.contains(toast)) root.removeChild(toast);
     }, 350);
