@@ -7,7 +7,6 @@
 
 import { getState, setPhase, setLocalPhase, completePhase, isSM } from '../state/store.js';
 import { calcSummaryStats, getMoodLabel } from '../services/stats.js';
-import { formatXP } from '../utils/format.js';
 import { escapeHTML } from '../utils/dom.js';
 import { getCurrentUser } from '../services/auth.js';
 
@@ -25,8 +24,6 @@ export function renderComplete(root) {
           ${state.sprint.name ? `Sprint: <strong style="color:var(--text)">${escapeHTML(state.sprint.name)}</strong>` : 'Retrospectiva finalizada'}
           ${state.team.name ? ` · Time: <strong style="color:var(--text)">${escapeHTML(state.team.name)}</strong>` : ''}
         </p>
-        <div class="complete-xp-total">${formatXP(stats.totalXP)}</div>
-        <p class="text-muted" style="margin-top:4px">XP total conquistado pela equipe</p>
       </div>
 
       <div class="stats-grid" role="region" aria-label="Estatísticas da retrospectiva">
@@ -88,7 +85,7 @@ export function renderComplete(root) {
   `;
 
   root.querySelector('#btn-back').addEventListener('click', () => {
-    if (isSM()) setPhase('missions');
+    if (isSM()) setPhase('workMonsters');
     else setLocalPhase('roleSelect');
   });
   root.querySelector('#btn-report').addEventListener('click', () => {

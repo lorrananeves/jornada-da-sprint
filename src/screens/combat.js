@@ -6,10 +6,9 @@
  */
 
 import {
-  getState, subscribe, setState, addSolution, voteSolution, addXP, setPhase, setLocalPhase, completePhase, isSM, signalReady,
+  getState, subscribe, setState, addSolution, voteSolution, setPhase, setLocalPhase, completePhase, isSM, signalReady,
 } from '../state/store.js';
-import { xpForSolution } from '../services/xp.js';
-import { showXPToast, showErrorToast } from '../components/xpToast.js';
+import { showErrorToast } from '../components/toast.js';
 import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
 import { canConvertToMission } from '../utils/permissions.js';
 import { getDeviceId } from '../services/presence.js';
@@ -193,17 +192,12 @@ export function renderCombat(root) {
           strategy: currentStrategy,
           votes: 0,
         });
-        addXP(xpForSolution());
-        showXPToast(xpForSolution(), 'Solução adicionada');
         input.value = '';
         if (_typing) _typing.destroy();
         render();
       } catch (e) {
         console.warn('Firestore addSolution failed:', e);
         showErrorToast('Solução não foi salva — verifique sua conexão.');
-        // Não credita XP: a solução não foi persistida, então o incremento
-        // não é enviado. Nenhuma reversão necessária pois addXP só é chamado
-        // no bloco de sucesso acima.
         addBtn.disabled = false;
       }
     });

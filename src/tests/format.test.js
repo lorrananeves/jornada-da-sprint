@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   formatDate,
-  formatXP,
   truncate,
   getScoreEmoji,
   getScoreLabel,
@@ -24,20 +23,6 @@ describe('formatDate', () => {
   it('retorna "—" para null/undefined', () => {
     expect(formatDate(null)).toBe('—');
     expect(formatDate(undefined)).toBe('—');
-  });
-});
-
-describe('formatXP', () => {
-  it('formata XP com sufixo', () => {
-    expect(formatXP(100)).toContain('XP');
-  });
-
-  it('inclui o número', () => {
-    expect(formatXP(500)).toContain('500');
-  });
-
-  it('lida com zero', () => {
-    expect(formatXP(0)).toContain('0');
   });
 });
 

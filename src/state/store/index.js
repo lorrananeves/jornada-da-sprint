@@ -21,8 +21,6 @@ export {
   setPhase,
   setLocalPhase,
   completePhase,
-  // xp
-  addXP,
   // autenticação / papel
   getRole,
   setRole,

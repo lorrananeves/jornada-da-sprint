@@ -72,7 +72,6 @@ import {
   setPhase,
   setLocalPhase,
   completePhase,
-  addXP,
   addCheckin,
   mergeMonsters,
   unmergeMonster,
@@ -83,7 +82,7 @@ import {
 } from '../state/store.js';
 import { _setSessionId } from '../state/store/session.js';
 
-import { batchWrite, saveSession, incrementXP, saveItem } from '../services/firebase.js';
+import { batchWrite, saveSession, saveItem } from '../services/firebase.js';
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -197,7 +196,7 @@ describe('setPhase', () => {
   });
 
   it('percorre todas as fases em sequência', () => {
-    const fases = ['checkin', 'treasures', 'monsters', 'combat', 'missions', 'complete'];
+    const fases = ['checkin', 'treasures', 'monsters', 'discussion', 'voting', 'workMonsters', 'complete'];
     for (const fase of fases) {
       setPhase(fase);
       expect(getState().currentPhase).toBe(fase);
@@ -232,35 +231,12 @@ describe('completePhase', () => {
   });
 });
 
-// ── addXP ─────────────────────────────────────────────────────────────────────
+// ── Proteção: xp não vaza para Firestore via setState ─────────────────────────
+// O campo xp é legado e nunca deve ser enviado ao Firestore via saveSession.
 
-describe('addXP', () => {
-  it('acumula XP corretamente em chamadas sucessivas', () => {
-    addXP(10);
-    addXP(20);
-    expect(getState().xp).toBe(30);
-  });
-
-  it('retorna o valor adicionado', () => {
-    expect(addXP(50)).toBe(50);
-  });
-
-  it('parte de zero quando estado está limpo', () => {
-    addXP(100);
-    expect(getState().xp).toBe(100);
-  });
-});
-
-// ── Proteção de XP ────────────────────────────────────────────────────────────
-//
-// Garante que xp nunca é enviado como valor absoluto ao Firestore via
-// setScalarState/saveSession. Apenas addXP() pode alterar o XP, usando
-// incrementXP (FieldValue.increment) de forma atômica.
-
-describe('proteção de XP contra escrita absoluta', () => {
+describe('xp legado não vaza para saveSession', () => {
   beforeEach(() => {
     saveSession.mockClear();
-    incrementXP.mockClear();
   });
 
   it('saveSession não recebe o campo xp quando setState é chamado', () => {
@@ -270,33 +246,12 @@ describe('proteção de XP contra escrita absoluta', () => {
     expect(payload).not.toHaveProperty('xp');
   });
 
-  it('addXP usa incrementXP (FieldValue.increment), não saveSession com valor absoluto', () => {
-    addXP(10);
-    // incrementXP deve ter sido chamado com o amount correto
-    expect(incrementXP).toHaveBeenCalledWith('test-session-id', 10);
-    // saveSession não deve ter sido chamado durante o addXP
-    expect(saveSession).not.toHaveBeenCalled();
-  });
-
   it('tentativa de setState({ xp }) não persiste o valor no Firestore', () => {
-    // Simula ataque: participante tenta gravar xp absoluto via setState
     setState({ xp: 999999 });
-    // Estado local aceita (comportamento legítimo do setState local)
-    // mas saveSession não deve receber o campo xp
     const calls = saveSession.mock.calls;
     for (const [, payload] of calls) {
       expect(payload).not.toHaveProperty('xp');
     }
-  });
-
-  it('xp acumulado localmente pelo addXP não vaza para o saveSession', () => {
-    addXP(10);
-    addXP(20);
-    // Qualquer setState subsequente não deve carregar xp no payload do Firestore
-    saveSession.mockClear();
-    setState({ retroStarted: true });
-    const payload = saveSession.mock.calls[0][1];
-    expect(payload).not.toHaveProperty('xp');
   });
 });
 
@@ -314,10 +269,10 @@ describe('setState', () => {
     expect(getState().treasures).toEqual(before);
   });
 
-  it('suporta função updater', () => {
-    setState({ xp: 10 });
-    setState((s) => ({ xp: s.xp + 5 }));
-    expect(getState().xp).toBe(15);
+  it('suporta função updater para campos escalares', () => {
+    setState({ retroStarted: false });
+    setState((s) => ({ retroStarted: !s.retroStarted }));
+    expect(getState().retroStarted).toBe(true);
   });
 
   it('preenche updatedAt após a primeira chamada', () => {

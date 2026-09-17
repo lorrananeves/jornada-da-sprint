@@ -8,7 +8,7 @@
 import { getState, setPhase, setLocalPhase, isSM } from '../state/store.js';
 import { calcSummaryStats, getMoodLabel } from '../services/stats.js';
 import { exportAsPDF, exportAsPNG } from '../services/export.js';
-import { formatDate, formatISO, formatXP, getScoreEmoji, getPriorityLabel, getStrategyLabel, DISCUSSION_TYPES, getDiscussionTypeEmoji, getDiscussionTypeLabel, DISCUSSION_RESULTS, getDiscussionResultEmoji, getDiscussionResultLabel } from '../utils/format.js';
+import { formatDate, formatISO, getScoreEmoji, getPriorityLabel, getStrategyLabel, DISCUSSION_TYPES, getDiscussionTypeEmoji, getDiscussionTypeLabel, DISCUSSION_RESULTS, getDiscussionResultEmoji, getDiscussionResultLabel } from '../utils/format.js';
 import { escapeHTML } from '../utils/dom.js';
 
 export function renderReport(root) {
@@ -160,14 +160,10 @@ export function renderReport(root) {
           </p>
         </div>
 
-        <!-- XP Summary -->
+        <!-- Resumo -->
         <div class="report-section">
-          <div class="report-section-title">⭐ Resultado Geral</div>
+          <div class="report-section-title">📊 Resultado Geral</div>
           <div class="report-kpis">
-            <div class="report-kpi">
-              <div class="report-kpi-value text-accent">${formatXP(stats.totalXP)}</div>
-              <div class="text-xs text-muted">XP Total</div>
-            </div>
             <div class="report-kpi">
               <div class="report-kpi-value" style="color:${mood.color}">${stats.checkinStats.average.toFixed(1)}</div>
               <div class="text-xs text-muted">${mood.label}</div>
@@ -175,6 +171,14 @@ export function renderReport(root) {
             <div class="report-kpi">
               <div class="report-kpi-value text-info">${stats.checkinStats.total}</div>
               <div class="text-xs text-muted">Check-ins</div>
+            </div>
+            <div class="report-kpi">
+              <div class="report-kpi-value text-danger">${stats.monsterCount}</div>
+              <div class="text-xs text-muted">Monstros</div>
+            </div>
+            <div class="report-kpi">
+              <div class="report-kpi-value text-success">${stats.missionCount}</div>
+              <div class="text-xs text-muted">Ações</div>
             </div>
           </div>
         </div>

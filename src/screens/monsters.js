@@ -16,10 +16,9 @@
 import {
   getState, subscribe, addMonster, reactToMonster, prioritizeMonsters,
   mergeMonsters, unmergeMonster, renameMonster, deleteMonster,
-  addXP, setPhase, setLocalPhase, completePhase, isSM, signalReady,
+  setPhase, setLocalPhase, completePhase, isSM, signalReady,
 } from '../state/store.js';
-import { xpForMonster } from '../services/xp.js';
-import { showXPToast, showErrorToast } from '../components/xpToast.js';
+import { showErrorToast } from '../components/toast.js';
 import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
 import { getDeviceId } from '../services/presence.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
@@ -319,8 +318,6 @@ export function renderMonsters(root) {
       addBtn.disabled = true;
       try {
         await addMonster({ id: uid(), text, reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false });
-        addXP(xpForMonster());
-        showXPToast(xpForMonster(), 'Monstro adicionado');
         input.value = '';
         if (_typing) _typing.destroy();
         render();

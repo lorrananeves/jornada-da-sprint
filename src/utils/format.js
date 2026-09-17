@@ -36,13 +36,6 @@ export function formatNumber(n) {
 }
 
 /**
- * Format XP value
- */
-export function formatXP(xp) {
-  return `${formatNumber(xp)} XP`;
-}
-
-/**
  * Truncate a string to maxLen, appending ellipsis
  */
 export function truncate(str, maxLen = 80) {

@@ -6,10 +6,9 @@
  */
 
 import {
-  getState, subscribe, addTreasure, reactToTreasure, addXP, setPhase, setLocalPhase, completePhase, isSM, signalReady,
+  getState, subscribe, addTreasure, reactToTreasure, setPhase, setLocalPhase, completePhase, isSM, signalReady,
 } from '../state/store.js';
-import { xpForTreasure } from '../services/xp.js';
-import { showXPToast, showErrorToast } from '../components/xpToast.js';
+import { showErrorToast } from '../components/toast.js';
 import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
 import { getDeviceId } from '../services/presence.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
@@ -147,9 +146,6 @@ export function renderTreasures(root) {
             category: cat.id,
             reactions: { heart: 0, thumbs: 0, bulb: 0 },
           });
-          const xp = xpForTreasure(cat.id);
-          addXP(xp);
-          showXPToast(xp, `${cat.emoji} ${cat.label} adicionado`);
           textarea.value = '';
           if (_typing) _typing.destroy();
           render();

@@ -18,7 +18,7 @@ import {
   getState, subscribe, setState, setPhase, setLocalPhase, completePhase, isSM, signalReady,
   addDiscussionNote, editDiscussionNote, removeDiscussionNote, setMonsterDiscussionResult,
 } from '../state/store.js';
-import { showErrorToast } from '../components/xpToast.js';
+import { showErrorToast } from '../components/toast.js';
 import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
 import { canManageDiscussionNotes, canSetDiscussionFocus, canConvertToMission, canSetDiscussionResult } from '../utils/permissions.js';
 import { getDeviceId } from '../services/presence.js';

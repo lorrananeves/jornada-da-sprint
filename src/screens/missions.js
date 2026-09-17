@@ -13,10 +13,9 @@
  */
 
 import {
-  getState, subscribe, addMission, removeMission, addXP, setPhase, setLocalPhase, completePhase, setState, isSM, signalReady,
+  getState, subscribe, addMission, removeMission, setPhase, setLocalPhase, completePhase, setState, isSM, signalReady,
 } from '../state/store.js';
-import { xpForMission } from '../services/xp.js';
-import { showXPToast, showErrorToast } from '../components/xpToast.js';
+import { showErrorToast } from '../components/toast.js';
 import { showModal } from '../components/modal.js';
 import { uid, escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
 import { canCreateMission, canRemoveMission } from '../utils/permissions.js';
@@ -286,8 +285,6 @@ export function renderMissions(root) {
       addBtn.disabled = true;
       try {
         await addMission(mission);
-        addXP(xpForMission());
-        showXPToast(xpForMission(), 'Missão adicionada');
         render();
       } catch (e) {
         console.warn('Firestore addMission failed:', e);

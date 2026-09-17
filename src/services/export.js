@@ -223,7 +223,7 @@ export async function exportAsPDF(state, filename = 'jornada-sprint-relatorio.pd
 
   // Importa helpers de formatação inline para não criar dependência circular
   const { calcSummaryStats, getMoodLabel } = await import('./stats.js');
-  const { formatDate, formatISO, formatXP, getScoreEmoji, getPriorityLabel, getStrategyLabel } = await import('../utils/format.js');
+  const { formatDate, formatISO, getScoreEmoji, getPriorityLabel, getStrategyLabel } = await import('../utils/format.js');
 
   const stats = calcSummaryStats(state);
   const mood  = getMoodLabel(stats.checkinStats.average);
@@ -292,9 +292,9 @@ export async function exportAsPDF(state, filename = 'jornada-sprint-relatorio.pd
   const boxY = cur.y;
   cur.ensure(boxH + 12);
 
-  statBox(pdf, MARGIN,                   boxY, boxW, boxH, formatXP(stats.totalXP),                      'XP Total',     C.accent);
-  statBox(pdf, MARGIN + boxW + boxGap,   boxY, boxW, boxH, stats.checkinStats.average.toFixed(1),         mood.label,     C.success);
-  statBox(pdf, MARGIN + (boxW + boxGap) * 2, boxY, boxW, boxH, stats.checkinStats.total,                 'Check-ins',    C.info);
+  statBox(pdf, MARGIN,                       boxY, boxW, boxH, stats.checkinStats.average.toFixed(1), mood.label,   C.success);
+  statBox(pdf, MARGIN + boxW + boxGap,       boxY, boxW, boxH, stats.checkinStats.total,               'Check-ins', C.info);
+  statBox(pdf, MARGIN + (boxW + boxGap) * 2, boxY, boxW, boxH, stats.missionCount,                    'Acoes',     C.accent);
   cur.advance(boxH + 16);
 
   // ── CHECK-IN ───────────────────────────────────────────────────────────────

@@ -14,6 +14,8 @@
  *   6. SM avança para Monstros; membro segue automaticamente (novo fluxo)
  *   7. SM avança para Discussão (sem exigir seleção de monstros)
  *   8. Resultado da Discussão por Monstro
+ *   9. SM avança até WorkMonsters; card do monstro pode ser expandido
+ *  10. SM registra solução e ação dentro do card do monstro
  */
 
 import { test, expect } from './fixtures.js';
@@ -74,8 +76,8 @@ test('Membro registra check-in e SM vê indicador atualizado em tempo real', asy
   await memberPage.locator('.score-btn[data-score="4"]').click();
   await memberPage.locator('#btn-register').click();
 
-  // Aguarda o membro ver o feedback de envio (confirma que o Firestore recebeu)
-  await expect(memberPage.locator('.xp-toast')).toBeVisible({ timeout: 10_000 });
+  // Aguarda o formulário desaparecer (confirma que o Firestore recebeu)
+  await expect(memberPage.locator('.checkin-already-done')).toBeVisible({ timeout: 10_000 });
 
   // SM vê o indicador de respostas atualizado via subscription em tempo real
   await expect(smPage.getByText(/1 de \d+/i)).toBeVisible({ timeout: 20_000 });
@@ -193,4 +195,82 @@ test('SM define Resultado da Discussão; monstro exibe o resultado em tempo real
   // Membro vê o resultado no painel somente-leitura (sincronização em tempo real)
   await expect(memberPage.locator('.discussion-result-panel--readonly')).toBeVisible({ timeout: 20_000 });
   await expect(memberPage.locator('.discussion-result-confirmed')).toContainText(/fizemos um acordo/i, { timeout: 10_000 });
+});
+
+// ── 9. SM avança até WorkMonsters; card aparece expandível ────────────────────
+
+test('SM avança até WorkMonsters; card do monstro pode ser expandido', async ({ twoParticipants }) => {
+  const { smPage, memberPage } = twoParticipants;
+
+  await memberJoin(memberPage);
+  await startRetro(smPage, memberPage);
+
+  // Navega: checkin → tesouros → monstros
+  await smPage.locator('#btn-next').click();
+  await expect(smPage.getByText(/tesouros da sprint/i)).toBeVisible({ timeout: 10_000 });
+  await smPage.locator('#btn-next').click();
+  await expect(smPage.getByText(/monstros da sprint/i)).toBeVisible({ timeout: 10_000 });
+
+  // SM adiciona um monstro
+  await smPage.locator('#monster-input').fill('Deploy muito manual');
+  await smPage.locator('#btn-add-monster').click();
+  await expect(smPage.getByText(/Deploy muito manual/i)).toBeVisible({ timeout: 5_000 });
+
+  // Avança: monstros → discussão → priorização → workMonsters
+  await smPage.locator('#btn-next').click(); // → discussão
+  await expect(smPage.locator('h2.phase-title').getByText(/discussão/i)).toBeVisible({ timeout: 10_000 });
+  await smPage.locator('#btn-next').click(); // → priorização
+  await expect(smPage.getByText(/priorização/i)).toBeVisible({ timeout: 10_000 });
+  await smPage.locator('#btn-next').click(); // → workMonsters
+  await expect(smPage.getByText(/trabalho nos monstros/i)).toBeVisible({ timeout: 10_000 });
+
+  // Membro também chega ao WorkMonsters via Firestore em tempo real
+  await expect(memberPage.getByText(/trabalho nos monstros/i)).toBeVisible({ timeout: 20_000 });
+
+  // O card do monstro está visível na lista
+  await expect(smPage.getByText(/Deploy muito manual/i)).toBeVisible({ timeout: 5_000 });
+
+  // O botão para expandir o card está presente
+  await expect(smPage.getByText(/▼ Trabalhar/i)).toBeVisible({ timeout: 5_000 });
+});
+
+// ── 10. SM registra solução e ação dentro do card do monstro ──────────────────
+
+test('SM registra solução e ação dentro do card; informações persistem', async ({ twoParticipants }) => {
+  const { smPage, memberPage } = twoParticipants;
+
+  await memberJoin(memberPage);
+  await startRetro(smPage, memberPage);
+
+  // Navega até WorkMonsters
+  await smPage.locator('#btn-next').click(); // → tesouros
+  await smPage.locator('#btn-next').click(); // → monstros
+
+  await smPage.locator('#monster-input').fill('Falta de alinhamento');
+  await smPage.locator('#btn-add-monster').click();
+  await expect(smPage.getByText(/Falta de alinhamento/i)).toBeVisible({ timeout: 5_000 });
+
+  await smPage.locator('#btn-next').click(); // → discussão
+  await expect(smPage.locator('h2.phase-title').getByText(/discussão/i)).toBeVisible({ timeout: 10_000 });
+  await smPage.locator('#btn-next').click(); // → priorização
+  await expect(smPage.getByText(/priorização/i)).toBeVisible({ timeout: 10_000 });
+  await smPage.locator('#btn-next').click(); // → workMonsters
+  await expect(smPage.getByText(/trabalho nos monstros/i)).toBeVisible({ timeout: 10_000 });
+
+  // Expande o card do monstro
+  await smPage.locator('[data-toggle-id]').first().click();
+  await expect(smPage.locator('.work-monster-body').first()).toBeVisible({ timeout: 5_000 });
+
+  // SM registra uma solução
+  const monsterId = await smPage.locator('[data-monster-id]').first().getAttribute('data-monster-id');
+  await smPage.locator(`#sol-input-${monsterId}`).fill('Criar reunião semanal de alinhamento');
+  await smPage.locator('[data-add-solution]').first().click();
+  await expect(smPage.getByText(/Criar reunião semanal/i)).toBeVisible({ timeout: 10_000 });
+
+  // SM registra uma ação
+  await smPage.locator(`#action-title-${monsterId}`).fill('Agendar daily de 15min');
+  await smPage.locator('[data-add-mission]').first().click();
+
+  // A ação aparece na lista de ações do card
+  await expect(smPage.getByText(/Agendar daily de 15min/i)).toBeVisible({ timeout: 10_000 });
 });

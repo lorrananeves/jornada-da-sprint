@@ -5,11 +5,10 @@
  * Check-in Screen
  */
 
-import { getState, subscribe, addCheckin, addXP, setPhase, setLocalPhase, completePhase, isSM, signalReady } from '../state/store.js';
+import { getState, subscribe, addCheckin, setPhase, setLocalPhase, completePhase, isSM, signalReady } from '../state/store.js';
 import { escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
-import { xpForCheckin } from '../services/xp.js';
 import { calcCheckinStats, getMoodLabel } from '../services/stats.js';
-import { showXPToast, showErrorToast } from '../components/xpToast.js';
+import { showErrorToast } from '../components/toast.js';
 import { getScoreEmoji, getScoreLabel } from '../utils/format.js';
 import { getDeviceId } from '../services/presence.js';
 import { createPhaseTimer } from '../components/phaseTimer.js';
@@ -233,8 +232,6 @@ export function renderCheckin(root) {
         regBtn.disabled = true;
         try {
           await addCheckin(checkin);
-          addXP(xpForCheckin());
-          showXPToast(xpForCheckin(), 'Check-in registrado');
           // Marca dispositivo como "já respondeu" — impede reenvio nesta sessão de browser
           sessionStorage.setItem(checkinDoneKey(), 'true');
           selectedScore = null;

@@ -19,10 +19,9 @@
 
 import {
   getState, subscribe, prioritizeMonsters, voteOnMonster,
-  addXP, setPhase, setLocalPhase, completePhase, isSM, signalReady,
+  setPhase, setLocalPhase, completePhase, isSM, signalReady,
 } from '../state/store.js';
-import { xpForMonsterVote } from '../services/xp.js';
-import { showXPToast, showErrorToast } from '../components/xpToast.js';
+import { showErrorToast } from '../components/toast.js';
 import { escapeHTML, preserveInputs, buildReadySignalHTML, attachReadySignal } from '../utils/dom.js';
 import { canVoteOnMonster, canPrioritizeMonsters } from '../utils/permissions.js';
 import { getDeviceId } from '../services/presence.js';
@@ -149,7 +148,7 @@ export function renderVoting(root) {
           <button class="btn btn-ghost" id="btn-back">← Voltar</button>
           ${buildReadySignalHTML('voting', state, sm, getDeviceId())}
           ${sm
-            ? `<button class="btn btn-primary" id="btn-next">🎯 IR PARA MISSÕES →</button>`
+            ? `<button class="btn btn-primary" id="btn-next">🛠️ TRABALHAR NOS MONSTROS →</button>`
             : `<span class="text-muted text-sm">Aguardando o Scrum Master avançar…</span>`}
         </div>
       </div>
@@ -193,8 +192,6 @@ export function renderVoting(root) {
           btn.disabled = false;
           showErrorToast('Não foi possível registrar seu voto.');
         } else {
-          addXP(xpForMonsterVote());
-          showXPToast(xpForMonsterVote(), 'Voto registrado!');
           // Atualiza o orçamento de votos sem re-render completo
           const usedNow = myVoteCount(getState().monsterVotes);
           const remaining = MAX_VOTES - usedNow;
@@ -233,7 +230,7 @@ export function renderVoting(root) {
 
     root.querySelector('#btn-next')?.addEventListener('click', () => {
       completePhase('voting');
-      setPhase('missions');
+      setPhase('workMonsters');
     });
   }
 

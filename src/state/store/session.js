@@ -4,7 +4,7 @@
  * Arquitetura de persistência:
  *
  *   Documento raiz  sessions/{id}
- *     sprint, team, currentPhase, retroStarted, xp,
+ *     sprint, team, currentPhase, retroStarted,
  *     smDeviceId, smUid, completedPhases, createdAt, updatedAt
  *
  *   Subcoleções (um documento por item — sem race condition)
@@ -25,7 +25,6 @@
  *   4. Subscriptions em tempo real: doc raiz (fases) + cada subcoleção.
  *   5. Writes:
  *      - Campos escalares  → saveSession() (setDoc merge, só campos raiz)
- *      - XP               → incrementXP() (FieldValue.increment, atômico)
  *      - Adicionar item    → saveItem()    (setDoc no documento do item)
  *      - Atualizar item    → patchItem()   (updateDoc parcial)
  *      - Remover item      → removeItem()  (deleteDoc)
@@ -37,7 +36,6 @@ import {
   loadSession,
   loadCollection,
   saveSession,
-  incrementXP,
   subscribeSession,
   subscribeCollection,
   saveSmProfile,
@@ -45,7 +43,7 @@ import {
 } from '../../services/firebase.js';
 import { getDeviceId } from '../../services/presence.js';
 import { initAuth, getCurrentUser, onAuthChange, signInAnon } from '../../services/auth.js';
-import { showErrorToast } from '../../components/xpToast.js';
+import { showErrorToast } from '../../components/toast.js';
 import { isSM as _isSM } from './role.js';
 import { clearReactionsCache } from '../../services/reactions.js';
 
@@ -60,7 +58,6 @@ const DEFAULT_STATE = () => ({
   team:                { name: '', participantCount: '' },
   currentPhase:        'home',
   retroStarted:        false,
-  xp:                  0,
   smDeviceId:          null,
   smUid:               null,
   completedPhases:     [],
@@ -181,10 +178,7 @@ export function setScalarState(scalars) {
       discussions: _d, monsterVotes: _mv,
       role: _r,
       _guestAutoJoin: _g,
-      // xp nunca é enviado via setScalarState/saveSession — apenas addXP()
-      // pode alterar o XP no Firestore, usando FieldValue.increment atômico.
-      // Enviar um valor absoluto aqui abriria o vetor de qualquer participante
-      // gravar xp = 999999 diretamente no documento raiz.
+      // xp (campo legado) — não é enviado para não sobrescrever sessões antigas.
       xp: _xp,
       // _prefillMission é estado local do SM (pre-preenche o form de missões).
       // Não existe no schema Firestore — enviar causaria rejeição pela Rule.
@@ -308,17 +302,11 @@ async function initFirebase() {
       openSubcollections();
 
       // Guarda de deduplicação: ignora snapshots que não trazem nada novo.
-      // Exceções — sempre aceitar quando:
-      //   1. A fase mudou (evita bug de dois writes no mesmo milissegundo)
-      //   2. O XP mudou — incrementXP() usa FieldValue.increment e não
-      //      atualiza updatedAt, então o snapshot pode chegar com updatedAt
-      //      igual mas xp diferente; descartar esse snapshot causaria
-      //      dessincronização de XP entre participantes.
+      // Exceção — sempre aceitar quando a fase mudou (evita bug de dois writes
+      // no mesmo milissegundo).
       const phaseChanged = remoteScalars.currentPhase && remoteScalars.currentPhase !== _state.currentPhase;
-      const xpChanged    = remoteScalars.xp !== undefined && remoteScalars.xp !== _state.xp;
       if (
         !phaseChanged &&
-        !xpChanged &&
         remoteScalars.updatedAt &&
         _state.updatedAt &&
         remoteScalars.updatedAt <= _state.updatedAt
@@ -377,7 +365,7 @@ export function removeParkingItem(id) {
  * Qualquer participante pode chamar (não requer isSM).
  * Persiste em readySignals[deviceId] = phaseId no doc raiz.
  */
-const VALID_READY_PHASES = new Set(['checkin', 'treasures', 'monsters', 'combat', 'discussion', 'voting', 'missions']);
+const VALID_READY_PHASES = new Set(['checkin', 'treasures', 'monsters', 'combat', 'discussion', 'voting', 'missions', 'workMonsters']);
 
 export function signalReady(phase) {
   if (!VALID_READY_PHASES.has(phase)) return;
@@ -411,21 +399,6 @@ export function completePhase(phase) {
     ? _state.completedPhases
     : [..._state.completedPhases, phase];
   setScalarState({ completedPhases });
-}
-
-// ── XP ────────────────────────────────────────────────────────────────────────
-
-export function addXP(amount) {
-  _state = { ..._state, xp: _state.xp + amount };
-  saveToStorage(_state);
-  notify();
-
-  if (_sessionId) {
-    incrementXP(_sessionId, amount).catch((e) =>
-      console.warn('Firestore XP increment failed:', e)
-    );
-  }
-  return amount;
 }
 
 // ── Reset & Nova sessão ───────────────────────────────────────────────────────

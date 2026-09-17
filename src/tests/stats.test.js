@@ -65,7 +65,6 @@ describe('getMoodLabel', () => {
 
 describe('calcSummaryStats', () => {
   const baseState = {
-    xp: 150,
     checkins:  [{ score: 4 }, { score: 5 }],
     treasures: [
       { category: 'treasure' },
@@ -103,10 +102,6 @@ describe('calcSummaryStats', () => {
     expect(stats.highPriority).toBe(1);
     expect(stats.medPriority).toBe(1);
     expect(stats.lowPriority).toBe(1);
-  });
-
-  it('expõe totalXP do estado', () => {
-    expect(calcSummaryStats(baseState).totalXP).toBe(150);
   });
 
   it('expõe checkinStats calculados', () => {

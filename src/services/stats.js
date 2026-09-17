@@ -66,6 +66,5 @@ export function calcSummaryStats(state) {
     highPriority,
     medPriority,
     lowPriority,
-    totalXP: state.xp,
   };
 }
