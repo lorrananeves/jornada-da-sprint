@@ -46,22 +46,31 @@ jobs:
   deploy-firestore-rules:
     name: Deploy Firestore Rules
     runs-on: ubuntu-latest
-    # Roda sempre que o arquivo de regras (ou este workflow) mudar no main.
-    # O filtro de paths é avaliado pelo GitHub: o job só é enfileirado quando
-    # pelo menos um dos arquivos listados foi alterado no push.
-    if: |
-      contains(github.event.commits.*.modified, 'firestore.rules') ||
-      contains(github.event.commits.*.added,    'firestore.rules') ||
-      contains(github.event.commits.*.modified, '.github/workflows/deploy.yml')
+    # Este job tem seu próprio trigger: roda apenas quando firestore.rules
+    # ou este próprio workflow forem alterados no push para main.
+    # Usa paths-filter (dorny/paths-filter) para detecção confiável —
+    # a expressão `contains(github.event.commits.*.modified, ...)` não
+    # funciona com arrays aninhados e sempre retorna false.
     steps:
       - uses: actions/checkout@v4
 
+      - name: Detectar arquivos alterados
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            rules:
+              - 'firestore.rules'
+              - '.github/workflows/deploy.yml'
+
       - uses: actions/setup-node@v4
+        if: steps.changes.outputs.rules == 'true'
         with:
           node-version: 24
           cache: npm
 
       - run: npm ci
+        if: steps.changes.outputs.rules == 'true'
 
       # Autentica com a service account do Firebase (JSON armazenado como secret).
       # Para criar o secret: Firebase Console → Configurações do projeto →
@@ -72,6 +81,7 @@ jobs:
       # um arquivo em disco — não aceita o JSON inline. Escrevemos o conteúdo
       # do secret num arquivo temporário e apontamos a variável para ele.
       - name: Deploy Firestore security rules
+        if: steps.changes.outputs.rules == 'true'
         run: |
           echo "$SA_JSON" > /tmp/sa.json
           GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json \
