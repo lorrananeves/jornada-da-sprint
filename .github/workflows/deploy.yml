@@ -72,20 +72,18 @@ jobs:
       - run: npm ci
         if: steps.changes.outputs.rules == 'true'
 
-      # Autentica com a service account do Firebase (JSON armazenado como secret).
-      # Para criar o secret: Firebase Console → Configurações do projeto →
-      # Contas de serviço → Gerar nova chave privada → copie o JSON completo
-      # e salve como secret FIREBASE_SERVICE_ACCOUNT no GitHub.
-      #
-      # A firebase-tools requer que GOOGLE_APPLICATION_CREDENTIALS aponte para
-      # um arquivo em disco — não aceita o JSON inline. Escrevemos o conteúdo
-      # do secret num arquivo temporário e apontamos a variável para ele.
+      # Autentica via CI token gerado com `firebase login:ci`.
+      # Para criar o secret:
+      #   1. Na sua máquina: npx firebase-tools login:ci
+      #   2. Copie o token exibido no terminal
+      #   3. No GitHub: Settings → Secrets → Actions → New secret
+      #      Nome: FIREBASE_TOKEN   Valor: <token copiado>
       - name: Deploy Firestore security rules
         if: steps.changes.outputs.rules == 'true'
         run: |
-          echo "$SA_JSON" > /tmp/sa.json
-          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json \
-            npx firebase-tools deploy --only firestore:rules --project "$PROJECT_ID"
+          npx firebase-tools deploy --only firestore:rules \
+            --project "$PROJECT_ID" \
+            --token "$FIREBASE_TOKEN"
         env:
-          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
           PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
