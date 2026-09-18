@@ -13,7 +13,7 @@
  *   Doc raiz (sessions/{id})
  *     ✅ writes legítimos permitidos
  *     ❌ participante altera campos SM-only (sprint, team, currentPhase…)
- *     ❌ participante manipula xp
+ *     ❌ participante tenta gravar campo xp (removido do schema)
  *     ❌ participante altera identidade (smDeviceId, smUid)
  *     ❌ readySignals: sinalizações indevidas
  *
@@ -88,7 +88,6 @@ const BASE_SESSION = {
   createdAt:       '2025-01-01T10:00:00.000Z',
   sprint:          { name: 'Sprint 1', startDate: '2025-01-01', endDate: '2025-01-14' },
   team:            { name: 'Time A', participantCount: 3 },
-  xp:              0,
   completedPhases: [],
   combatMonsterIdx: 0,
   combatStrategy:  'prevent',
@@ -325,10 +324,10 @@ describe('doc raiz — participante NÃO pode alterar campos SM-only', () => {
   });
 });
 
-describe('doc raiz — manipulação de XP', () => {
-  beforeEach(async () => { await seedSession({ ...BASE_SESSION, xp: 50 }); });
+describe('doc raiz — campo xp removido do schema', () => {
+  beforeEach(async () => { await seedSession(); });
 
-  it('❌ participante não pode zerar o xp', async () => {
+  it('❌ qualquer write com campo xp é rejeitado (campo fora do hasOnly)', async () => {
     await assertFails(
       setDoc(sessionDoc(anonDb()), {
         ...BASE_SESSION,
@@ -338,31 +337,11 @@ describe('doc raiz — manipulação de XP', () => {
     );
   });
 
-  it('❌ participante não pode gravar xp absurdo diretamente', async () => {
+  it('❌ SM também não pode gravar xp (campo removido do schema)', async () => {
     await assertFails(
-      setDoc(sessionDoc(anonDb()), {
+      setDoc(sessionDoc(smDb()), {
         ...BASE_SESSION,
         xp: 999999,
-        updatedAt: '2025-01-01T13:00:00.000Z',
-      }, { merge: true })
-    );
-  });
-
-  it('❌ participante não pode subir xp mais de 30 pts por write', async () => {
-    await assertFails(
-      setDoc(sessionDoc(anonDb()), {
-        ...BASE_SESSION,
-        xp: 131,  // 50 + 81 — acima do máximo de +30 por write
-        updatedAt: '2025-01-01T13:00:00.000Z',
-      }, { merge: true })
-    );
-  });
-
-  it('✅ xp pode subir até +30 por write (missão = maior recompensa)', async () => {
-    await assertSucceeds(
-      setDoc(sessionDoc(anonDb()), {
-        ...BASE_SESSION,
-        xp: 80,   // 50 + 30 — exatamente o máximo
         updatedAt: '2025-01-01T13:00:00.000Z',
       }, { merge: true })
     );

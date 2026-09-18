@@ -30,10 +30,6 @@ service cloud.firestore {
         // smDeviceId e smUid são imutáveis após a criação da sessão:
         // nenhum participante — nem mesmo o SM — pode alterá-los via update.
         && !isChangingIdentityFields(request.resource.data, resource.data)
-        // xp só pode crescer e o incremento por operação é limitado ao maior
-        // valor de XP do jogo (30 pts — criação de missão). Impede que qualquer
-        // cliente grave um valor absoluto arbitrário (ex: xp = 999999).
-        && isXpUpdateValid(request.resource.data, resource.data)
         // Campos exclusivos do SM: qualquer alteração exige Auth == smUid.
         // Inclui sprint, team, retroStarted, phaseDurations, phaseStartedAt,
         // currentPhase e completedPhases. Participantes só podem tocar em
@@ -254,7 +250,7 @@ function isValidSessionRoot(data) {
     data.keys().hasAll(['currentPhase', 'updatedAt', 'smDeviceId'])
     && data.keys().hasOnly([
       'sprint', 'team', 'currentPhase', 'retroStarted',
-      'xp', 'completedPhases', 'createdAt', 'updatedAt', 'smDeviceId',
+      'completedPhases', 'createdAt', 'updatedAt', 'smDeviceId',
       'phaseDurations', 'phaseStartedAt', 'smUid',
       // campos sincronizados entre participantes (legado)
       'combatMonsterIdx', 'combatStrategy',
@@ -269,8 +265,6 @@ function isValidSessionRoot(data) {
     && data.updatedAt is string
     && data.smDeviceId is string
     && data.smDeviceId.size() <= 32
-    && data.get('xp', 0) is number
-    && data.get('xp', 0) >= 0
     && data.get('retroStarted', false) is bool
     && data.get('completedPhases', []).size() <= 20
     && data.get('combatMonsterIdx', 0) is number
@@ -376,21 +370,6 @@ function isChangingIdentityFields(newData, oldData) {
     || newData.get('smUid', null) != oldData.get('smUid', null);
 }
 
-// Valida alterações no campo xp:
-//   1. xp nunca pode diminuir (impede "zerar" ou manipular pontuação).
-//   2. O incremento por write é limitado a 30 pts — o maior valor de XP
-//      do jogo (criação de missão). Impede escritas absolutas arbitrárias
-//      como xp = 999999, que passariam pela validação de tipo (is number && >= 0).
-//
-// Nota: o frontend legítimo só grava xp via FieldValue.increment em addXP(),
-// nunca via setScalarState/saveSession. Esta rule é uma camada de defesa
-// extra no servidor para o caso de chamadas diretas à API do Firestore.
-function isXpUpdateValid(newData, oldData) {
-  let newXp = newData.get('xp', 0);
-  let oldXp = oldData.get('xp', 0);
-  return newXp >= oldXp && newXp <= oldXp + 30;
-}
-
 // Verifica se o request vem do Scrum Master legítimo da sessão.
 //
 // Dois modos:
@@ -407,36 +386,6 @@ function isScrumMaster(newData, oldData) {
     : (newData.get('smDeviceId', '') == oldData.get('smDeviceId', '')
        && oldData.get('smDeviceId', '').size() > 0);
 }
-
-// Verifica se o request vem do Scrum Master a partir de uma subcoleção.
-//
-// Lê o documento raiz da sessão via get() e delega para isScrumMaster.
-// Usada nas subcoleções (ex: discussions) onde o doc pai não está disponível
-// diretamente como resource.data.
-//
-// Nota sobre o modo sem conta: assim como isScrumMaster, aceita o smDeviceId
-// presente no header x-sm-device (request.resource.data não tem smDeviceId).
-// Como a subcoleção não carrega smDeviceId, o único modo seguro é smUid.
-// Para sessões sem smUid, usamos o mesmo padrão de isScrumMaster: o request.auth
-// não existe, portanto a verificação cai no ramo do smDeviceId. Contudo, nas
-// subcoleções não há como confrontar o smDeviceId do request com o do doc pai
-// via request.resource.data — portanto apenas o ramo com smUid é enforcement real.
-// Sessões sem smUid ficam protegidas pelo sessionId de 32 hex chars (obscuridade),
-// que é o compromisso documentado no restante do código.
-function isSessionScrumMaster(sessionId) {
-  // get() retorna um objeto com .exists e .data — usamos .exists para evitar
-  // Null value error quando o documento ainda não foi criado.
-  let doc = get(/databases/$(database)/documents/sessions/$(sessionId));
-  let session = doc.data;
-  // Sessão com conta: valida uid. Sem conta: qualquer deviceId não-vazio.
-  return doc.exists
-      && ((session.get('smUid', null) != null
-           && request.auth != null
-           && request.auth.uid == session.get('smUid', ''))
-       || (session.get('smUid', null) == null
-           && session.get('smDeviceId', '').size() > 0));
-}
-
 
 // ── Validadores de subcoleção ─────────────────────────────────────────────────
 
