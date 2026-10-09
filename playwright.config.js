@@ -19,6 +19,9 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     // Vídeo só em falha no CI
     video: process.env.CI ? 'retain-on-failure' : 'off',
+    // Desabilita animações CSS/JS para evitar falsos "element not stable"
+    // causados por slideUp/fadeIn nos modais durante interação do Playwright.
+    reducedMotion: 'reduce',
   },
 
   projects: [
