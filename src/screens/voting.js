@@ -29,8 +29,6 @@ import { createPhaseTimer } from '../components/phaseTimer.js';
 import { getDiscussionTypeEmoji } from '../utils/format.js';
 import { hasReacted } from '../services/reactions.js';
 
-const MAX_VOTES = 3;
-
 /** Conta quantos votos o dispositivo atual já deu nessa sessão */
 function myVoteCount(monsterVotes) {
   const deviceId = getDeviceId();
@@ -51,7 +49,7 @@ function getNoteSummary(discussions, monsterId) {
   return sorted.slice(0, 2);
 }
 
-function buildMonsterVoteCard(m, discussions, sessionId, myVotes, canVote) {
+function buildMonsterVoteCard(m, discussions, sessionId, myVotes, canVote, voteLimit = 3) {
   const voted = hasVotedOnMonster(sessionId, m.id);
   const noteSummary = getNoteSummary(discussions, m.id);
   const voteCount = m.voteCount || 0;
@@ -84,10 +82,10 @@ function buildMonsterVoteCard(m, discussions, sessionId, myVotes, canVote) {
       ${canVote ? `
         <button class="btn ${voted ? 'btn-success' : 'btn-ghost'} btn-sm monster-vote-btn"
           data-vote-monster="${escapeHTML(m.id)}"
-          ${voted || myVotes >= MAX_VOTES ? 'disabled' : ''}
+          ${voted || myVotes >= voteLimit ? 'disabled' : ''}
           aria-pressed="${voted}"
-          title="${voted ? 'Já votou neste problema' : myVotes >= MAX_VOTES ? 'Você já usou todos os votos' : 'Votar neste problema'}">
-          ${voted ? '✅ Votou' : myVotes >= MAX_VOTES ? '— Votos esgotados' : '🗳️ Votar'}
+          title="${voted ? 'Já votou neste problema' : myVotes >= voteLimit ? 'Você já usou todos os votos' : 'Votar neste problema'}">
+          ${voted ? '✅ Votou' : myVotes >= voteLimit ? '— Votos esgotados' : '🗳️ Votar'}
         </button>
       ` : ''}
     </div>
@@ -102,8 +100,9 @@ export function renderVoting(root) {
     const { monsters, discussions, monsterVotes } = state;
     const sm = isSM();
     const sessionId = new URLSearchParams(window.location.search).get('s') || '';
+    const voteLimit = Number(state.votesPerParticipant) || 3;
     const used = myVoteCount(monsterVotes);
-    const remaining = MAX_VOTES - used;
+    const remaining = voteLimit - used;
 
     preserveInputs(root, () => { root.innerHTML = `
       <div class="screen-voting screen-enter">
@@ -120,9 +119,9 @@ export function renderVoting(root) {
         <div class="voting-budget-banner">
           <span class="voting-budget-icon">🗳️</span>
           <div>
-            <div class="voting-budget-title">Seus votos disponíveis</div>
+            <div class="voting-budget-title">Seus votos disponíveis (${voteLimit} no total)</div>
             <div class="voting-budget-dots">
-              ${Array.from({ length: MAX_VOTES }, (_, i) =>
+              ${Array.from({ length: voteLimit }, (_, i) =>
                 `<span class="voting-budget-dot${i < used ? ' voting-budget-dot--used' : ''}"></span>`
               ).join('')}
             </div>
@@ -140,7 +139,7 @@ export function renderVoting(root) {
 
         <div class="voting-monsters-list" id="voting-monsters-list">
           ${monsters.map((m) =>
-            buildMonsterVoteCard(m, discussions, sessionId, used, canVoteOnMonster())
+            buildMonsterVoteCard(m, discussions, sessionId, used, canVoteOnMonster(), voteLimit)
           ).join('')}
         </div>
 
@@ -172,7 +171,8 @@ export function renderVoting(root) {
         // Proteção client-side imediata
         if (hasVotedOnMonster(sessionId, monsterId)) return;
         const state = getState();
-        if (myVoteCount(state.monsterVotes) >= MAX_VOTES) return;
+        const voteLimitNow = Number(state.votesPerParticipant) || 3;
+        if (myVoteCount(state.monsterVotes) >= voteLimitNow) return;
 
         btn.disabled = true;
 
@@ -193,8 +193,10 @@ export function renderVoting(root) {
           showErrorToast('Não foi possível registrar seu voto.');
         } else {
           // Atualiza o orçamento de votos sem re-render completo
-          const usedNow = myVoteCount(getState().monsterVotes);
-          const remaining = MAX_VOTES - usedNow;
+          const stateAfter = getState();
+          const usedNow = myVoteCount(stateAfter.monsterVotes);
+          const voteLimitAfter = Number(stateAfter.votesPerParticipant) || 3;
+          const remaining = voteLimitAfter - usedNow;
           const dots = root.querySelectorAll('.voting-budget-dot');
           dots.forEach((d, i) => d.classList.toggle('voting-budget-dot--used', i < usedNow));
           const label = root.querySelector('.voting-budget-remaining');
@@ -205,7 +207,7 @@ export function renderVoting(root) {
             label.className = `voting-budget-remaining ${remaining === 0 ? 'text-muted' : 'text-accent'}`;
           }
           // Desabilita outros botões se atingiu o limite
-          if (usedNow >= MAX_VOTES) {
+          if (usedNow >= voteLimitAfter) {
             root.querySelectorAll('[data-vote-monster]').forEach((b) => {
               if (!b.classList.contains('btn-success')) {
                 b.disabled = true;

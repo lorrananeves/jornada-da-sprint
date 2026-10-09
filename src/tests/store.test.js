@@ -79,6 +79,7 @@ import {
   resetState,
   setMonsterDiscussionResult,
   setVotingClosed,
+  setVotingConfig,
   voteOnMonster,
 } from '../state/store.js';
 import { _setSessionId } from '../state/store/session.js';
@@ -987,5 +988,244 @@ describe('voteOnMonster — respeita votingClosed', () => {
     const result = await voteOnMonster('monster-vc-legacy');
     expect(castMonsterVote).toHaveBeenCalled();
     expect(result).toBe(true);
+  });
+});
+
+// ── setVotingConfig ──────────────────────────────────────────────────────────
+
+describe('setVotingConfig', () => {
+  beforeEach(() => {
+    setState({ smDeviceId: DEVICE_SM });
+    _mocks.currentDeviceId = DEVICE_SM;
+  });
+
+  it('votesPerParticipant começa como 3 no DEFAULT_STATE', () => {
+    expect(getState().votesPerParticipant).toBe(3);
+  });
+
+  it('SM pode definir votesPerParticipant válido', () => {
+    setVotingConfig({ votesPerParticipant: 2, votingClosed: false });
+    expect(getState().votesPerParticipant).toBe(2);
+  });
+
+  it('SM pode definir votesPerParticipant=1 (limite mínimo)', () => {
+    setVotingConfig({ votesPerParticipant: 1, votingClosed: false });
+    expect(getState().votesPerParticipant).toBe(1);
+  });
+
+  it('setVotingConfig persiste votingClosed junto com votesPerParticipant', () => {
+    setVotingConfig({ votesPerParticipant: 2, votingClosed: false });
+    expect(getState().votingClosed).toBe(false);
+    expect(getState().votesPerParticipant).toBe(2);
+  });
+
+  it('setVotingConfig seta votingStarted=true', () => {
+    expect(getState().votingStarted).toBe(false);
+    setVotingConfig({ votesPerParticipant: 2, votingClosed: false });
+    expect(getState().votingStarted).toBe(true);
+  });
+
+  it('setVotingConfig é no-op para participante não-SM', () => {
+    _mocks.currentDeviceId = DEVICE_TEAM;
+    setVotingConfig({ votesPerParticipant: 5, votingClosed: false });
+    expect(getState().votesPerParticipant).toBe(3); // default inalterado
+  });
+
+  it('setVotingConfig rejeita votesPerParticipant=0 (inválido)', () => {
+    setVotingConfig({ votesPerParticipant: 0, votingClosed: false });
+    expect(getState().votesPerParticipant).toBe(3); // não alterou
+  });
+
+  it('setVotingConfig rejeita valor negativo', () => {
+    setVotingConfig({ votesPerParticipant: -1, votingClosed: false });
+    expect(getState().votesPerParticipant).toBe(3); // não alterou
+  });
+
+  it('setVotingConfig persiste via saveSession', () => {
+    saveSession.mockClear();
+    setVotingConfig({ votesPerParticipant: 2, votingClosed: false });
+    expect(saveSession).toHaveBeenCalled();
+    const [[, data]] = saveSession.mock.calls;
+    expect(data.votesPerParticipant).toBe(2);
+  });
+
+  it('setVotingConfig notifica subscribers', () => {
+    const listener = vi.fn();
+    const unsub = subscribe(listener);
+    listener.mockClear();
+    setVotingConfig({ votesPerParticipant: 2, votingClosed: false });
+    expect(listener).toHaveBeenCalled();
+    expect(listener.mock.calls[0][0].votesPerParticipant).toBe(2);
+    unsub();
+  });
+
+  it('snapshot remoto com votesPerParticipant é refletido no estado', () => {
+    _mocks.sessionCallback?.({
+      currentPhase: 'monsters',
+      votesPerParticipant: 5,
+      updatedAt: new Date(Date.now() + 10000).toISOString(),
+    });
+    expect(getState().votesPerParticipant).toBe(5);
+  });
+
+  it('sessão legada sem votesPerParticipant usa default 3 via fallback no store', () => {
+    // Simula sessão legada: snapshot sem o campo
+    _mocks.sessionCallback?.({
+      currentPhase: 'monsters',
+      updatedAt: new Date(Date.now() + 10000).toISOString(),
+    });
+    // votesPerParticipant não foi enviado → continua com o valor do DEFAULT_STATE
+    expect(getState().votesPerParticipant).toBe(3);
+  });
+});
+
+// ── voteOnMonster — respeita votesPerParticipant configurável ────────────────
+
+describe('voteOnMonster — respeita votesPerParticipant', () => {
+  beforeEach(() => {
+    setState({ smDeviceId: DEVICE_SM });
+    _mocks.currentDeviceId = DEVICE_TEAM;
+    castMonsterVote.mockResolvedValue(undefined);
+    _mocks.colCallbacks.monsterVotes?.([]);
+  });
+
+  it('bloqueia voto quando limite 1 foi atingido', async () => {
+    setState({ votesPerParticipant: 1, votingClosed: false });
+    // Simula que o participante já votou em um monstro
+    _mocks.colCallbacks.monsterVotes?.([
+      { id: `${DEVICE_TEAM}_monster-vpp-1`, deviceId: DEVICE_TEAM, monsterId: 'monster-vpp-1' },
+    ]);
+    castMonsterVote.mockClear();
+    const result = await voteOnMonster('monster-vpp-2');
+    expect(castMonsterVote).not.toHaveBeenCalled();
+    expect(result).toBe(false);
+  });
+
+  it('permite voto quando limite 2 e só 1 voto usado', async () => {
+    setState({ votesPerParticipant: 2, votingClosed: false });
+    _mocks.colCallbacks.monsterVotes?.([
+      { id: `${DEVICE_TEAM}_monster-vpp-first`, deviceId: DEVICE_TEAM, monsterId: 'monster-vpp-first' },
+    ]);
+    castMonsterVote.mockClear();
+    const result = await voteOnMonster('monster-vpp-second');
+    expect(castMonsterVote).toHaveBeenCalled();
+    expect(result).toBe(true);
+  });
+
+  it('bloqueia voto quando limite 2 e 2 votos já usados', async () => {
+    setState({ votesPerParticipant: 2, votingClosed: false });
+    _mocks.colCallbacks.monsterVotes?.([
+      { id: `${DEVICE_TEAM}_monster-vpp-a`, deviceId: DEVICE_TEAM, monsterId: 'monster-vpp-a' },
+      { id: `${DEVICE_TEAM}_monster-vpp-b`, deviceId: DEVICE_TEAM, monsterId: 'monster-vpp-b' },
+    ]);
+    castMonsterVote.mockClear();
+    const result = await voteOnMonster('monster-vpp-c');
+    expect(castMonsterVote).not.toHaveBeenCalled();
+    expect(result).toBe(false);
+  });
+
+  it('sessão legada sem votesPerParticipant aplica default 3', async () => {
+    // Não seta votesPerParticipant — deve usar o valor 3 do DEFAULT_STATE
+    setState({ votingClosed: false });
+    expect(getState().votesPerParticipant).toBe(3);
+    // 2 votos usados → ainda pode votar (limite 3)
+    _mocks.colCallbacks.monsterVotes?.([
+      { id: `${DEVICE_TEAM}_m-legacy-1`, deviceId: DEVICE_TEAM, monsterId: 'm-legacy-1' },
+      { id: `${DEVICE_TEAM}_m-legacy-2`, deviceId: DEVICE_TEAM, monsterId: 'm-legacy-2' },
+    ]);
+    castMonsterVote.mockClear();
+    const result = await voteOnMonster('m-legacy-3');
+    expect(castMonsterVote).toHaveBeenCalled();
+    expect(result).toBe(true);
+  });
+});
+
+// ── Cenários adversariais — o que o store bloqueia vs o que depende das Rules ──
+//
+// Estes testes documentam explicitamente os dois planos de defesa:
+//   - Store (client-side): bloqueia antes de chamar castMonsterVote
+//   - Firestore Rules (server-side): rejeitam mesmo se o cliente contornar o store
+//
+// Os testes do store só cobrem o plano 1 (mocks de firebase.js).
+// O plano 2 é testado nos testes de Rules (rules/rules.test.js) com emulador.
+
+describe('cenários adversariais — proteção client-side do store', () => {
+  beforeEach(() => {
+    setState({ smDeviceId: DEVICE_SM });
+    _mocks.currentDeviceId = DEVICE_TEAM;
+    castMonsterVote.mockResolvedValue(undefined);
+    _mocks.colCallbacks.monsterVotes?.([]);
+  });
+
+  it('store rejeita voto acima do limite — castMonsterVote NÃO é chamado', async () => {
+    // Adversário tenta votar após atingir o limite 1 modificando apenas o estado local.
+    // O store lê monsterVotes do estado, que foi preenchido pela subscription.
+    setState({ votesPerParticipant: 1, votingClosed: false });
+    _mocks.colCallbacks.monsterVotes?.([
+      { id: `${DEVICE_TEAM}_adv-m1`, deviceId: DEVICE_TEAM, monsterId: 'adv-m1' },
+    ]);
+    castMonsterVote.mockClear();
+    const result = await voteOnMonster('adv-m2');
+    // Store deve bloquear ANTES de chamar o Firestore
+    expect(castMonsterVote).not.toHaveBeenCalled();
+    expect(result).toBe(false);
+  });
+
+  it('store rejeita voto duplicado no mesmo monstro — hasReacted bloqueia', async () => {
+    // Simula que o participante já votou neste monstro (reactions cache + monsterVotes)
+    setState({ votesPerParticipant: 3, votingClosed: false });
+    // Injeta o voto anterior tanto no estado quanto no cache de reações
+    _mocks.colCallbacks.monsterVotes?.([
+      { id: `${DEVICE_TEAM}_adv-dup`, deviceId: DEVICE_TEAM, monsterId: 'adv-dup' },
+    ]);
+    // Primeira votação — bem-sucedida
+    castMonsterVote.mockClear();
+    await voteOnMonster('adv-dup'); // hasReacted ainda não marcado nesta execução
+
+    // Segunda tentativa no mesmo monstro — deve ser bloqueada pela marcação hasReacted
+    // (markReacted foi chamado internamente no sucesso anterior)
+    castMonsterVote.mockClear();
+    const result = await voteOnMonster('adv-dup');
+    expect(castMonsterVote).not.toHaveBeenCalled();
+    expect(result).toBe(false);
+  });
+
+  it('store rejeita voto quando votingClosed=true — mesmo que Firestore estivesse aberto', async () => {
+    setState({ smDeviceId: DEVICE_SM });
+    _mocks.currentDeviceId = DEVICE_SM;
+    setState({ votingClosed: true, votesPerParticipant: 3 });
+    _mocks.currentDeviceId = DEVICE_TEAM;
+    castMonsterVote.mockClear();
+    const result = await voteOnMonster('adv-closed');
+    expect(castMonsterVote).not.toHaveBeenCalled();
+    expect(result).toBe(false);
+  });
+
+  it('store propaga erro do Firestore quando voteTracker rejeita na Rule', async () => {
+    // Simula rejeição das Rules (ex: limite atingido no servidor mas não no cliente local)
+    // O castMonsterVote lança um erro genérico que o store captura e retorna false
+    setState({ votesPerParticipant: 2, votingClosed: false });
+    _mocks.colCallbacks.monsterVotes?.([]);
+    castMonsterVote.mockRejectedValue(new Error('permission-denied'));
+    castMonsterVote.mockClear();
+    const result = await voteOnMonster('adv-server-reject');
+    // Store chamou castMonsterVote (passou as verificações client-side)
+    expect(castMonsterVote).toHaveBeenCalled();
+    // Mas retorna false pois o Firestore rejeitou
+    expect(result).toBe(false);
+  });
+
+  it('store NÃO protege contra bypass direto do Firestore — documentado explicitamente', () => {
+    // Este teste documenta a limitação conhecida:
+    // Se alguém chamar castMonsterVote() diretamente, contornando voteOnMonster(),
+    // o store não pode impedir. A proteção está nas Firestore Security Rules
+    // via voteTokens/{deviceId} (testado nos testes de Rules com emulador).
+    //
+    // Confirma que castMonsterVote é exportado por firebase.js (acessível a atacantes)
+    // e que a defesa real está no servidor.
+    expect(typeof castMonsterVote).toBe('function');
+    // A proteção no servidor é: isValidVoteTrackerCreate/Update valida count <= limit
+    // via get(sessionDoc).data.votesPerParticipant nas Firestore Security Rules.
+    // Ver rules/rules.test.js para testes adversariais do servidor.
   });
 });

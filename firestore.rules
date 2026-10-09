@@ -143,13 +143,10 @@ service cloud.firestore {
           && request.auth != null;
       }
 
-      // ── Votos em monstros ─────────────────────────────────────────────────
-      // ID do documento: {deviceId}_{monsterId} — create falha se já existir.
-      // Unicidade garante 1 voto por dispositivo por monstro sem transação extra.
-      //
-      // Proteção de encerramento: lemos votingClosed do doc raiz via get().
-      // Se votingClosed == true, novos votos são rejeitados pelo Firestore mesmo
-      // que o cliente ignore os controles da interface.
+      // ── Votos em monstros — token de unicidade ────────────────────────────
+      // ID: {deviceId}_{monsterId} — create falha se já existir.
+      // Garante 1 voto por dispositivo por monstro (prevenção de duplicata).
+      // O limite total por dispositivo é aplicado em voteTokens/{deviceId}.
       match /monsterVotes/{tokenId} {
         allow read: if validSessionId(sessionId);
         allow create: if
@@ -158,6 +155,45 @@ service cloud.firestore {
           && isValidMonsterVote(request.resource.data)
           && !isVotingClosed(database, sessionId);
         allow update, delete: if false;
+      }
+
+      // ── Registro de votos por dispositivo — enforcement do limite total ───
+      //
+      // Cada dispositivo tem um único documento voteTokens/{deviceId} que
+      // mantém { count: N, monsters: [...ids], deviceId: "..." }.
+      //
+      // Invariantes garantidas no servidor (independem do cliente):
+      //   (a) count <= votesPerParticipant do doc raiz
+      //   (b) count aumenta exatamente +1 por operação
+      //   (c) todos os monstros anteriores estão preservados na lista (hasAll)
+      //   (d) exatamente 1 novo monstro é adicionado por operação
+      //   (e) deviceId do documento == deviceId do path (o dono escreve só no próprio doc)
+      //   (f) votingClosed == false no doc raiz
+      //   (g) delete e update de campo arbitrário são proibidos
+      //
+      // Nota sobre (c): a verificação hasAll() impede o ataque de substituição
+      // parcial [A,B]→[A,C] que passaria apenas na verificação de tamanho +1.
+      //
+      // A integridade entre voteTokens e monsterVotes é garantida pela
+      // transação atômica no cliente (castMonsterVote). Se qualquer escrita
+      // da transação for rejeitada pela Rule, toda a transação é revertida.
+      match /voteTokens/{deviceId} {
+        allow read: if validSessionId(sessionId);
+
+        // Criação: primeiro voto do dispositivo (count deve ser 1)
+        allow create: if
+          validSessionId(sessionId)
+          && deviceId.matches('^[0-9a-f]{16}$')
+          && isValidVoteTrackerCreate(request.resource.data, deviceId, database, sessionId);
+
+        // Atualização: votos subsequentes (count += 1, lista cresce em 1)
+        allow update: if
+          validSessionId(sessionId)
+          && deviceId.matches('^[0-9a-f]{16}$')
+          && isValidVoteTrackerUpdate(request.resource.data, resource.data, deviceId, database, sessionId);
+
+        // Deletar o registro de votos é proibido (evita recuperar cota artificialmente)
+        allow delete: if false;
       }
 
       // ── Soluções ─────────────────────────────────────────────────────────
@@ -265,6 +301,10 @@ function isValidSessionRoot(data) {
       'discussionResults',
       // encerramento da votação — SM controla, participantes veem em tempo real
       'votingClosed',
+      // flag que indica que a votação foi iniciada pelo SM (persiste entre reloads)
+      'votingStarted',
+      // quantidade de votos por participante — SM configura antes de iniciar a votação
+      'votesPerParticipant',
       'readySignals', 'parkingLot'
     ])
     && data.currentPhase is string
@@ -277,6 +317,11 @@ function isValidSessionRoot(data) {
     && data.get('combatMonsterIdx', 0) is number
     && data.get('combatStrategy', '') is string
     && (data.get('votingClosed', null) == null || data.get('votingClosed', false) is bool)
+    && (data.get('votingStarted', null) == null || data.get('votingStarted', false) is bool)
+    && (data.get('votesPerParticipant', null) == null
+        || (data.get('votesPerParticipant', 1) is number
+            && data.get('votesPerParticipant', 1) >= 1
+            && data.get('votesPerParticipant', 1) <= 100))
     && isValidReadySignals(data.get('readySignals', {}))
     && isValidParkingLot(data.get('parkingLot', []))
     && isValidSprint(data.get('sprint', {}))
@@ -344,7 +389,10 @@ function isChangingSmOnlyFields(newData, oldData) {
     || newData.get('combatStrategy',  null) != oldData.get('combatStrategy',    null)
     || newData.get('discussionFocus', null) != oldData.get('discussionFocus',   null)
     || newData.get('discussionResults', null) != oldData.get('discussionResults', null)
-    || newData.get('votingClosed',  null) != oldData.get('votingClosed',     null);
+    || newData.get('votingClosed',  null) != oldData.get('votingClosed',     null)
+    || newData.get('votingStarted', null) != oldData.get('votingStarted',    null)
+    // votesPerParticipant: somente o SM pode configurar o limite de votos
+    || newData.get('votesPerParticipant', null) != oldData.get('votesPerParticipant', null);
 }
 
 // readySignals: permite apenas que o dispositivo que está fazendo o request
@@ -595,9 +643,82 @@ function isMissionStatusUpdate(newData, oldData) {
 
 // Verifica se a votação está encerrada lendo votingClosed do doc raiz.
 // Retorna true se votingClosed == true, false caso contrário (incluindo ausência do campo).
-// Usado para bloquear criação de monsterVotes quando o SM encerrou a votação.
+// Usado para bloquear criação de monsterVotes e voteTokens quando o SM encerrou a votação.
 function isVotingClosed(database, sessionId) {
   let path = /databases/$(database)/documents/sessions/$(sessionId);
   return exists(path) && get(path).data.get('votingClosed', false) == true;
+}
+
+// Lê votesPerParticipant do doc raiz. Retorna 3 se ausente (retrocompatibilidade).
+function getVotesPerParticipant(database, sessionId) {
+  let path = /databases/$(database)/documents/sessions/$(sessionId);
+  return exists(path) ? get(path).data.get('votesPerParticipant', 3) : 3;
+}
+
+// ── Validadores de voteTokens ─────────────────────────────────────────────────
+
+/**
+ * Valida a criação do documento de controle de votos (primeiro voto do dispositivo).
+ *
+ * Invariantes:
+ *   - deviceId no documento == deviceId no path
+ *   - count == 1 (primeiro e único voto criado atomicamente)
+ *   - count <= votesPerParticipant (lido do doc raiz)
+ *   - monsters é uma lista com exatamente 1 elemento
+ *   - votingClosed == false no doc raiz
+ */
+function isValidVoteTrackerCreate(data, deviceId, database, sessionId) {
+  return
+    // Schema: somente os campos esperados
+    data.keys().hasOnly(['deviceId', 'count', 'monsters'])
+    && data.keys().hasAll(['deviceId', 'count', 'monsters'])
+    // deviceId no documento deve ser o mesmo do path
+    && data.deviceId is string
+    && data.deviceId == deviceId
+    // count deve ser 1 no momento da criação
+    && data.count is number
+    && data.count == 1
+    // count não pode ultrapassar votesPerParticipant
+    && data.count <= getVotesPerParticipant(database, sessionId)
+    // monsters deve ser uma lista com exatamente 1 elemento
+    && data.monsters is list
+    && data.monsters.size() == 1
+    // votação não pode estar encerrada
+    && !isVotingClosed(database, sessionId);
+}
+
+/**
+ * Valida a atualização do documento de controle de votos (votos subsequentes).
+ *
+ * Invariantes:
+ *   - deviceId não muda
+ *   - count aumenta exatamente +1
+ *   - count <= votesPerParticipant (lido do doc raiz)
+ *   - todos os monstros anteriores estão preservados (hasAll — impede [A,B]→[A,C])
+ *   - monsters cresce exatamente em 1 elemento (size +1 + hasAll = apenas 1 adicionado)
+ *   - votingClosed == false no doc raiz
+ */
+function isValidVoteTrackerUpdate(newData, oldData, deviceId, database, sessionId) {
+  return
+    // Schema: somente os campos esperados
+    newData.keys().hasOnly(['deviceId', 'count', 'monsters'])
+    // deviceId é imutável
+    && newData.get('deviceId', '') == oldData.get('deviceId', '')
+    && newData.get('deviceId', '') == deviceId
+    // count aumenta exatamente +1
+    && newData.count is number
+    && newData.count == oldData.count + 1
+    // count não ultrapassa o limite configurado no doc raiz
+    && newData.count <= getVotesPerParticipant(database, sessionId)
+    // monsters cresce em exatamente 1 elemento (nenhum removido, 1 adicionado)
+    && newData.monsters is list
+    && newData.monsters.size() == oldData.monsters.size() + 1
+    // Todos os elementos anteriores estão preservados na nova lista.
+    // hasAll() garante que nenhum monstro anterior foi removido ou substituído.
+    // Sem isso, um atacante poderia trocar [A,B]→[A,C] passando na verificação
+    // de tamanho, mas contornando a proteção de unicidade do voto anterior.
+    && newData.monsters.hasAll(oldData.monsters)
+    // votação não pode estar encerrada
+    && !isVotingClosed(database, sessionId);
 }
 

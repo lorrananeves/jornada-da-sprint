@@ -74,10 +74,17 @@ const DEFAULT_STATE = () => ({
   // Armazenado no doc raiz (não na subcoleção monsters) para sincronização
   // confiável em tempo real sem depender de get() nas Firestore Rules.
   discussionResults:   {},
-  // ── estado da votação — false = votação aberta/não iniciada, true = encerrada ──
-  // Persistido no doc raiz para que o encerramento seja compartilhado entre
-  // todos os participantes em tempo real (não apenas um booleano local).
+  // ── estado da votação ──────────────────────────────────────────────────────
+  // votingClosed: false = votação aberta, true = encerrada pelo SM.
+  // votingStarted: true quando o SM configurou e iniciou a votação (persiste
+  //   entre sessões, para que o botão "encerrar" apareça mesmo após reload).
+  // Ambos persistidos no doc raiz para sincronização em tempo real.
   votingClosed:        false,
+  votingStarted:       false,
+  // ── quantidade de votos por participante na fase de priorização ──
+  // Configurado pelo SM antes de iniciar a votação. Padrão 3 para manter
+  // retrocompatibilidade com sessões antigas sem o campo.
+  votesPerParticipant: 3,
   // ── sinais "Terminei" por fase { [deviceId]: phaseId } ──
   readySignals:        {},
   // ── parking lot (notas "para depois", acessíveis em qualquer fase) ──
@@ -389,6 +396,21 @@ export function signalReady(phase) {
 export function setVotingClosed(closed) {
   if (!isSM()) return;
   setScalarState({ votingClosed: closed });
+}
+
+/**
+ * Configura a votação: persiste `votesPerParticipant` e encerra/reabre `votingClosed`
+ * em uma única escrita atômica. Somente o SM pode chamar.
+ * Garante que o limite seja persistido antes de a votação ser considerada encerrada,
+ * impedindo que participantes comecem a votar com um limite antigo.
+ *
+ * @param {{ votesPerParticipant: number, votingClosed: boolean }} config
+ */
+export function setVotingConfig({ votesPerParticipant, votingClosed }) {
+  if (!isSM()) return;
+  const votes = Number(votesPerParticipant);
+  if (!Number.isInteger(votes) || votes < 1) return;
+  setScalarState({ votesPerParticipant: votes, votingClosed: Boolean(votingClosed), votingStarted: true });
 }
 
 // ── Phase helpers ─────────────────────────────────────────────────────────────

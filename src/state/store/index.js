@@ -35,6 +35,7 @@ export {
   removeParkingItem,
   // votação
   setVotingClosed,
+  setVotingConfig,
 } from './session.js';
 
 import { getState, getSessionId, setCollection, setState as _setStateFn } from './session.js';
@@ -156,22 +157,26 @@ export const setMonsterDiscussionResult = (monsterId, result) => {
 /**
  * Vota em um monstro durante a fase de priorização.
  * Proteção dupla:
- *   1. Client-side: verifica limite de 3 votos e duplicata local (hasReacted).
+ *   1. Client-side: verifica limite configurável de votos e duplicata local (hasReacted).
  *   2. Firestore: transação atômica rejeita ID duplicado.
+ *
+ * O limite é lido de state.votesPerParticipant (padrão 3 para sessões legadas).
  */
 export async function voteOnMonster(monsterId) {
   const sessionId = sid();
   const deviceId  = getDeviceId();
+  const state     = getState();
 
   // Proteção de duplicata local (igual às reações e voteSolution)
   if (hasReacted(sessionId, 'monsterVotes', monsterId, deviceId, 'vote')) return false;
 
   // Bloqueia votos quando a votação foi encerrada pelo SM
-  if (getState().votingClosed) return false;
+  if (state.votingClosed) return false;
 
-  // Limite de 3 votos por dispositivo
-  const myVotes = getState().monsterVotes.filter((v) => v.deviceId === deviceId);
-  if (myVotes.length >= 3) return false;
+  // Limite configurável de votos por dispositivo (default 3 para sessões legadas)
+  const limit = Number(state.votesPerParticipant) || 3;
+  const myVotes = state.monsterVotes.filter((v) => v.deviceId === deviceId);
+  if (myVotes.length >= limit) return false;
 
   try {
     await _castMonsterVoteOp(sessionId, monsterId, deviceId);

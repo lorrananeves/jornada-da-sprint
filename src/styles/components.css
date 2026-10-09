@@ -280,6 +280,54 @@
 }
 
 /* ============================================================
+   Vote Config Modal — opções de quantidade de votos
+   ============================================================ */
+.vote-config-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 16px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+  min-width: 60px;
+  text-align: center;
+  user-select: none;
+}
+
+.vote-config-option input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.vote-config-option:hover {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.vote-config-option--selected {
+  border-color: var(--accent);
+  background: rgba(251, 188, 4, 0.08);
+}
+
+.vote-config-option-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+
+.vote-config-option-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* ============================================================
    Error Toast
    ============================================================ */
 .error-toast {

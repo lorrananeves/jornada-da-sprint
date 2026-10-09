@@ -95,6 +95,8 @@ const BASE_SESSION = {
   parkingLot:      [],
   phaseDurations:  {},
   phaseStartedAt:  {},
+  // votesPerParticipant e votingStarted são opcionais — sessões legadas sem esses
+  // campos continuam funcionando (isValidSessionRoot usa get() com default).
 };
 
 // ── Ambiente de testes ────────────────────────────────────────────────────────
@@ -1170,3 +1172,369 @@ describe('votingClosed — encerramento da votação', () => {
   });
 });
 
+
+// ── votesPerParticipant — controle de acesso ─────────────────────────────────
+
+describe('votesPerParticipant — somente SM pode configurar', () => {
+  beforeEach(async () => { await seedSession(); });
+
+  it('✅ SM pode definir votesPerParticipant ao iniciar a votação', async () => {
+    await assertSucceeds(
+      setDoc(sessionDoc(smDb()), {
+        ...BASE_SESSION,
+        votesPerParticipant: 2,
+        updatedAt: '2025-01-01T13:00:00.000Z',
+      }, { merge: true })
+    );
+  });
+
+  it('✅ SM pode definir votesPerParticipant=1 (limite mínimo)', async () => {
+    await assertSucceeds(
+      setDoc(sessionDoc(smDb()), {
+        ...BASE_SESSION,
+        votesPerParticipant: 1,
+        updatedAt: '2025-01-01T13:00:00.000Z',
+      }, { merge: true })
+    );
+  });
+
+  it('❌ participante NÃO pode alterar votesPerParticipant', async () => {
+    await assertFails(
+      setDoc(sessionDoc(anonDb()), {
+        ...BASE_SESSION,
+        votesPerParticipant: 5,
+        updatedAt: '2025-01-01T13:00:00.000Z',
+      }, { merge: true })
+    );
+  });
+
+  it('❌ SM NÃO pode definir votesPerParticipant=0 (inválido)', async () => {
+    await assertFails(
+      setDoc(sessionDoc(smDb()), {
+        ...BASE_SESSION,
+        votesPerParticipant: 0,
+        updatedAt: '2025-01-01T13:00:00.000Z',
+      }, { merge: true })
+    );
+  });
+
+  it('❌ SM NÃO pode definir votesPerParticipant acima de 100 (limite arbitrário)', async () => {
+    await assertFails(
+      setDoc(sessionDoc(smDb()), {
+        ...BASE_SESSION,
+        votesPerParticipant: 101,
+        updatedAt: '2025-01-01T13:00:00.000Z',
+      }, { merge: true })
+    );
+  });
+
+  it('✅ sessão sem votesPerParticipant continua compatível (leitura funciona)', async () => {
+    // BASE_SESSION não tem votesPerParticipant — verifica que leitura não quebra
+    await assertSucceeds(
+      // Leitura sempre é permitida para sessionIds válidos
+      import('firebase/firestore').then(({ getDoc, doc }) =>
+        getDoc(doc(anonDb(), 'sessions', SESSION))
+      )
+    );
+  });
+
+  it('✅ SM pode atualizar votesPerParticipant junto com votingClosed em uma escrita', async () => {
+    await assertSucceeds(
+      setDoc(sessionDoc(smDb()), {
+        ...BASE_SESSION,
+        votesPerParticipant: 3,
+        votingClosed: false,
+        updatedAt: '2025-01-01T13:00:00.000Z',
+      }, { merge: true })
+    );
+  });
+
+  it('✅ SM pode setar votingStarted=true ao iniciar votação', async () => {
+    await assertSucceeds(
+      setDoc(sessionDoc(smDb()), {
+        ...BASE_SESSION,
+        votesPerParticipant: 2,
+        votingStarted: true,
+        votingClosed: false,
+        updatedAt: '2025-01-01T13:00:00.000Z',
+      }, { merge: true })
+    );
+  });
+
+  it('❌ participante NÃO pode setar votingStarted=true', async () => {
+    await assertFails(
+      setDoc(sessionDoc(anonDb()), {
+        ...BASE_SESSION,
+        votingStarted: true,
+        updatedAt: '2025-01-01T13:00:00.000Z',
+      }, { merge: true })
+    );
+  });
+});
+
+// ── voteTokens — enforcement do limite total de votos por dispositivo ─────────
+//
+// Estes são os testes adversariais centrais da segurança de votação.
+// Verificam que um atacante que grave diretamente no Firestore (sem usar a app)
+// não consegue ultrapassar o limite configurado, remover votos anteriores
+// para recuperar cota, votar duas vezes no mesmo monstro, ou votar quando
+// a votação está encerrada.
+//
+// Pré-requisito: emulador Firestore em localhost:8080.
+
+describe('voteTokens — enforcement do limite total no servidor', () => {
+  const DEVICE_VOTER = '3'.repeat(16);
+  const MONSTER_A    = 'a'.repeat(32);
+  const MONSTER_B    = 'b'.repeat(32);
+  const MONSTER_C    = 'c'.repeat(32);
+
+  const validMonster = { text: 'X', reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false, voteCount: 0 };
+
+  /** Cria monstros e seta a sessão com votesPerParticipant=N */
+  async function seedVotingSession(votesPerParticipant = 2) {
+    await seedSession({ ...BASE_SESSION, votesPerParticipant, votingClosed: false });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'sessions', SESSION, 'monsters', MONSTER_A), validMonster);
+      await setDoc(doc(db, 'sessions', SESSION, 'monsters', MONSTER_B), { ...validMonster, text: 'Y' });
+      await setDoc(doc(db, 'sessions', SESSION, 'monsters', MONSTER_C), { ...validMonster, text: 'Z' });
+    });
+  }
+
+  /** Helper: cria um voteToken diretamente (bypass das Rules) para setup de testes */
+  async function seedVoteTracker(deviceId, count, monsters) {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), 'sessions', SESSION, 'voteTokens', deviceId),
+        { deviceId, count, monsters }
+      );
+    });
+  }
+
+  // ── Criação (primeiro voto) ──────────────────────────────────────────────────
+
+  it('✅ participante pode criar voteToken com count=1 dentro do limite', async () => {
+    await seedVotingSession(2);
+    await assertSucceeds(
+      setDoc(
+        doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER),
+        { deviceId: DEVICE_VOTER, count: 1, monsters: [MONSTER_A] }
+      )
+    );
+  });
+
+  it('✅ participante pode criar voteToken com count=1 e limite=1', async () => {
+    await seedVotingSession(1);
+    await assertSucceeds(
+      setDoc(
+        doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER),
+        { deviceId: DEVICE_VOTER, count: 1, monsters: [MONSTER_A] }
+      )
+    );
+  });
+
+  it('❌ participante NÃO pode criar voteToken com count>1 (burla o limite acumulando votos)', async () => {
+    // Atacante tenta registrar 2 votos em uma única operação de criação
+    await seedVotingSession(2);
+    await assertFails(
+      setDoc(
+        doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER),
+        { deviceId: DEVICE_VOTER, count: 2, monsters: [MONSTER_A, MONSTER_B] }
+      )
+    );
+  });
+
+  it('❌ participante NÃO pode criar voteToken quando limite=1 e count=1 já seria o único voto — testando create quando já existe', async () => {
+    // Atacante cria um token para si mesmo, depois tenta criar outro — deve falhar pois o update é exigido
+    await seedVotingSession(2);
+    // Cria o primeiro via Rules legítimas
+    await assertSucceeds(
+      setDoc(
+        doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER),
+        { deviceId: DEVICE_VOTER, count: 1, monsters: [MONSTER_A] }
+      )
+    );
+    // Tenta fazer SET novamente (não update): deve falhar — setDoc com merge=false é create se não existe
+    // mas como já existe, no Firestore o setDoc sem merge = overwrite (não cria).
+    // A Rule de update deve ser aplicada neste caso. Testamos via updateDoc diretamente.
+    await assertFails(
+      updateDoc(
+        doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER),
+        { deviceId: DEVICE_VOTER, count: 3, monsters: [MONSTER_A, MONSTER_B, MONSTER_C] }
+      )
+    );
+  });
+
+  it('❌ participante NÃO pode criar voteToken com deviceId diferente do path', async () => {
+    // Atacante tenta criar um tracker para outro dispositivo
+    await seedVotingSession(2);
+    await assertFails(
+      setDoc(
+        doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER),
+        { deviceId: EVIL_DEV, count: 1, monsters: [MONSTER_A] } // deviceId errado
+      )
+    );
+  });
+
+  it('❌ participante NÃO pode criar voteToken quando votingClosed=true', async () => {
+    await seedVotingSession(2);
+    await seedSession({ ...BASE_SESSION, votesPerParticipant: 2, votingClosed: true });
+    await assertFails(
+      setDoc(
+        doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER),
+        { deviceId: DEVICE_VOTER, count: 1, monsters: [MONSTER_A] }
+      )
+    );
+  });
+
+  it('❌ participante NÃO pode criar voteToken com campos extras', async () => {
+    await seedVotingSession(2);
+    await assertFails(
+      setDoc(
+        doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER),
+        { deviceId: DEVICE_VOTER, count: 1, monsters: [MONSTER_A], extraField: 'hack' }
+      )
+    );
+  });
+
+  // ── Atualização (votos subsequentes) ─────────────────────────────────────────
+
+  it('✅ participante pode atualizar voteToken de count=1 para count=2 (dentro do limite 2)', async () => {
+    await seedVotingSession(2);
+    await seedVoteTracker(DEVICE_VOTER, 1, [MONSTER_A]);
+    await assertSucceeds(
+      updateDoc(
+        doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER),
+        { count: 2, monsters: [MONSTER_A, MONSTER_B] }
+      )
+    );
+  });
+
+  it('❌ ADVERSARIAL: participante NÃO pode atualizar voteToken ultrapassando votesPerParticipant=1', async () => {
+    // Atacante já tem count=1 (único voto permitido) e tenta registrar mais um
+    await seedVotingSession(1); // limite = 1
+    await seedVoteTracker(DEVICE_VOTER, 1, [MONSTER_A]);
+    await assertFails(
+      updateDoc(
+        doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER),
+        { count: 2, monsters: [MONSTER_A, MONSTER_B] }
+      )
+    );
+  });
+
+  it('❌ ADVERSARIAL: participante NÃO pode pular incremento (count += 2 em vez de +1)', async () => {
+    // Atacante tenta inflar o count para parecer que atingiu o limite e depois usar
+    // votos extras. Ou qualquer outro esquema de manipulação de count.
+    await seedVotingSession(3);
+    await seedVoteTracker(DEVICE_VOTER, 1, [MONSTER_A]);
+    await assertFails(
+      updateDoc(
+        doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER),
+        { count: 3, monsters: [MONSTER_A, MONSTER_B] } // pula de 1 para 3
+      )
+    );
+  });
+
+  it('❌ ADVERSARIAL: participante NÃO pode remover monstros anteriores (zerando a lista para recuperar cota)', async () => {
+    // Atacante tem 2 votos (count=2), tenta remover os monstros e recriar com lista menor
+    await seedVotingSession(3);
+    await seedVoteTracker(DEVICE_VOTER, 2, [MONSTER_A, MONSTER_B]);
+    await assertFails(
+      updateDoc(
+        doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER),
+        { count: 3, monsters: [MONSTER_C] } // removeu A e B, adicionou apenas C
+      )
+    );
+  });
+
+  it('❌ ADVERSARIAL: participante NÃO pode substituir lista de monstros mantendo o count', async () => {
+    // Atacante tenta trocar quais monstros votou sem alterar o count
+    await seedVotingSession(3);
+    await seedVoteTracker(DEVICE_VOTER, 1, [MONSTER_A]);
+    await assertFails(
+      updateDoc(
+        doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER),
+        { count: 2, monsters: [MONSTER_B, MONSTER_C] } // removeu A, adicionou B e C
+      )
+    );
+  });
+
+  it('❌ ADVERSARIAL: participante NÃO pode trocar elemento anterior mantendo tamanho correto ([A,B]→[A,C])', async () => {
+    // Este ataque passou na verificação de tamanho antes da correção:
+    //   oldData.monsters = [A, B], newData.monsters = [A, C]
+    //   size check: 2 == 1+1 ✓  (antes era suficiente)
+    //   hasAll check: [A,C].hasAll([A,B]) = false ✗  (proteção adicionada)
+    //
+    // O atacante tentaria "revogar" o voto em B e redirecionar para C,
+    // burlando o token de unicidade do monsterVotes (já escrito para B).
+    await seedVotingSession(3);
+    await seedVoteTracker(DEVICE_VOTER, 2, [MONSTER_A, MONSTER_B]);
+    await assertFails(
+      updateDoc(
+        doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER),
+        { count: 3, monsters: [MONSTER_A, MONSTER_C] } // substituiu B por C — tamanho +1 correto, mas B foi removido
+      )
+    );
+  });
+
+  it('❌ ADVERSARIAL: participante NÃO pode alterar deviceId do tracker (imutável)', async () => {
+    await seedVotingSession(2);
+    await seedVoteTracker(DEVICE_VOTER, 1, [MONSTER_A]);
+    await assertFails(
+      updateDoc(
+        doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER),
+        { deviceId: EVIL_DEV, count: 2, monsters: [MONSTER_A, MONSTER_B] }
+      )
+    );
+  });
+
+  it('❌ ADVERSARIAL: participante NÃO pode deletar o tracker (recuperaria cota artificialmente)', async () => {
+    await seedVotingSession(2);
+    await seedVoteTracker(DEVICE_VOTER, 2, [MONSTER_A, MONSTER_B]);
+    await assertFails(
+      deleteDoc(doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER))
+    );
+  });
+
+  it('❌ ADVERSARIAL: participante NÃO pode escrever no tracker de outro dispositivo', async () => {
+    // Atacante EVIL_DEV tenta modificar o tracker de DEVICE_VOTER
+    await seedVotingSession(3);
+    await seedVoteTracker(DEVICE_VOTER, 1, [MONSTER_A]);
+    // O path é DEVICE_VOTER mas EVIL_DEV está tentando escrever
+    // A Rule verifica deviceId no documento == deviceId no path
+    await assertFails(
+      updateDoc(
+        doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER),
+        { deviceId: EVIL_DEV, count: 2, monsters: [MONSTER_A, MONSTER_B] }
+      )
+    );
+  });
+
+  it('❌ ADVERSARIAL: participante NÃO pode atualizar voteToken quando votingClosed=true', async () => {
+    // Atacante tenta votar após o SM encerrar a votação
+    await seedVotingSession(3);
+    await seedVoteTracker(DEVICE_VOTER, 1, [MONSTER_A]);
+    // SM encerra a votação
+    await seedSession({ ...BASE_SESSION, votesPerParticipant: 3, votingClosed: true });
+    await assertFails(
+      updateDoc(
+        doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER),
+        { count: 2, monsters: [MONSTER_A, MONSTER_B] }
+      )
+    );
+  });
+
+  it('✅ sessão legada sem votesPerParticipant usa default 3 nas Rules', async () => {
+    // Sessão antiga sem o campo — limit default de 3 deve permitir count=1
+    await seedSession({ ...BASE_SESSION, votingClosed: false }); // sem votesPerParticipant
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_A), validMonster);
+    });
+    await assertSucceeds(
+      setDoc(
+        doc(anonDb(), 'sessions', SESSION, 'voteTokens', DEVICE_VOTER),
+        { deviceId: DEVICE_VOTER, count: 1, monsters: [MONSTER_A] }
+      )
+    );
+  });
+});

@@ -25,7 +25,7 @@ import {
   addMonster, reactToMonster, prioritizeMonsters,
   mergeMonsters, unmergeMonster, renameMonster, deleteMonster,
   // votação
-  voteOnMonster, setVotingClosed,
+  voteOnMonster, setVotingClosed, setVotingConfig,
   // notas de discussão
   addDiscussionNote, editDiscussionNote, removeDiscussionNote,
   setMonsterDiscussionResult,
@@ -82,7 +82,6 @@ const PRIORITIES = [
   { id: 'low',    label: 'Baixa', cls: 'priority-badge-low' },
 ];
 
-const MAX_VOTES = 3;
 const PREV_MISSION_STATUS_KEY = '_jornada_prev_mission_status';
 
 // ── Helpers de votação ────────────────────────────────────────────────────────
@@ -217,6 +216,92 @@ function showRenameModal(monster) {
   });
 }
 
+/**
+ * Modal de configuração de votação — pergunta quantos votos cada participante terá.
+ *
+ * @param {number} maxOptions  Número de monstros elegíveis (teto das opções).
+ * @param {number} defaultVal  Valor pré-selecionado (último limite ou 1).
+ * @returns {Promise<number|null>} Número escolhido, ou null se cancelado.
+ */
+function showVoteConfigModal(maxOptions, defaultVal = 1) {
+  return new Promise((resolve) => {
+    const safeMax     = Math.max(1, maxOptions);
+    const safeDefault = Math.min(Math.max(1, defaultVal), safeMax);
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.setAttribute('role', 'dialog');
+    backdrop.setAttribute('aria-modal', 'true');
+    backdrop.setAttribute('aria-labelledby', 'vote-cfg-title');
+
+    const optionsHTML = Array.from({ length: safeMax }, (_, i) => i + 1).map((n) =>
+      `<label class="vote-config-option${n === safeDefault ? ' vote-config-option--selected' : ''}" for="vote-cfg-${n}">
+         <input type="radio" id="vote-cfg-${n}" name="vote-cfg-votes" value="${n}" ${n === safeDefault ? 'checked' : ''}>
+         <span class="vote-config-option-value">${n}</span>
+         <span class="vote-config-option-label">voto${n !== 1 ? 's' : ''}</span>
+       </label>`
+    ).join('');
+
+    backdrop.innerHTML = `
+      <div class="modal" style="max-width:440px">
+        <h3 class="modal-title" id="vote-cfg-title">🗳️ Configurar Votação</h3>
+        <p class="modal-body" style="margin-bottom:4px">
+          <strong>${safeMax} monstro${safeMax !== 1 ? 's' : ''}</strong> elegível${safeMax !== 1 ? 'is' : ''} para votação.
+        </p>
+        <p class="modal-body" style="margin-bottom:16px;font-size:0.875rem;color:var(--text-muted)">
+          Quantos votos cada participante terá? Cada pessoa poderá votar em até N monstros
+          diferentes, mas não poderá votar mais de uma vez no mesmo monstro.
+        </p>
+        <div class="vote-config-options" role="radiogroup" aria-label="Quantidade de votos por participante" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
+          ${optionsHTML}
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" id="vote-cfg-cancel">Cancelar</button>
+          <button class="btn btn-primary" id="vote-cfg-confirm">🗳️ Iniciar votação</button>
+        </div>
+      </div>
+    `;
+
+    // Atualiza estilos dos labels ao mudar seleção
+    backdrop.querySelectorAll('input[name="vote-cfg-votes"]').forEach((input) => {
+      input.addEventListener('change', () => {
+        backdrop.querySelectorAll('.vote-config-option').forEach((label) => {
+          label.classList.toggle('vote-config-option--selected', label.querySelector('input')?.checked);
+        });
+      });
+    });
+
+    const getValue = () => {
+      const checked = backdrop.querySelector('input[name="vote-cfg-votes"]:checked');
+      return checked ? Number(checked.value) : safeDefault;
+    };
+
+    const cleanup = (result) => {
+      document.removeEventListener('keydown', onKey);
+      backdrop.remove();
+      resolve(result);
+    };
+
+    backdrop.querySelector('#vote-cfg-cancel').addEventListener('click', () => cleanup(null));
+    backdrop.querySelector('#vote-cfg-confirm').addEventListener('click', () => cleanup(getValue()));
+
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) cleanup(null);
+    });
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') cleanup(null);
+      if (e.key === 'Enter') cleanup(getValue());
+    };
+    document.addEventListener('keydown', onKey);
+
+    document.body.appendChild(backdrop);
+
+    // Foca o botão de confirmar para acessibilidade por teclado
+    setTimeout(() => backdrop.querySelector('#vote-cfg-confirm')?.focus(), 50);
+  });
+}
+
 // ── Construtor do card expandido ───────────────────────────────────────────────
 
 function buildExpandedBody(m, state, sessionId) {
@@ -226,6 +311,7 @@ function buildExpandedBody(m, state, sessionId) {
   const monsterVotes = state.monsterVotes;
   const discussionResults = state.discussionResults ?? {};
   const votingClosed = state.votingClosed ?? false;
+  const voteLimit = Number(state.votesPerParticipant) || 3;
 
   const monsterSolutions = solutions.filter((s) => s.monsterId === m.id);
   const monsterMissions  = missions.filter((mis) => mis.monsterId === m.id);
@@ -250,10 +336,10 @@ function buildExpandedBody(m, state, sessionId) {
             ? `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
                  <button class="btn ${voted ? 'btn-success' : 'btn-ghost'} btn-sm monster-vote-btn"
                    data-vote-monster="${escapeHTML(m.id)}"
-                   ${voted || used >= MAX_VOTES ? 'disabled' : ''}
+                   ${voted || used >= voteLimit ? 'disabled' : ''}
                    aria-pressed="${voted}"
-                   title="${voted ? 'Já votou neste problema' : used >= MAX_VOTES ? 'Você já usou todos os votos' : 'Votar neste problema'}">
-                   ${voted ? '✅ Votou' : used >= MAX_VOTES ? '— Votos esgotados' : '🗳️ Votar'}
+                   title="${voted ? 'Já votou neste problema' : used >= voteLimit ? 'Você já usou todos os votos' : 'Votar neste problema'}">
+                   ${voted ? '✅ Votou' : used >= voteLimit ? '— Votos esgotados' : '🗳️ Votar'}
                  </button>
                  <span class="text-muted text-sm">${m.voteCount || 0} voto${(m.voteCount || 0) !== 1 ? 's' : ''}</span>
                </div>`
@@ -550,10 +636,12 @@ export function renderMonsters(root) {
     const sm = isSM();
     const selectedCount = monsters.filter((m) => m.selected).length;
     const votingClosed = state.votingClosed ?? false;
+    const votingStarted = state.votingStarted ?? false;
     const monsterVotes = state.monsterVotes;
     const sessionId = new URLSearchParams(window.location.search).get('s') || '';
+    const voteLimit = Number(state.votesPerParticipant) || 3;
     const used = myVoteCount(monsterVotes);
-    const remaining = MAX_VOTES - used;
+    const remaining = voteLimit - used;
 
     preserveInputs(root, () => {
       root.innerHTML = `
@@ -601,7 +689,7 @@ export function renderMonsters(root) {
               </div>
               ${!votingClosed ? `
                 <div class="voting-budget-dots">
-                  ${Array.from({ length: MAX_VOTES }, (_, i) =>
+                  ${Array.from({ length: voteLimit }, (_, i) =>
                     `<span class="voting-budget-dot${i < used ? ' voting-budget-dot--used' : ''}"></span>`
                   ).join('')}
                 </div>
@@ -614,10 +702,12 @@ export function renderMonsters(root) {
               : ''
             }
             ${sm ? `
-              <div style="margin-left:auto;display:flex;gap:8px">
+              <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
                 ${votingClosed
                   ? `<button class="btn btn-ghost btn-sm" id="btn-reopen-voting">🔓 Reabrir votação</button>`
-                  : `<button class="btn btn-primary btn-sm" id="btn-close-voting">🔒 Encerrar votação</button>`
+                  : votingStarted
+                    ? `<button class="btn btn-ghost btn-sm" id="btn-close-voting">🔒 Encerrar votação</button>`
+                    : `<button class="btn btn-primary btn-sm" id="btn-start-voting">🗳️ Iniciar votação</button>`
                 }
               </div>
             ` : ''}
@@ -818,13 +908,31 @@ export function renderMonsters(root) {
       render();
     });
 
-    // ── Encerrar / Reabrir votação (SM only) ──────────────────────────────────
+    // ── Iniciar votação (SM only) — abre modal de configuração ────────────────
+    root.querySelector('#btn-start-voting')?.addEventListener('click', async () => {
+      if (!isSM()) return;
+      const curState = getState();
+      const eligibleMonsters = curState.monsters; // apenas monstros ativos (já filtrados por sortCollection)
+      if (eligibleMonsters.length === 0) {
+        showErrorToast('Adicione pelo menos um monstro antes de iniciar a votação.');
+        return;
+      }
+      const maxOptions = eligibleMonsters.length;
+      const currentLimit = Number(curState.votesPerParticipant) || 3;
+      const chosen = await showVoteConfigModal(maxOptions, Math.min(currentLimit, maxOptions));
+      if (chosen === null) return; // cancelado — não inicia votação nem altera estado
+      setVotingConfig({ votesPerParticipant: chosen, votingClosed: false });
+      render();
+    });
+
+    // ── Encerrar votação (SM only) ────────────────────────────────────────────
     root.querySelector('#btn-close-voting')?.addEventListener('click', () => {
       if (!isSM()) return;
       setVotingClosed(true);
       render();
     });
 
+    // ── Reabrir votação (SM only) ─────────────────────────────────────────────
     root.querySelector('#btn-reopen-voting')?.addEventListener('click', () => {
       if (!isSM()) return;
       setVotingClosed(false);
@@ -840,7 +948,8 @@ export function renderMonsters(root) {
         const curState = getState();
         if (curState.votingClosed) return;
         if (hasVotedOnMonster(sessionId, monsterId)) return;
-        if (myVoteCount(curState.monsterVotes) >= MAX_VOTES) return;
+        const voteLimit = Number(curState.votesPerParticipant) || 3;
+        if (myVoteCount(curState.monsterVotes) >= voteLimit) return;
 
         btn.disabled = true;
         // Otimismo local
@@ -855,8 +964,10 @@ export function renderMonsters(root) {
           btn.disabled = false;
           showErrorToast('Não foi possível registrar seu voto.');
         } else {
-          const usedNow = myVoteCount(getState().monsterVotes);
-          const rem = MAX_VOTES - usedNow;
+          const stateAfter = getState();
+          const usedNow = myVoteCount(stateAfter.monsterVotes);
+          const voteLimitNow = Number(stateAfter.votesPerParticipant) || 3;
+          const rem = voteLimitNow - usedNow;
           // Atualiza o banner de votos sem re-render completo
           const dots = root.querySelectorAll('.voting-budget-dot');
           dots.forEach((d, i) => d.classList.toggle('voting-budget-dot--used', i < usedNow));
@@ -865,7 +976,7 @@ export function renderMonsters(root) {
             label.textContent = rem > 0 ? `${rem} restante${rem !== 1 ? 's' : ''}` : 'Todos os votos usados';
             label.className = `voting-budget-remaining ${rem === 0 ? 'text-muted' : 'text-accent'}`;
           }
-          if (usedNow >= MAX_VOTES) {
+          if (usedNow >= voteLimitNow) {
             root.querySelectorAll('[data-vote-monster]').forEach((b) => {
               if (!b.classList.contains('btn-success')) {
                 b.disabled = true; b.textContent = '— Votos esgotados';
@@ -873,7 +984,7 @@ export function renderMonsters(root) {
             });
           }
           if (countEl) {
-            const newCount = (getState().monsters.find((m) => m.id === monsterId)?.voteCount || 0);
+            const newCount = (stateAfter.monsters.find((m) => m.id === monsterId)?.voteCount || 0);
             countEl.textContent = `${newCount} voto${newCount !== 1 ? 's' : ''}`;
           }
         }
@@ -1189,7 +1300,9 @@ export function renderMonsters(root) {
     const count = parseInt(state.team?.participantCount, 10) || 0;
     const results = JSON.stringify(state.discussionResults ?? {});
     const closed = state.votingClosed ? '1' : '0';
-    return `${mons}|${votes}|${sols}|${mis}|${notes}|${count}|${results}|${closed}`;
+    const started = state.votingStarted ? '1' : '0';
+    const voteLimit = Number(state.votesPerParticipant) || 3;
+    return `${mons}|${votes}|${sols}|${mis}|${notes}|${count}|${results}|${closed}|${started}|${voteLimit}`;
   }
 
   let _lastFp = _fingerprint(getState());

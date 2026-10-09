@@ -249,27 +249,61 @@ export async function castVote(sessionId, colName, itemId, deviceId) {
 /**
  * Registra o voto de um dispositivo em um monstro de forma atômica.
  *
- * ID do token de voto: `{deviceId}_{monsterId}` em monsterVotes/
- * A unicidade (1 voto por dispositivo por monstro) é garantida pelo Firestore
- * (create falha se o documento já existe).
+ * Documentos escritos em uma única transação Firestore:
  *
- * Operação atômica (runTransaction):
- *   1. Tenta criar monsterVotes/{deviceId}_{monsterId} — lança 'already-voted' se existe.
- *   2. Incrementa monsters/{monsterId}.voteCount += 1.
+ *   1. monsterVotes/{deviceId}_{monsterId}  — token de unicidade por (dispositivo, monstro).
+ *      Cria apenas se não existe: garante 1 voto por dispositivo por monstro.
  *
- * O limite de 3 votos por dispositivo é validado no cliente antes de chamar.
+ *   2. voteTokens/{deviceId}  — registro de votos do dispositivo nesta sessão.
+ *      Mantém { count: N, monsters: [...ids] }.
+ *      Criado no primeiro voto (count=1) ou atualizado nos subsequentes (count+1).
+ *      As Firestore Security Rules validam:
+ *        - count <= votesPerParticipant  (lido do doc raiz via get())
+ *        - count aumenta exatamente +1 por operação
+ *        - nenhum monstro anterior é removido da lista
+ *        - exatamente 1 novo monstro é adicionado
+ *        - deviceId no documento == deviceId no path
+ *        - votingClosed == false no doc raiz
+ *      Isso é o enforcement real no servidor — independe do cliente.
+ *
+ *   3. monsters/{monsterId}.voteCount += 1  — contador público de votos.
+ *
+ * O limite de votos por dispositivo é validado nas Rules via get() do doc raiz,
+ * independentemente do que o cliente enviar.
  */
 export async function castMonsterVote(sessionId, monsterId, deviceId) {
-  const tokenId  = `${deviceId}_${monsterId}`;
-  const tokenRef = doc(db, 'sessions', sessionId, 'monsterVotes', tokenId);
-  const monRef   = itemRef(sessionId, 'monsters', monsterId);
+  const tokenId      = `${deviceId}_${monsterId}`;
+  const tokenRef     = doc(db, 'sessions', sessionId, 'monsterVotes', tokenId);
+  const trackerRef   = doc(db, 'sessions', sessionId, 'voteTokens', deviceId);
+  const monRef       = itemRef(sessionId, 'monsters', monsterId);
 
   await runTransaction(db, async (tx) => {
-    const tokenSnap = await tx.get(tokenRef);
+    const [tokenSnap, trackerSnap] = await Promise.all([
+      tx.get(tokenRef),
+      tx.get(trackerRef),
+    ]);
+
     if (tokenSnap.exists()) {
       throw new Error('already-voted');
     }
+
+    const prevCount    = trackerSnap.exists() ? (trackerSnap.data().count ?? 0) : 0;
+    const prevMonsters = trackerSnap.exists() ? (trackerSnap.data().monsters ?? []) : [];
+    const newCount     = prevCount + 1;
+    const newMonsters  = [...prevMonsters, monsterId];
+
+    // Escreve o token de unicidade (1 voto por monstro por dispositivo)
     tx.set(tokenRef, { deviceId, monsterId, votedAt: new Date().toISOString() });
+
+    // Cria ou atualiza o documento de controle de votos do dispositivo.
+    // As Rules validam o limite total no servidor.
+    if (trackerSnap.exists()) {
+      tx.update(trackerRef, { count: newCount, monsters: newMonsters });
+    } else {
+      tx.set(trackerRef, { deviceId, count: newCount, monsters: newMonsters });
+    }
+
+    // Incrementa o contador público do monstro
     tx.update(monRef, { voteCount: increment(1) });
   });
 }
