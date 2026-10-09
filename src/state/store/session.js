@@ -74,6 +74,10 @@ const DEFAULT_STATE = () => ({
   // Armazenado no doc raiz (não na subcoleção monsters) para sincronização
   // confiável em tempo real sem depender de get() nas Firestore Rules.
   discussionResults:   {},
+  // ── estado da votação — false = votação aberta/não iniciada, true = encerrada ──
+  // Persistido no doc raiz para que o encerramento seja compartilhado entre
+  // todos os participantes em tempo real (não apenas um booleano local).
+  votingClosed:        false,
   // ── sinais "Terminei" por fase { [deviceId]: phaseId } ──
   readySignals:        {},
   // ── parking lot (notas "para depois", acessíveis em qualquer fase) ──
@@ -372,6 +376,19 @@ export function signalReady(phase) {
   const deviceId = getDeviceId();
   const readySignals = { ..._state.readySignals, [deviceId]: phase };
   setScalarState({ readySignals });
+}
+
+// ── Votação — encerramento compartilhado ──────────────────────────────────────
+
+/**
+ * Encerra ou reabre a votação.
+ * Somente o SM pode chamar (verificado no cliente via isSM).
+ * O flag votingClosed é persistido no doc raiz e sincronizado em tempo real
+ * para que todos os participantes vejam o estado atualizado.
+ */
+export function setVotingClosed(closed) {
+  if (!isSM()) return;
+  setScalarState({ votingClosed: closed });
 }
 
 // ── Phase helpers ─────────────────────────────────────────────────────────────

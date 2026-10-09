@@ -146,12 +146,17 @@ service cloud.firestore {
       // ── Votos em monstros ─────────────────────────────────────────────────
       // ID do documento: {deviceId}_{monsterId} — create falha se já existir.
       // Unicidade garante 1 voto por dispositivo por monstro sem transação extra.
+      //
+      // Proteção de encerramento: lemos votingClosed do doc raiz via get().
+      // Se votingClosed == true, novos votos são rejeitados pelo Firestore mesmo
+      // que o cliente ignore os controles da interface.
       match /monsterVotes/{tokenId} {
         allow read: if validSessionId(sessionId);
         allow create: if
           validSessionId(sessionId)
           && tokenId.matches('^[0-9a-f]{16}_[0-9a-zA-Z_-]+$')
-          && isValidMonsterVote(request.resource.data);
+          && isValidMonsterVote(request.resource.data)
+          && !isVotingClosed(sessionId);
         allow update, delete: if false;
       }
 
@@ -258,6 +263,8 @@ function isValidSessionRoot(data) {
       'discussionFocus',
       // resultados da discussão por monstro — SM controla, todos veem via subscribeSession
       'discussionResults',
+      // encerramento da votação — SM controla, participantes veem em tempo real
+      'votingClosed',
       'readySignals', 'parkingLot'
     ])
     && data.currentPhase is string
@@ -269,6 +276,7 @@ function isValidSessionRoot(data) {
     && data.get('completedPhases', []).size() <= 20
     && data.get('combatMonsterIdx', 0) is number
     && data.get('combatStrategy', '') is string
+    && (data.get('votingClosed', null) == null || data.get('votingClosed', false) is bool)
     && isValidReadySignals(data.get('readySignals', {}))
     && isValidParkingLot(data.get('parkingLot', []))
     && isValidSprint(data.get('sprint', {}))
@@ -335,7 +343,8 @@ function isChangingSmOnlyFields(newData, oldData) {
     || newData.get('combatMonsterIdx', null) != oldData.get('combatMonsterIdx', null)
     || newData.get('combatStrategy',  null) != oldData.get('combatStrategy',    null)
     || newData.get('discussionFocus', null) != oldData.get('discussionFocus',   null)
-    || newData.get('discussionResults', null) != oldData.get('discussionResults', null);
+    || newData.get('discussionResults', null) != oldData.get('discussionResults', null)
+    || newData.get('votingClosed',  null) != oldData.get('votingClosed',     null);
 }
 
 // readySignals: permite apenas que o dispositivo que está fazendo o request
@@ -582,5 +591,13 @@ function isMissionStatusUpdate(newData, oldData) {
     // status é o único campo que pode mudar
     && newData.get('status', '') is string
     && newData.get('status', '') in ['done', 'partial', 'pending', ''];
+}
+
+// Verifica se a votação está encerrada lendo votingClosed do doc raiz.
+// Retorna true se votingClosed == true, false caso contrário (incluindo ausência do campo).
+// Usado para bloquear criação de monsterVotes quando o SM encerrou a votação.
+function isVotingClosed(sessionId) {
+  let rootDoc = get(/databases/$(database)/documents/sessions/$(sessionId));
+  return rootDoc != null && rootDoc.data.get('votingClosed', false) == true;
 }
 

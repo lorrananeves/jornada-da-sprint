@@ -78,10 +78,12 @@ import {
   subscribe,
   resetState,
   setMonsterDiscussionResult,
+  setVotingClosed,
+  voteOnMonster,
 } from '../state/store.js';
 import { _setSessionId } from '../state/store/session.js';
 
-import { batchWrite, saveSession, saveItem } from '../services/firebase.js';
+import { batchWrite, saveSession, saveItem, castMonsterVote } from '../services/firebase.js';
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -885,5 +887,105 @@ describe('setMonsterDiscussionResult', () => {
     const called = listener.mock.calls[0][0];
     expect(called.discussionResults).toMatchObject({ mon1: 'insight' });
     unsub();
+  });
+});
+
+// ── setVotingClosed ───────────────────────────────────────────────────────────
+
+describe('setVotingClosed', () => {
+  beforeEach(() => {
+    setState({ smDeviceId: DEVICE_SM });
+    _mocks.currentDeviceId = DEVICE_SM;
+  });
+
+  it('votingClosed começa como false no DEFAULT_STATE', () => {
+    expect(getState().votingClosed).toBe(false);
+  });
+
+  it('SM pode encerrar a votação (true)', () => {
+    setVotingClosed(true);
+    expect(getState().votingClosed).toBe(true);
+  });
+
+  it('SM pode reabrir a votação (false)', () => {
+    setVotingClosed(true);
+    setVotingClosed(false);
+    expect(getState().votingClosed).toBe(false);
+  });
+
+  it('participante não pode alterar votingClosed', () => {
+    _mocks.currentDeviceId = DEVICE_TEAM;
+    setVotingClosed(true);
+    // Como DEVICE_TEAM != smDeviceId (DEVICE_SM), isSM() retorna false
+    // e setVotingClosed é no-op
+    expect(getState().votingClosed).toBe(false);
+  });
+
+  it('encerramento é persistido via saveSession', () => {
+    saveSession.mockClear();
+    setVotingClosed(true);
+    expect(saveSession).toHaveBeenCalled();
+  });
+
+  it('encerramento notifica subscribers', () => {
+    const listener = vi.fn();
+    const unsub = subscribe(listener);
+    listener.mockClear();
+    setVotingClosed(true);
+    expect(listener).toHaveBeenCalled();
+    const called = listener.mock.calls[0][0];
+    expect(called.votingClosed).toBe(true);
+    unsub();
+  });
+
+  it('snapshot remoto com votingClosed=true é refletido no estado', () => {
+    _mocks.sessionCallback?.({
+      currentPhase: 'monsters',
+      votingClosed: true,
+      updatedAt: new Date(Date.now() + 10000).toISOString(),
+    });
+    expect(getState().votingClosed).toBe(true);
+  });
+});
+
+// ── voteOnMonster — proteção de votingClosed no store ────────────────────────
+
+describe('voteOnMonster — respeita votingClosed', () => {
+  // Cada teste usa monsterId único para evitar colisão no cache de reações.
+  // reactions.js persiste no localStorage (jsdom) e clearReactionsCache() apaga
+  // apenas o cache em memória — na próxima chamada a _getCache() relê o localStorage,
+  // que ainda contém a entrada do teste anterior se o mesmo monsterId for reutilizado.
+  beforeEach(() => {
+    setState({ smDeviceId: DEVICE_SM });
+    _mocks.currentDeviceId = DEVICE_TEAM;
+    castMonsterVote.mockResolvedValue(undefined);
+    _mocks.colCallbacks.monsterVotes?.([]);
+  });
+
+  it('permite voto quando votingClosed=false', async () => {
+    setState({ votingClosed: false });
+    const result = await voteOnMonster('monster-vc-open');
+    expect(castMonsterVote).toHaveBeenCalled();
+    expect(result).toBe(true);
+  });
+
+  it('bloqueia voto quando votingClosed=true — não chama castMonsterVote', async () => {
+    setState({ smDeviceId: DEVICE_SM });
+    _mocks.currentDeviceId = DEVICE_SM;
+    setState({ votingClosed: true });
+    _mocks.currentDeviceId = DEVICE_TEAM;
+    castMonsterVote.mockClear();
+    const result = await voteOnMonster('monster-vc-closed');
+    expect(castMonsterVote).not.toHaveBeenCalled();
+    expect(result).toBe(false);
+  });
+
+  it('sessão legada sem votingClosed (false) — voto é permitido', async () => {
+    // DEFAULT_STATE tem votingClosed=false → guard é falsy → voto permitido
+    expect(getState().votingClosed).toBe(false);
+    castMonsterVote.mockClear();
+    const result = await voteOnMonster('monster-vc-legacy');
+    expect(castMonsterVote).toHaveBeenCalled();
+    expect(result).toBe(true);
   });
 });

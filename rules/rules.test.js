@@ -1080,3 +1080,93 @@ describe('coleções não previstas', () => {
     );
   });
 });
+
+// ── votingClosed — encerramento da votação ────────────────────────────────────
+
+describe('votingClosed — encerramento da votação', () => {
+  const MONSTER_ID   = 'e'.repeat(32);
+  const DEVICE_VOTER = '3'.repeat(16);
+  const TOKEN_ID     = `${DEVICE_VOTER}_${MONSTER_ID}`;
+  const validVote    = { deviceId: DEVICE_VOTER, monsterId: MONSTER_ID, votedAt: '2025-01-01T12:00:00.000Z' };
+  const validMonster = { text: 'Problema X', reactions: { fire: 0, eyes: 0, bulb: 0 }, selected: false, voteCount: 0 };
+
+  beforeEach(async () => {
+    // Cria monstro e sessão sem regras
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'sessions', SESSION, 'monsters', MONSTER_ID), validMonster);
+    });
+  });
+
+  it('✅ participante pode votar quando votingClosed está ausente (sessões antigas)', async () => {
+    await seedSession(); // BASE_SESSION não tem votingClosed
+    await assertSucceeds(
+      setDoc(subDoc(anonDb(), 'monsterVotes', TOKEN_ID), validVote)
+    );
+  });
+
+  it('✅ participante pode votar quando votingClosed=false', async () => {
+    await seedSession({ ...BASE_SESSION, votingClosed: false });
+    await assertSucceeds(
+      setDoc(subDoc(anonDb(), 'monsterVotes', TOKEN_ID), validVote)
+    );
+  });
+
+  it('❌ participante NÃO pode votar quando votingClosed=true', async () => {
+    await seedSession({ ...BASE_SESSION, votingClosed: true });
+    await assertFails(
+      setDoc(subDoc(anonDb(), 'monsterVotes', TOKEN_ID), validVote)
+    );
+  });
+
+  it('❌ SM NÃO pode votar quando votingClosed=true (regra cobre todos)', async () => {
+    await seedSession({ ...BASE_SESSION, votingClosed: true });
+    await assertFails(
+      setDoc(subDoc(smDb(), 'monsterVotes', TOKEN_ID), validVote)
+    );
+  });
+
+  it('✅ SM pode encerrar a votação (setar votingClosed=true)', async () => {
+    await seedSession();
+    await assertSucceeds(
+      setDoc(sessionDoc(smDb()), {
+        ...BASE_SESSION,
+        votingClosed: true,
+        updatedAt: '2025-01-01T13:00:00.000Z',
+      }, { merge: true })
+    );
+  });
+
+  it('❌ participante NÃO pode encerrar a votação (setar votingClosed=true)', async () => {
+    await seedSession();
+    await assertFails(
+      setDoc(sessionDoc(anonDb()), {
+        ...BASE_SESSION,
+        votingClosed: true,
+        updatedAt: '2025-01-01T13:00:00.000Z',
+      }, { merge: true })
+    );
+  });
+
+  it('✅ SM pode reabrir a votação (setar votingClosed=false)', async () => {
+    await seedSession({ ...BASE_SESSION, votingClosed: true });
+    await assertSucceeds(
+      setDoc(sessionDoc(smDb()), {
+        ...BASE_SESSION,
+        votingClosed: false,
+        updatedAt: '2025-01-01T13:00:00.000Z',
+      }, { merge: true })
+    );
+  });
+
+  it('❌ participante NÃO pode reabrir a votação', async () => {
+    await seedSession({ ...BASE_SESSION, votingClosed: true });
+    await assertFails(
+      setDoc(sessionDoc(anonDb()), {
+        ...BASE_SESSION,
+        votingClosed: false,
+        updatedAt: '2025-01-01T13:00:00.000Z',
+      }, { merge: true })
+    );
+  });
+});
+

@@ -85,8 +85,12 @@ export function renderComplete(root) {
   `;
 
   root.querySelector('#btn-back').addEventListener('click', () => {
-    if (isSM()) setPhase('workMonsters');
-    else setLocalPhase('roleSelect');
+    if (!isSM()) { setLocalPhase('roleSelect'); return; }
+    // Sessões novas concluem 'monsters' diretamente (fluxo unificado).
+    // Sessões legadas concluem 'workMonsters' antes de chegarem aqui.
+    const { completedPhases } = getState();
+    const prevPhase = completedPhases.includes('workMonsters') ? 'workMonsters' : 'monsters';
+    setPhase(prevPhase);
   });
   root.querySelector('#btn-report').addEventListener('click', () => {
     if (!isSM()) { setLocalPhase('report'); return; }
