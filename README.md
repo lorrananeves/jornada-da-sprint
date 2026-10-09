@@ -20,21 +20,18 @@ A aplicação é **multiplayer em tempo real**: o Scrum Master controla o fluxo 
 | 🚪 **Lobby** | `lobby` | Sala de espera com presença em tempo real enquanto todos entram |
 | ✅ **Check-in** | `checkin` | Cada pessoa registra como chegou na retro (humor de 1 a 5) |
 | 💎 **Tesouros** | `treasures` | O que foi bem — pontos positivos, reconhecimentos e aprendizados |
-| 👹 **Monstros** | `monsters` | O que atrapalhou ou pode melhorar — com reações e votação |
-| 🗳️ **Priorização** | `voting` | O time prioriza os monstros com até 3 votos por pessoa |
-| 💬 **Discussão** | `discussion` | SM conduz a discussão por monstro e registra notas e resultado |
-| 🛠️ **Trabalho nos Monstros** | `workMonsters` | Cards expansíveis por monstro: proposição de soluções (por estratégia) e definição de ações/missões vinculadas |
+| 👹 **Monstros** | `monsters` | Painel central unificado: cadastro de problemas, votação, discussão, soluções por estratégia e ações — tudo em cards expansíveis sem trocar de tela |
 | 🏆 **Conclusão** | `complete` | Encerramento, celebração e resumo da jornada |
 | 📊 **Relatório** | `report` | Exportação do resumo completo em PDF ou PNG |
 
-> **Nota de compatibilidade:** As telas legadas `combat` e `missions` ainda são roteadas para sessões antigas já em andamento, mas o fluxo padrão de novas sessões usa `workMonsters`.
+> **Nota de compatibilidade:** As telas `voting`, `discussion`, `workMonsters`, `combat` e `missions` ainda são roteadas para sessões antigas já em andamento, mas o fluxo padrão de novas sessões acontece inteiramente dentro de `monsters`.
 
 ## ✨ Funcionalidades
 
 ### Colaboração em tempo real
 - **Multiplayer** — todos os participantes veem as atualizações instantaneamente via Firestore
 - **Controle de papéis** — apenas o Scrum Master avança as fases; o time participa sem controle sobre o fluxo
-- **Sincronização de foco** — o SM navega entre monstros na Discussão, e todos os membros seguem automaticamente com indicador "📡 foco do SM"
+- **Sincronização de foco** — o SM navega entre monstros na Discussão e todos os membros seguem automaticamente com indicador "📡 foco do SM"
 - **Indicador de conectividade** — badge 🟢/🔴 na navbar mostra o estado da conexão com o Firestore em tempo real
 
 ### Participação
@@ -49,13 +46,20 @@ A aplicação é **multiplayer em tempo real**: o Scrum Master controla o fluxo 
 - **Resultado de discussão** — ao final de cada monstro, o SM registra o desfecho; resultado sincronizado em tempo real para todos
 - **📊 Tendências** — painel no dashboard com gráfico SVG de humor médio por sprint e taxa de conclusão de missões, além de lista de monstros recorrentes (2+ retros)
 - **Timer de fase** — cronômetro controlável por fase, visível para todos os participantes
+- **Limite de votos configurável** — ao iniciar a votação, o SM escolhe quantos votos cada participante terá (1 até o nº de monstros; padrão 3); o limite fica persistido no Firestore e validado pelas Security Rules
+- **Votação inline nos Monstros** — o SM inicia, encerra e reabre a votação diretamente nos cards; `votingClosed` é persistido no Firestore e sincronizado em tempo real para todos
 
-### Trabalho nos Monstros (`workMonsters`)
-- **Cards expansíveis** — cada monstro é um card clicável; ao expandir, exibe seção de soluções e seção de ações
-- **Estratégias de solução** — tabs por estratégia: 🛡️ Prevenir, 🧪 Reduzir impacto, 🤝 Lidar melhor
-- **Soluções vinculadas ao monstro** — cada solução fica associada a um `monsterId` e a uma estratégia; votação por 👍
-- **Ações/missões vinculadas ao monstro** — missões criadas dentro de um card ficam associadas ao monstro via `monsterId`; SM pode definir prioridade (Alta / Média / Baixa) e responsável
-- **Revisão de missões anteriores** — ao abrir WorkMonsters, o SM vê as missões da última retro concluída do mesmo time (com dropdown de status ✅ / 🔄 / ⏳ persistido no Firestore)
+### Painel de Monstros — fluxo unificado (`monsters`)
+
+A tela `monsters` concentra todo o ciclo de vida de um monstro em cards expansíveis. Cada card expõe cinco seções:
+
+1. **Cadastro e reações** — texto, reações 🔥👀💡, merge/rename/delete (SM), drag-and-drop com fallback mobile
+2. **🗳️ Votação** — participantes votam diretamente no card com o limite configurado pelo SM; SM pode ordenar por votos
+3. **💬 Notas de discussão** — SM registra notas por tipo (💡 insight, 🛡️ mitigação, 🤝 acordo, 🚀 ação, 📌 observação); participantes veem em modo somente-leitura
+4. **💡 Soluções por estratégia** — tabs 🛡️ Prevenir / 🧪 Reduzir impacto / 🤝 Lidar melhor; cada solução é votável por 👍
+5. **🎯 Ações** — missões com prioridade (Alta / Média / Baixa) e responsável, vinculadas ao monstro via `monsterId`
+
+Ao abrir a tela, o SM também vê as **missões da retro anterior** do mesmo time com dropdown de status (✅ / 🔄 / ⏳) persistido no Firestore.
 
 ### Qualidade dos dados
 - **`participantCount` dinâmico** — quando a retro já está em andamento, a navbar do SM detecta entradas tardias via `subscribeParticipants` e sincroniza `team.participantCount` para todos via Firestore sempre que a contagem sobe. Todas as telas de retro re-renderizam ao receber o valor atualizado, garantindo que o denominador dos contadores (check-in, "Terminei") reflita o número real de participantes. O valor nunca diminui — evita que quedas momentâneas de rede (celular bloqueado, Wi-Fi instável) revelem prematuramente o resultado do check-in
@@ -165,6 +169,7 @@ cp .env.example .env
 | `VITE_FIREBASE_STORAGE_BUCKET` | Bucket do Storage |
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | ID do sender de mensagens |
 | `VITE_FIREBASE_APP_ID` | ID do app Web |
+| `VITE_FIREBASE_USE_EMULATOR` | `true` para usar o emulador local (Firestore + Auth); `false` em produção |
 
 > **Como obter esses valores:** acesse o [Firebase Console](https://console.firebase.google.com) → Configurações do projeto → Seus apps → App Web → `firebaseConfig`.
 
@@ -230,11 +235,11 @@ O mecanismo de identidade do SM é o seguinte: o Scrum Master faz `signInAnonymo
 
 | Coleção | Participante anônimo | SM autenticado |
 |---|---|---|
-| **Doc raiz** | `readySignals` e `parkingLot` (própria chave) | Todos os campos + `smDeviceId`/`smUid` imutáveis |
+| **Doc raiz** | `readySignals` e `parkingLot` (própria chave) | Todos os campos + `smDeviceId`/`smUid` imutáveis; `votesPerParticipant` e `votingClosed` via `setVotingConfig` |
 | **checkins** | create (1 por dispositivo, imutável) | — |
 | **treasures** | create; reactions (+1, nunca decrementar) | — |
 | **monsters** | create; reactions (+1) e voteCount (+1) | rename, select, merge, unmerge, delete lógico, priorityRank |
-| **monsterVotes** | create (1 token por dispositivo por monstro) | — |
+| **monsterVotes** | create (1 token por dispositivo por monstro, validado contra `votesPerParticipant` do doc raiz) | — |
 | **discussions** | read | create, update, delete |
 | **solutions** | create; votes (+1, nunca decrementar) | — |
 | **missions** | update (somente campo `status`) | create, delete |
@@ -247,6 +252,7 @@ Proteções adicionais aplicadas pelo Firestore:
 - **`readySignals`** — cada dispositivo só pode escrever na chave igual ao seu próprio `deviceId`; remoções bloqueadas
 - **Reações de monstro** — participante: cada contador sobe no máximo +1 e nunca cai; SM no merge: pode somar as reações dos dois monstros (sem limite de +1), mas nunca pode cair
 - **Votos de solução** — `isVoteUpdate` exige `votes == oldVotes + 1`; votos nunca diminuem
+- **Votos de monstro** — o Firestore valida server-side que o total de tokens do dispositivo não excede `votesPerParticipant` salvo no doc raiz (via `get()`); o limite mínimo é 1 e máximo é o número de monstros ativos
 - **Check-ins** — imutáveis após criação; ID do documento é o `deviceId` (impede múltiplos check-ins por dispositivo)
 
 ### Estrutura do Store (`src/state/store/`)
@@ -317,10 +323,10 @@ src/
 │   ├── lobby.js          # Sala de espera com presença em tempo real
 │   ├── checkin.js        # Check-in emocional (com trava de reenvio e proteção de resultado)
 │   ├── treasures.js      # Tesouros da sprint
-│   ├── monsters.js       # Monstros da sprint (drag-and-drop + fallback mobile)
-│   ├── voting.js         # Priorização de monstros por votação
-│   ├── discussion.js     # Discussão conduzida pelo SM com notas e resultado
-│   ├── workMonsters.js   # Trabalho nos monstros — soluções e ações em cards expansíveis
+│   ├── monsters.js       # Painel central unificado: votação, discussão, soluções e ações
+│   ├── voting.js         # (Legado) Priorização separada — mantida para sessões antigas
+│   ├── discussion.js     # (Legado) Discussão separada — mantida para sessões antigas
+│   ├── workMonsters.js   # (Legado) Trabalho nos monstros separado — mantido para sessões antigas
 │   ├── combat.js         # (Legado) Combate — mantido para sessões antigas
 │   ├── missions.js       # (Legado) Missões — mantido para sessões antigas
 │   ├── complete.js       # Conclusão e celebração
@@ -361,8 +367,8 @@ src/
 
 e2e/                      # Testes E2E (Playwright)
 ├── fixtures.js           # Fixture twoParticipants (SM + membro)
-└── session.spec.js       # Cenários: lobby, check-in, avanço de fase, discussão,
-                          #           WorkMonsters (soluções e ações por monstro)
+└── session.spec.js       # Cenários: lobby, check-in, avanço de fase, votação,
+                          #           notas de discussão, soluções e ações por monstro
 
 rules/                    # Testes das Firestore Rules
 └── rules.test.js         # Cenários adversariais contra o emulador Firestore
