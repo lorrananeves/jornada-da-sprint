@@ -345,8 +345,9 @@ test('SM configura 1 voto; participante vota em 1 monstro e é bloqueado no 2º'
   const monsterCards = memberPage.locator('[data-monster-id]');
   const secondId = await monsterCards.nth(1).getAttribute('data-monster-id').catch(() => null);
   if (secondId) {
-    await memberPage.locator('[data-toggle-id]').nth(1).click();
-    await expect(memberPage.locator('.work-monster-body').nth(1)).toBeVisible({ timeout: 10_000 });
+    const secondCard = memberPage.locator(`[data-monster-id="${secondId}"]`);
+    await secondCard.locator('.work-monster-header').click();
+    await expect(secondCard.locator('.work-monster-body')).toBeVisible({ timeout: 10_000 });
     const voteBtn2 = memberPage.locator(`[data-vote-monster="${secondId}"]`);
     const visible = await voteBtn2.isVisible({ timeout: 3_000 }).catch(() => false);
     if (visible) {
@@ -433,14 +434,14 @@ test('SM configura 2 votos; participante vota em 2 monstros e é bloqueado no 3�
 
   // Vota no 1º
   if (monsterIds[0]) {
-    await memberPage.locator('[data-toggle-id]').first().click();
+    await memberPage.locator(`[data-monster-id="${monsterIds[0]}"] .work-monster-header`).click();
     await memberPage.locator(`[data-vote-monster="${monsterIds[0]}"]`).click();
     await expect(memberPage.locator(`[data-vote-monster="${monsterIds[0]}"]`)).toBeDisabled({ timeout: 10_000 });
   }
 
   // Vota no 2º (deve ser permitido com limite 2)
   if (monsterIds[1]) {
-    await memberPage.locator('[data-toggle-id]').nth(1).click();
+    await memberPage.locator(`[data-monster-id="${monsterIds[1]}"] .work-monster-header`).click();
     const btn2 = memberPage.locator(`[data-vote-monster="${monsterIds[1]}"]`);
     const btn2Visible = await btn2.isVisible({ timeout: 5_000 }).catch(() => false);
     if (btn2Visible && !(await btn2.isDisabled())) {
@@ -451,7 +452,7 @@ test('SM configura 2 votos; participante vota em 2 monstros e é bloqueado no 3�
 
   // 3º voto deve ser bloqueado (todos os votos esgotados)
   if (monsterIds[2]) {
-    await memberPage.locator('[data-toggle-id]').nth(2).click();
+    await memberPage.locator(`[data-monster-id="${monsterIds[2]}"] .work-monster-header`).click();
     const btn3 = memberPage.locator(`[data-vote-monster="${monsterIds[2]}"]`);
     const btn3Visible = await btn3.isVisible({ timeout: 3_000 }).catch(() => false);
     if (btn3Visible) {
