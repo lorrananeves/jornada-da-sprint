@@ -596,8 +596,14 @@ function isMissionStatusUpdate(newData, oldData) {
 // Verifica se a votação está encerrada lendo votingClosed do doc raiz.
 // Retorna true se votingClosed == true, false caso contrário (incluindo ausência do campo).
 // Usado para bloquear criação de monsterVotes quando o SM encerrou a votação.
+//
+// Nota: usa rootDoc.exists() em vez de rootDoc != null, pois get() sempre
+// retorna um DocumentSnapshot — nunca null. Sem exists(), rootDoc.data é null
+// quando o documento não existe, causando "Null value error" no emulador
+// standard edition em contexto de subcoleção. O caminho relativo /sessions/$(sessionId)
+// evita depender de $(database), que não está em escopo em funções de nível superior.
 function isVotingClosed(sessionId) {
-  let rootDoc = get(/databases/$(database)/documents/sessions/$(sessionId));
-  return rootDoc != null && rootDoc.data.get('votingClosed', false) == true;
+  let rootDoc = get(/sessions/$(sessionId));
+  return rootDoc.exists() && rootDoc.data.get('votingClosed', false) == true;
 }
 
