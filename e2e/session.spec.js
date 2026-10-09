@@ -330,9 +330,10 @@ test('SM configura 1 voto; participante vota em 1 monstro e é bloqueado no 2º'
   await expect(memberPage.locator(`[data-vote-monster="${monsterId}"]`)).toBeVisible({ timeout: 5_000 });
 
   // SM abre modal, escolhe 1 voto e confirma
+  // O <input type="radio"> é ocultado por CSS (opacity:0/size:0) — interage via label
   await smPage.locator('#btn-start-voting').click();
   await expect(smPage.locator('#vote-cfg-title')).toBeVisible({ timeout: 5_000 });
-  await smPage.locator('input[name="vote-cfg-votes"][value="1"]').check();
+  await smPage.locator('label[for="vote-cfg-1"]').click();
   await smPage.locator('#vote-cfg-confirm').click();
   await expect(smPage.locator('#vote-cfg-title')).not.toBeVisible({ timeout: 3_000 });
 
@@ -412,9 +413,10 @@ test('SM configura 2 votos; participante vota em 2 monstros e é bloqueado no 3�
   }
 
   // SM inicia votação com 2 votos
+  // O <input type="radio"> é ocultado por CSS (opacity:0/size:0) — interage via label
   await smPage.locator('#btn-start-voting').click();
   await expect(smPage.locator('#vote-cfg-title')).toBeVisible({ timeout: 5_000 });
-  await smPage.locator('input[name="vote-cfg-votes"][value="2"]').check();
+  await smPage.locator('label[for="vote-cfg-2"]').click();
   await smPage.locator('#vote-cfg-confirm').click();
   await expect(smPage.locator('#vote-cfg-title')).not.toBeVisible({ timeout: 3_000 });
 
